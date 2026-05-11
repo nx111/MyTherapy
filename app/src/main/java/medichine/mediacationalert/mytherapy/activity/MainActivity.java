@@ -1072,6 +1072,9 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
 
         LinkedHashMap<String, Double> stocks = new LinkedHashMap<>();
         for (Reminder reminder : rb.getAllReminders()) {
+            if (!"true".equals(reminder.getActive())) {
+                continue;
+            }
             String title = normalizeTitle(reminder.getTitle());
             if (!stocks.containsKey(title)) {
                 stocks.put(title, rb.getTotalStock(title));
