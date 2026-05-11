@@ -29,6 +29,7 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 
+import medichine.mediacationalert.mytherapy.BuildConfig;
 import medichine.mediacationalert.mytherapy.utils.DateTimeComparator;
 import medichine.mediacationalert.mytherapy.utils.ItemClickListener;
 import medichine.mediacationalert.mytherapy.R;
@@ -72,10 +73,10 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         rb = new ReminderDatabase(getApplicationContext());
         new Fun(this);
 
-        if (Fun.checkInternet()) {
+        if (BuildConfig.ADS_ENABLED && Fun.checkInternet()) {
             checkSubscription();
 
-        } else {
+        } else if (BuildConfig.ADS_ENABLED) {
             Toast.makeText(this, "Please Check Your Internet Connection", Toast.LENGTH_SHORT).show();
         }
         FrameLayout adContainerView = findViewById(R.id.ad_view_container);

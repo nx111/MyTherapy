@@ -38,6 +38,7 @@ import com.google.common.collect.ImmutableList;
 import java.util.ArrayList;
 import java.util.List;
 
+import medichine.mediacationalert.mytherapy.BuildConfig;
 import medichine.mediacationalert.mytherapy.utils.ItemClickListener;
 import medichine.mediacationalert.mytherapy.activity.MainActivity;
 import medichine.mediacationalert.mytherapy.R;
@@ -71,6 +72,11 @@ public class RemoveAdsActivity extends AppCompatActivity implements ItemClickLis
         ActionBar actionBar = getSupportActionBar();
         if (actionBar != null) {
             actionBar.hide();
+        }
+        if (!BuildConfig.ADS_ENABLED) {
+            startActivity(new Intent(this, MainActivity.class));
+            finish();
+            return;
         }
         initViews();
         setTitle("Remove Ads");

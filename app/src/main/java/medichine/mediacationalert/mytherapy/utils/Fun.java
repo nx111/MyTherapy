@@ -40,6 +40,7 @@ import com.google.android.gms.ads.interstitial.InterstitialAdLoadCallback;
 
 import java.io.File;
 
+import medichine.mediacationalert.mytherapy.BuildConfig;
 import medichine.mediacationalert.mytherapy.R;
 
 
@@ -69,20 +70,24 @@ public class Fun {
     }
 
     private static void checkAds() {
+        if (!BuildConfig.ADS_ENABLED) {
+            removeAds = true;
+            return;
+        }
         Prefs prefs = new Prefs(context);
         removeAds = prefs.isRemoveAd();
     }
 
     public static void showBanner(Activity activity, FrameLayout adContainerView) {
+        if (!BuildConfig.ADS_ENABLED || removeAds || adContainerView == null) {
+            return;
+        }
 
         // Step 1 - Create an AdView and set the ad unit ID on it.
         adView = new AdView(activity);
         adView.setAdUnitId(activity.getString(R.string.banner_ad));
         adContainerView.addView(adView);
-        if (removeAds) {
-        } else {
-            loadBanner(activity);
-        }
+        loadBanner(activity);
 
     }
 
@@ -140,46 +145,41 @@ public class Fun {
 
     public static void addShowAdmob() {
 
-        if (removeAds) {
-
-        } else {
-            AdRequest adRequest = new AdRequest.Builder().build();
-            InterstitialAd.load(activity, context.getString(R.string.interstitial_key), adRequest,
-                    new InterstitialAdLoadCallback() {
-                        @Override
-                        public void onAdLoaded(@NonNull InterstitialAd interstitialAd) {
-
-                            // an ad is loaded.
-                            mInterstitialAd = interstitialAd;
-                            if (mInterstitialAd != null) {
-                                mInterstitialAd.show(activity);
-                            }
-                        }
-
-                        @Override
-                        public void onAdFailedToLoad(@NonNull LoadAdError loadAdError) {
-
-                            Log.i("MainActivity", loadAdError.getMessage());
-                            mInterstitialAd = null;
-                        }
-
-                    });
+        if (!BuildConfig.ADS_ENABLED || removeAds) {
+            return;
         }
 
+        AdRequest adRequest = new AdRequest.Builder().build();
+        InterstitialAd.load(activity, context.getString(R.string.interstitial_key), adRequest,
+                new InterstitialAdLoadCallback() {
+                    @Override
+                    public void onAdLoaded(@NonNull InterstitialAd interstitialAd) {
+
+                        // an ad is loaded.
+                        mInterstitialAd = interstitialAd;
+                        if (mInterstitialAd != null) {
+                            mInterstitialAd.show(activity);
+                        }
+                    }
+
+                    @Override
+                    public void onAdFailedToLoad(@NonNull LoadAdError loadAdError) {
+
+                        Log.i("MainActivity", loadAdError.getMessage());
+                        mInterstitialAd = null;
+                    }
+
+                });
 
     }
 
     public static void addShow() {
 
-        count++;
-        if (removeAds) {
-
-        } else {
-
-            addShowAdmob();
-
-
+        if (!BuildConfig.ADS_ENABLED || removeAds) {
+            return;
         }
+        count++;
+        addShowAdmob();
 
     }
 

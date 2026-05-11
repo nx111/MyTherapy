@@ -3,6 +3,8 @@ plugins {
     id 'org.jetbrains.kotlin.android'
 }
 
+def adsEnabled = (project.findProperty("adsEnabled") ?: "false").toString().toBoolean()
+
 android {
     namespace 'medichine.mediacationalert.mytherapy'
     compileSdk 33
@@ -13,6 +15,7 @@ android {
         targetSdk 33
         versionCode 1
         versionName "1.0"
+        buildConfigField "boolean", "ADS_ENABLED", adsEnabled.toString()
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
