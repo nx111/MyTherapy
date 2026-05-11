@@ -41,7 +41,7 @@
     <string name="no_reminders">दवा रिमाइंडर बनाने के लिए नीचे प्लस बटन पर टैप करें।</string>
     <string name="select_type">प्रकार चुनें</string>
     <string name="enter_number">संख्या दर्ज करें</string>
-    <string name="add_stock_batch">स्टॉक बैच जोड़ें</string>
+    <string name="add_stock_batch">स्टॉक जोड़ें</string>
     <string name="select_icon">आइकन चुनें</string>
     <string name="medicine_photo">दवा की फोटो</string>
     <string name="gallery">गैलरी</string>

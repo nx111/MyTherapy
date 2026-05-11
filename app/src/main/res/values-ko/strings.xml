@@ -41,7 +41,7 @@
     <string name="no_reminders">아래 더하기 버튼을 눌러 복약 알림을 만드세요.</string>
     <string name="select_type">유형 선택</string>
     <string name="enter_number">숫자 입력</string>
-    <string name="add_stock_batch">재고 묶음 추가</string>
+    <string name="add_stock_batch">재고 추가</string>
     <string name="select_icon">아이콘 선택</string>
     <string name="medicine_photo">약 사진</string>
     <string name="gallery">갤러리</string>

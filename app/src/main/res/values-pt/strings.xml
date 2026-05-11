@@ -41,7 +41,7 @@
     <string name="no_reminders">Toque no botão de mais abaixo para criar seus lembretes de medicamentos.</string>
     <string name="select_type">Selecionar tipo</string>
     <string name="enter_number">Inserir número</string>
-    <string name="add_stock_batch">Adicionar lote de estoque</string>
+    <string name="add_stock_batch">Adicionar estoque</string>
     <string name="select_icon">Selecionar ícone</string>
     <string name="medicine_photo">Foto do medicamento</string>
     <string name="gallery">Galeria</string>

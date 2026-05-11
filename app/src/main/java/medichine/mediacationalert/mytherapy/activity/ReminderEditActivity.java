@@ -437,7 +437,13 @@ public class ReminderEditActivity extends AppCompatActivity implements
         alert.setTitle(R.string.add_stock_batch);
         final EditText input = new EditText(this);
         input.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
-        alert.setView(input);
+        FrameLayout inputFrame = new FrameLayout(this);
+        int horizontalPadding = (int) (20 * getResources().getDisplayMetrics().density + 0.5f);
+        int topPadding = (int) (4 * getResources().getDisplayMetrics().density + 0.5f);
+        inputFrame.setPadding(horizontalPadding, topPadding, horizontalPadding, 0);
+        inputFrame.addView(input, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT));
+        alert.setView(inputFrame);
         alert.setPositiveButton(R.string.ok, new DialogInterface.OnClickListener() {
             public void onClick(DialogInterface dialog, int whichButton) {
                 try {

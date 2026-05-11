@@ -41,7 +41,7 @@
     <string name="no_reminders">Toca el botón más para crear tus recordatorios de medicamentos.</string>
     <string name="select_type">Seleccionar tipo</string>
     <string name="enter_number">Ingresar número</string>
-    <string name="add_stock_batch">Agregar lote de stock</string>
+    <string name="add_stock_batch">Agregar stock</string>
     <string name="select_icon">Seleccionar icono</string>
     <string name="medicine_photo">Foto del medicamento</string>
     <string name="gallery">Galería</string>

@@ -41,7 +41,7 @@
     <string name="no_reminders">Нажмите кнопку плюс ниже, чтобы создать напоминания о лекарствах.</string>
     <string name="select_type">Выбрать тип</string>
     <string name="enter_number">Введите число</string>
-    <string name="add_stock_batch">Добавить партию запаса</string>
+    <string name="add_stock_batch">Добавить запас</string>
     <string name="select_icon">Выбрать значок</string>
     <string name="medicine_photo">Фото лекарства</string>
     <string name="gallery">Галерея</string>
