@@ -43,6 +43,8 @@
     <string name="icon_shape_semicircle">半圆形</string>
     <string name="icon_shape_capsule_slim">细长型</string>
     <string name="icon_shape_capsule_thick">粗长型</string>
+    <string name="icon_shape_capsule_slim_half">细长半白</string>
+    <string name="icon_shape_capsule_thick_half">粗长半白</string>
     <string name="icon_shape_injection">针剂</string>
     <string name="icon_shape_oral_bottle">口服小瓶</string>
     <string name="icon_shape_measuring_cup">量杯型</string>

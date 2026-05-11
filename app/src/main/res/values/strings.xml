@@ -57,6 +57,8 @@
     <string name="icon_shape_semicircle">Semicircle</string>
     <string name="icon_shape_capsule_slim">Slim</string>
     <string name="icon_shape_capsule_thick">Thick</string>
+    <string name="icon_shape_capsule_slim_half">Slim half white</string>
+    <string name="icon_shape_capsule_thick_half">Thick half white</string>
     <string name="icon_shape_injection">Injection</string>
     <string name="icon_shape_oral_bottle">Oral bottle</string>
     <string name="icon_shape_measuring_cup">Measuring cup</string>

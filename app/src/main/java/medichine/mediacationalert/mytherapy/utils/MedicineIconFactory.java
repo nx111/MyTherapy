@@ -86,7 +86,9 @@ public class MedicineIconFactory {
 
     private static final IconShape[] CAPSULE_SHAPES = new IconShape[]{
             new IconShape("slim", R.string.icon_shape_capsule_slim),
-            new IconShape("thick", R.string.icon_shape_capsule_thick)
+            new IconShape("thick", R.string.icon_shape_capsule_thick),
+            new IconShape("slim_half", R.string.icon_shape_capsule_slim_half),
+            new IconShape("thick_half", R.string.icon_shape_capsule_thick_half)
     };
 
     private static final IconShape[] LIQUID_SHAPES = new IconShape[]{
@@ -547,24 +549,33 @@ public class MedicineIconFactory {
         private void drawCapsule(Canvas canvas) {
             canvas.save();
             canvas.rotate(-18, 125, 125);
-            float capsuleScale = "thick".equals(shape) ? 1.2f : 0.85f;
+            boolean thick = shape.startsWith("thick");
+            boolean halfWhite = shape.endsWith("_half");
+            float capsuleScale = thick ? 1.2f : 0.85f;
             canvas.scale(capsuleScale, capsuleScale, 125, 125);
-            RectF rect = "thick".equals(shape)
+            RectF rect = thick
                     ? new RectF(32, 82.25f, 218, 167.75f)
                     : new RectF(18, 88, 232, 162);
-            float split = rect.centerX();
-            Paint whiteFill = new Paint(fill);
-            whiteFill.setColor(Color.WHITE);
-            canvas.save();
-            canvas.clipRect(rect.left, rect.top, split, rect.bottom);
+            if (halfWhite) {
+                float split = rect.centerX();
+                Paint whiteFill = new Paint(fill);
+                whiteFill.setColor(Color.WHITE);
+                canvas.save();
+                canvas.clipRect(rect.left, rect.top, split, rect.bottom);
+                canvas.drawRoundRect(rect, rect.height() / 2f, rect.height() / 2f, fill);
+                canvas.restore();
+                canvas.save();
+                canvas.clipRect(split, rect.top, rect.right, rect.bottom);
+                canvas.drawRoundRect(rect, rect.height() / 2f, rect.height() / 2f, whiteFill);
+                canvas.restore();
+                canvas.drawRoundRect(rect, rect.height() / 2f, rect.height() / 2f, stroke);
+                canvas.drawLine(split, rect.top + 6, split, rect.bottom - 6, stroke);
+                canvas.restore();
+                return;
+            }
             canvas.drawRoundRect(rect, rect.height() / 2f, rect.height() / 2f, fill);
-            canvas.restore();
-            canvas.save();
-            canvas.clipRect(split, rect.top, rect.right, rect.bottom);
-            canvas.drawRoundRect(rect, rect.height() / 2f, rect.height() / 2f, whiteFill);
-            canvas.restore();
             canvas.drawRoundRect(rect, rect.height() / 2f, rect.height() / 2f, stroke);
-            canvas.drawLine(split, rect.top + 6, split, rect.bottom - 6, stroke);
+            canvas.drawLine(125, rect.top + 12, 125, rect.bottom - 12, line);
             canvas.restore();
         }
 
