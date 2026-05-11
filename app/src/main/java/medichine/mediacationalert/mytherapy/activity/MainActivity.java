@@ -22,6 +22,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.Window;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.ImageButton;
@@ -272,25 +273,55 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     }
 
     private void showAccountInfoDialog() {
-        String[] actions = new String[]{
-                getString(R.string.import_data),
-                getString(R.string.export_data),
-                getString(R.string.rename_account)
-        };
-        new AlertDialog.Builder(this)
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        int padding = dp(20);
+        content.setPadding(padding, dp(8), padding, 0);
+
+        TextView accountName = new TextView(this);
+        accountName.setText(rb.getCurrentAccountName());
+        accountName.setTextColor(getResources().getColor(R.color.text_primary));
+        accountName.setTextSize(18);
+        accountName.setTypeface(Typeface.DEFAULT_BOLD);
+        content.addView(accountName, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        Button importButton = accountActionButton(R.string.import_data);
+        Button exportButton = accountActionButton(R.string.export_data);
+        Button renameButton = accountActionButton(R.string.rename_account);
+        content.addView(importButton);
+        content.addView(exportButton);
+        content.addView(renameButton);
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle(R.string.account_info)
-                .setMessage(rb.getCurrentAccountName())
-                .setItems(actions, (dialog, which) -> {
-                    if (which == 0) {
-                        openArchiveImport();
-                    } else if (which == 1) {
-                        openArchiveExport();
-                    } else {
-                        showRenameAccountDialog();
-                    }
-                })
+                .setView(content)
                 .setNegativeButton(R.string.cancel, null)
-                .show();
+                .create();
+        importButton.setOnClickListener(v -> {
+            dialog.dismiss();
+            openArchiveImport();
+        });
+        exportButton.setOnClickListener(v -> {
+            dialog.dismiss();
+            openArchiveExport();
+        });
+        renameButton.setOnClickListener(v -> {
+            dialog.dismiss();
+            showRenameAccountDialog();
+        });
+        dialog.show();
+    }
+
+    private Button accountActionButton(int textRes) {
+        Button button = new Button(this);
+        button.setText(textRes);
+        button.setAllCaps(false);
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        params.topMargin = dp(10);
+        button.setLayoutParams(params);
+        return button;
     }
 
     private void showAccountDialog() {
