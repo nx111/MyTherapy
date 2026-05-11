@@ -73,6 +73,11 @@
     <string name="medication_not_confirmed">Medicamento não confirmado</string>
     <string name="medication_time_count">Horário do medicamento: %1$d medicamentos</string>
     <string name="time_to_take_medication">Está na hora de tomar seu medicamento</string>
+    <string name="notification_taken">Tomado</string>
+    <string name="notification_skip">Pular</string>
+    <string name="notification_delay">Adiar</string>
+    <string name="notification_delay_options">Adiar</string>
+    <string name="notification_delay_minutes">%1$d min</string>
     <string name="remove_ads">Remover anúncios</string>
     <string name="subscribe_now">Assine agora</string>
     <string name="monthly">Mensal</string>

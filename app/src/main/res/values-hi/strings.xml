@@ -73,6 +73,11 @@
     <string name="medication_not_confirmed">दवा की पुष्टि नहीं हुई</string>
     <string name="medication_time_count">दवा का समय: %1$d दवाएं</string>
     <string name="time_to_take_medication">दवा लेने का समय हो गया है</string>
+    <string name="notification_taken">ले लिया</string>
+    <string name="notification_skip">छोड़ें</string>
+    <string name="notification_delay">विलंब</string>
+    <string name="notification_delay_options">विलंब</string>
+    <string name="notification_delay_minutes">%1$d मिनट</string>
     <string name="remove_ads">विज्ञापन हटाएं</string>
     <string name="subscribe_now">अभी सदस्यता लें</string>
     <string name="monthly">मासिक</string>

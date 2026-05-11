@@ -73,6 +73,11 @@
     <string name="medication_not_confirmed">服用を確認していません</string>
     <string name="medication_time_count">服薬時間: %1$d 件の薬</string>
     <string name="time_to_take_medication">薬を服用する時間です</string>
+    <string name="notification_taken">服用済み</string>
+    <string name="notification_skip">スキップ</string>
+    <string name="notification_delay">延期</string>
+    <string name="notification_delay_options">延期</string>
+    <string name="notification_delay_minutes">%1$d 分</string>
     <string name="remove_ads">広告を削除</string>
     <string name="subscribe_now">今すぐ登録</string>
     <string name="monthly">月額</string>

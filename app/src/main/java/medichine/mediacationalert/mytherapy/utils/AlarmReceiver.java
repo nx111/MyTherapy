@@ -40,14 +40,29 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
     private static final String CHANNEL_ID = "Channel_id";
     private static final String CHANNEL_NAME = "Notification";
     private static final String ACTION_TAKE_GROUP = "medichine.mediacationalert.mytherapy.ACTION_TAKE_GROUP";
-    private static final String EXTRA_GROUP_DATE = "group_date";
-    private static final String EXTRA_GROUP_TIME = "group_time";
+    private static final String ACTION_SKIP_GROUP = "medichine.mediacationalert.mytherapy.ACTION_SKIP_GROUP";
+    private static final String ACTION_DELAY_OPTIONS = "medichine.mediacationalert.mytherapy.ACTION_DELAY_OPTIONS";
+    private static final String ACTION_DELAY_MINUTES = "medichine.mediacationalert.mytherapy.ACTION_DELAY_MINUTES";
     private static final String EXTRA_SCHEDULED_AT = "scheduled_at";
+    private static final String EXTRA_DELAY_MINUTES = "delay_minutes";
+    private static final int[] DELAY_MINUTES = new int[]{10, 20, 30, 60};
 
     @Override
     public void onReceive(Context context, Intent intent) {
         if (ACTION_TAKE_GROUP.equals(intent.getAction())) {
             confirmGroupFromNotification(context, intent);
+            return;
+        }
+        if (ACTION_SKIP_GROUP.equals(intent.getAction())) {
+            skipGroupFromNotification(context, intent);
+            return;
+        }
+        if (ACTION_DELAY_OPTIONS.equals(intent.getAction())) {
+            showDelayOptionsFromNotification(context, intent);
+            return;
+        }
+        if (ACTION_DELAY_MINUTES.equals(intent.getAction())) {
+            delayGroupFromNotification(context, intent);
             return;
         }
 
@@ -80,6 +95,11 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
         List<Reminder> group = rb.getActiveRemindersAt(scheduledAt);
         if (group.isEmpty()) {
             group.add(reminder);
+        }
+        group = pendingReminders(rb, group, scheduledAt);
+        if (group.isEmpty()) {
+            scheduleReminderAfter(context, reminder, System.currentTimeMillis() + 60000L);
+            return;
         }
         showReminderNotification(context, reminder, group, scheduledAt);
         scheduleReminderAfter(context, reminder, System.currentTimeMillis() + 60000L);
@@ -114,19 +134,57 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
         }
     }
 
+    private void skipGroupFromNotification(Context context, Intent intent) {
+        String scheduledAt = intent.getStringExtra(EXTRA_SCHEDULED_AT);
+        if (scheduledAt == null) {
+            return;
+        }
+
+        ReminderDatabase rb = new ReminderDatabase(context);
+        List<Reminder> group = rb.getActiveRemindersAt(scheduledAt);
+        cancelNotification(context, scheduledAt);
+        scheduleGroupNextAfter(context, group, System.currentTimeMillis() + 60000L);
+    }
+
+    private void showDelayOptionsFromNotification(Context context, Intent intent) {
+        String scheduledAt = intent.getStringExtra(EXTRA_SCHEDULED_AT);
+        if (scheduledAt == null) {
+            return;
+        }
+
+        ReminderDatabase rb = new ReminderDatabase(context);
+        List<Reminder> group = pendingReminders(rb, rb.getActiveRemindersAt(scheduledAt), scheduledAt);
+        if (group.isEmpty()) {
+            cancelNotification(context, scheduledAt);
+            return;
+        }
+        showDelayOptionsNotification(context, group, scheduledAt);
+    }
+
+    private void delayGroupFromNotification(Context context, Intent intent) {
+        String scheduledAt = intent.getStringExtra(EXTRA_SCHEDULED_AT);
+        int minutes = intent.getIntExtra(EXTRA_DELAY_MINUTES, 0);
+        if (scheduledAt == null || minutes <= 0) {
+            return;
+        }
+
+        ReminderDatabase rb = new ReminderDatabase(context);
+        List<Reminder> group = pendingReminders(rb, rb.getActiveRemindersAt(scheduledAt), scheduledAt);
+        cancelNotification(context, scheduledAt);
+        for (Reminder reminder : group) {
+            cancelAlarm(context, reminder.getID());
+            setSnoozeAlarm(context, reminder, scheduledAt, minutes);
+        }
+    }
+
     private void showReminderNotification(Context context, Reminder reminder, List<Reminder> group, String scheduledAt) {
         // Create intent to open ReminderEditActivity on notification click
         Intent mainIntent = new Intent(context, MainActivity.class);
         PendingIntent mClick = PendingIntent.getActivity(context, notificationIdFor(scheduledAt), mainIntent, AppUtils.Companion.getFlag());
 
-        Intent takenIntent = new Intent(context, AlarmReceiver.class);
-        takenIntent.setAction(ACTION_TAKE_GROUP);
-        takenIntent.putExtra(EXTRA_SCHEDULED_AT, scheduledAt);
-        PendingIntent takenClick = PendingIntent.getBroadcast(
-                context,
-                notificationIdFor(scheduledAt) + 1,
-                takenIntent,
-                AppUtils.Companion.getFlag());
+        PendingIntent takenClick = groupAction(context, scheduledAt, ACTION_TAKE_GROUP, 1);
+        PendingIntent skipClick = groupAction(context, scheduledAt, ACTION_SKIP_GROUP, 2);
+        PendingIntent delayClick = groupAction(context, scheduledAt, ACTION_DELAY_OPTIONS, 3);
 
         String contentText = buildGroupText(context, group);
         String title = group.size() > 1
@@ -144,15 +202,52 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
                 .setStyle(new NotificationCompat.BigTextStyle().bigText(contentText))
                 .setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION))
                 .setContentIntent(mClick)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setCategory(NotificationCompat.CATEGORY_ALARM)
                 .setAutoCancel(true)
                 .setOnlyAlertOnce(true)
-                .addAction(R.drawable.baseline_check_24, context.getString(R.string.taken), takenClick);
+                .addAction(R.drawable.baseline_check_24, context.getString(R.string.notification_taken), takenClick)
+                .addAction(R.drawable.baseline_notifications_off_24, context.getString(R.string.notification_skip), skipClick)
+                .addAction(R.drawable.baseline_replay_circle_filled_24, context.getString(R.string.notification_delay), delayClick);
 
         this.manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
         createNotificationChannel(this.manager);
         myNotication2 = mBuilder.build();
 
         this.manager.notify(CHANNEL_ID, notificationIdFor(scheduledAt), mBuilder.build());
+    }
+
+    private void showDelayOptionsNotification(Context context, List<Reminder> group, String scheduledAt) {
+        String contentText = buildGroupText(context, group);
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
+                .setLargeIcon(BitmapFactory.decodeResource(context.getResources(), R.drawable.pill_reminder_icon))
+                .setSmallIcon(R.drawable.baseline_access_alarm_24)
+                .setContentTitle(context.getString(R.string.notification_delay_options))
+                .setContentText(contentText)
+                .setStyle(new NotificationCompat.BigTextStyle().bigText(contentText))
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setCategory(NotificationCompat.CATEGORY_ALARM)
+                .setAutoCancel(true)
+                .setOnlyAlertOnce(true);
+
+        for (int minutes : DELAY_MINUTES) {
+            Intent delayIntent = new Intent(context, AlarmReceiver.class);
+            delayIntent.setAction(ACTION_DELAY_MINUTES);
+            delayIntent.putExtra(EXTRA_SCHEDULED_AT, scheduledAt);
+            delayIntent.putExtra(EXTRA_DELAY_MINUTES, minutes);
+            PendingIntent delayClick = PendingIntent.getBroadcast(
+                    context,
+                    requestCodeFor(scheduledAt, 100 + minutes),
+                    delayIntent,
+                    AppUtils.Companion.getFlag());
+            builder.addAction(R.drawable.baseline_replay_circle_filled_24,
+                    context.getString(R.string.notification_delay_minutes, minutes),
+                    delayClick);
+        }
+
+        NotificationManager notificationManager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+        createNotificationChannel(notificationManager);
+        notificationManager.notify(CHANNEL_ID, notificationIdFor(scheduledAt), builder.build());
     }
 
     private String buildGroupText(Context context, List<Reminder> group) {
@@ -179,6 +274,61 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
 
     private int notificationIdFor(String scheduledAt) {
         return Math.abs(scheduledAt.hashCode());
+    }
+
+    private int requestCodeFor(String scheduledAt, int salt) {
+        return Math.abs((scheduledAt + "|" + salt).hashCode());
+    }
+
+    private PendingIntent groupAction(Context context, String scheduledAt, String action, int salt) {
+        Intent intent = new Intent(context, AlarmReceiver.class);
+        intent.setAction(action);
+        intent.putExtra(EXTRA_SCHEDULED_AT, scheduledAt);
+        return PendingIntent.getBroadcast(
+                context,
+                requestCodeFor(scheduledAt, salt),
+                intent,
+                AppUtils.Companion.getFlag());
+    }
+
+    private List<Reminder> pendingReminders(ReminderDatabase rb, List<Reminder> group, String scheduledAt) {
+        ArrayList<Reminder> pending = new ArrayList<>();
+        for (Reminder reminder : group) {
+            if (!rb.isReminderTaken(reminder.getID(), scheduledAt)) {
+                pending.add(reminder);
+            }
+        }
+        return pending;
+    }
+
+    private void cancelNotification(Context context, String scheduledAt) {
+        NotificationManager notificationManager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+        notificationManager.cancel(CHANNEL_ID, notificationIdFor(scheduledAt));
+    }
+
+    private void scheduleGroupNextAfter(Context context, List<Reminder> group, long afterMillis) {
+        for (Reminder reminder : group) {
+            cancelAlarm(context, reminder.getID());
+            scheduleReminderAfter(context, reminder, afterMillis);
+        }
+    }
+
+    private void setSnoozeAlarm(Context context, Reminder reminder, String scheduledAt, int minutes) {
+        mAlarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
+
+        Intent intent = new Intent(context, AlarmReceiver.class);
+        intent.putExtra(ReminderEditActivity.EXTRA_REMINDER_ID, Integer.toString(reminder.getID()));
+        intent.putExtra(EXTRA_SCHEDULED_AT, scheduledAt);
+        PendingIntent pendingIntent = PendingIntent.getBroadcast(
+                context,
+                requestCodeFor(scheduledAt + "|" + reminder.getID(), 200 + minutes),
+                intent,
+                AppUtils.Companion.getFlag());
+
+        mAlarmManager.set(AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                SystemClock.elapsedRealtime() + minutes * 60000L,
+                pendingIntent);
+        setBootReceiverEnabled(context, true);
     }
 
     private String formatQuantity(double value) {

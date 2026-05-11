@@ -73,6 +73,11 @@
     <string name="medication_not_confirmed">복용이 확인되지 않았습니다</string>
     <string name="medication_time_count">복약 시간: 약 %1$d개</string>
     <string name="time_to_take_medication">약을 복용할 시간입니다</string>
+    <string name="notification_taken">복용함</string>
+    <string name="notification_skip">건너뛰기</string>
+    <string name="notification_delay">연기</string>
+    <string name="notification_delay_options">연기</string>
+    <string name="notification_delay_minutes">%1$d분</string>
     <string name="remove_ads">광고 제거</string>
     <string name="subscribe_now">지금 구독</string>
     <string name="monthly">월간</string>

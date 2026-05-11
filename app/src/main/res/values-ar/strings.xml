@@ -73,6 +73,11 @@
     <string name="medication_not_confirmed">لم يتم تأكيد الدواء</string>
     <string name="medication_time_count">وقت الدواء: %1$d أدوية</string>
     <string name="time_to_take_medication">حان وقت تناول الدواء</string>
+    <string name="notification_taken">تم التناول</string>
+    <string name="notification_skip">تخطي</string>
+    <string name="notification_delay">تأجيل</string>
+    <string name="notification_delay_options">تأجيل</string>
+    <string name="notification_delay_minutes">%1$d دقيقة</string>
     <string name="remove_ads">إزالة الإعلانات</string>
     <string name="subscribe_now">اشترك الآن</string>
     <string name="monthly">شهري</string>

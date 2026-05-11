@@ -96,6 +96,11 @@
     <string name="medication_not_confirmed">未确认服药</string>
     <string name="medication_time_count">用药时间：%1$d 种药品</string>
     <string name="time_to_take_medication">该服药了</string>
+    <string name="notification_taken">已服用</string>
+    <string name="notification_skip">跳过</string>
+    <string name="notification_delay">延迟</string>
+    <string name="notification_delay_options">延迟</string>
+    <string name="notification_delay_minutes">%1$d 分钟</string>
     <string name="remove_ads">移除广告</string>
     <string name="subscribe_now">立即订阅</string>
     <string name="monthly">每月</string>

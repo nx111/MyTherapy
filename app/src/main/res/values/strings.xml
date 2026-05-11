@@ -112,6 +112,11 @@
     <string name="medication_not_confirmed">Medication not confirmed</string>
     <string name="medication_time_count">Medication time: %1$d medicines</string>
     <string name="time_to_take_medication">It\'s time to take your Medication</string>
+    <string name="notification_taken">Taken</string>
+    <string name="notification_skip">Skip</string>
+    <string name="notification_delay">Delay</string>
+    <string name="notification_delay_options">Delay</string>
+    <string name="notification_delay_minutes">%1$d min</string>
     <string name="remove_ads">Remove Ads</string>
     <string name="subscribe_now">Subscribe Right Now</string>
     <string name="monthly">Monthly</string>

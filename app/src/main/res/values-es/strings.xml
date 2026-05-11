@@ -73,6 +73,11 @@
     <string name="medication_not_confirmed">Medicamento no confirmado</string>
     <string name="medication_time_count">Hora de medicación: %1$d medicamentos</string>
     <string name="time_to_take_medication">Es hora de tomar tu medicamento</string>
+    <string name="notification_taken">Tomado</string>
+    <string name="notification_skip">Omitir</string>
+    <string name="notification_delay">Posponer</string>
+    <string name="notification_delay_options">Posponer</string>
+    <string name="notification_delay_minutes">%1$d min</string>
     <string name="remove_ads">Quitar anuncios</string>
     <string name="subscribe_now">Suscríbete ahora</string>
     <string name="monthly">Mensual</string>

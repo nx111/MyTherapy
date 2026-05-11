@@ -73,6 +73,11 @@
     <string name="medication_not_confirmed">Лекарство не подтверждено</string>
     <string name="medication_time_count">Время приема: %1$d лекарств</string>
     <string name="time_to_take_medication">Пора принять лекарство</string>
+    <string name="notification_taken">Принято</string>
+    <string name="notification_skip">Пропустить</string>
+    <string name="notification_delay">Отложить</string>
+    <string name="notification_delay_options">Отложить</string>
+    <string name="notification_delay_minutes">%1$d мин</string>
     <string name="remove_ads">Удалить рекламу</string>
     <string name="subscribe_now">Оформить подписку</string>
     <string name="monthly">Ежемесячно</string>
