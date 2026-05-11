@@ -25,7 +25,6 @@ import com.wdullaer.materialdatetimepicker.date.DatePickerDialog;
 import com.wdullaer.materialdatetimepicker.time.TimePickerDialog;
 
 import java.util.Calendar;
-import java.util.Objects;
 
 import medichine.mediacationalert.mytherapy.R;
 import medichine.mediacationalert.mytherapy.utils.AlarmReceiver;
@@ -86,7 +85,8 @@ public class ReminderAddActivity extends AppCompatActivity implements
         mFAB2 = (FloatingActionButton) findViewById(R.id.starred2);
 
         // Setup Toolbar
-        Objects.requireNonNull(getSupportActionBar()).setTitle(R.string.title_activity_add_reminder);
+        setSupportActionBar(mToolbar);
+        getSupportActionBar().setTitle(R.string.title_activity_add_reminder);
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         getSupportActionBar().setHomeButtonEnabled(true);
 

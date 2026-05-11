@@ -97,7 +97,7 @@ public class ReminderEditActivity extends AppCompatActivity implements
         mRepeatSwitch = (Switch) findViewById(R.id.repeat_switch);
 
         // Setup Toolbar
-
+        setSupportActionBar(mToolbar);
         getSupportActionBar().setTitle(R.string.title_activity_edit_reminder);
         getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         getSupportActionBar().setHomeButtonEnabled(true);
