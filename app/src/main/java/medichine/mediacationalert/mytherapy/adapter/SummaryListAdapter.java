@@ -17,7 +17,11 @@ import medichine.mediacationalert.mytherapy.R;
 import medichine.mediacationalert.mytherapy.model.SummaryItem;
 import medichine.mediacationalert.mytherapy.utils.ItemClickListener;
 
-public class SummaryListAdapter extends RecyclerView.Adapter<SummaryListAdapter.SummaryHolder> {
+public class SummaryListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
+    private static final int TYPE_HEADER = 0;
+    private static final int TYPE_SUMMARY = 1;
+    private static final int TYPE_HISTORY = 2;
+
     private final List<SummaryItem> mItems;
     private final Activity mActivity;
     private final ItemClickListener mListener;
@@ -33,14 +37,28 @@ public class SummaryListAdapter extends RecyclerView.Adapter<SummaryListAdapter.
 
     @NonNull
     @Override
-    public SummaryHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-        View root = LayoutInflater.from(mActivity).inflate(R.layout.summary_recycle_item, parent, false);
+    public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+        if (viewType == TYPE_HEADER) {
+            View root = LayoutInflater.from(mActivity).inflate(R.layout.history_date_header_item, parent, false);
+            return new HeaderHolder(root);
+        }
+        int layout = viewType == TYPE_HISTORY ? R.layout.history_recycle_item : R.layout.summary_recycle_item;
+        View root = LayoutInflater.from(mActivity).inflate(layout, parent, false);
         return new SummaryHolder(root);
     }
 
     @Override
-    public void onBindViewHolder(@NonNull SummaryHolder holder, int position) {
+    public void onBindViewHolder(@NonNull RecyclerView.ViewHolder viewHolder, int position) {
         SummaryItem item = mItems.get(position);
+        if (viewHolder instanceof HeaderHolder) {
+            HeaderHolder holder = (HeaderHolder) viewHolder;
+            holder.title.setText(item.mTitle);
+            holder.itemView.setOnClickListener(null);
+            holder.itemView.setClickable(false);
+            return;
+        }
+
+        SummaryHolder holder = (SummaryHolder) viewHolder;
         holder.title.setText(item.mTitle);
         holder.subtitle.setText(item.mSubtitle);
         holder.details.setText(item.mDetails);
@@ -49,8 +67,18 @@ public class SummaryListAdapter extends RecyclerView.Adapter<SummaryListAdapter.
                 ? R.drawable.notification_icon
                 : R.drawable.baseline_notifications_off_24);
         holder.setIcon(item.mIconType, item.mIconUri);
+        holder.bindMode(item, mClickable);
         holder.itemView.setOnClickListener(mClickable ? v -> mListener.clickListener(position) : null);
         holder.itemView.setClickable(mClickable);
+    }
+
+    @Override
+    public int getItemViewType(int position) {
+        SummaryItem item = mItems.get(position);
+        if (item.mHeader) {
+            return TYPE_HEADER;
+        }
+        return mClickable ? TYPE_SUMMARY : TYPE_HISTORY;
     }
 
     @Override
@@ -86,6 +114,30 @@ public class SummaryListAdapter extends RecyclerView.Adapter<SummaryListAdapter.
             } else {
                 thumbnail.setImageResource(R.drawable.medicine_pill);
             }
+        }
+
+        void bindMode(SummaryItem item, boolean clickable) {
+            activeImage.setVisibility(clickable ? View.VISIBLE : View.GONE);
+            subtitle.setVisibility(item.mSubtitle == null || item.mSubtitle.length() == 0 ? View.GONE : View.VISIBLE);
+            details.setVisibility(item.mDetails == null || item.mDetails.length() == 0 ? View.GONE : View.VISIBLE);
+            if (clickable) {
+                status.setTextColor(mActivity.getResources().getColor(R.color.text_secondary));
+            } else if (item.mTaken) {
+                status.setTextColor(mActivity.getResources().getColor(R.color.history_taken));
+            } else if ("true".equals(item.mActive)) {
+                status.setTextColor(mActivity.getResources().getColor(R.color.history_missed));
+            } else {
+                status.setTextColor(mActivity.getResources().getColor(R.color.text_secondary));
+            }
+        }
+    }
+
+    class HeaderHolder extends RecyclerView.ViewHolder {
+        private final TextView title;
+
+        HeaderHolder(@NonNull View itemView) {
+            super(itemView);
+            title = itemView.findViewById(R.id.history_date_title);
         }
     }
 }

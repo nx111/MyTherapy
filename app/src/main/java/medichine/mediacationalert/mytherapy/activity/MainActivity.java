@@ -367,24 +367,38 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
 
         Collections.sort(scheduledReminders, (left, right) -> Long.compare(right.timeMillis, left.timeMillis));
 
+        String lastDate = "";
         for (ScheduledReminder scheduled : scheduledReminders) {
             Reminder reminder = scheduled.reminder;
             boolean taken = rb.isReminderTaken(reminder.getID(), scheduled.scheduledAt);
             boolean active = "true".equals(reminder.getActive());
-            String status = taken
-                    ? getString(R.string.taken)
-                    : active ? getString(R.string.not_taken) : getString(R.string.paused);
-            String details = getString(R.string.dose) + " " + formatQuantity(reminder.getDose());
+            String[] parts = splitScheduledAt(scheduled.scheduledAt);
+            if (!parts[0].equals(lastDate)) {
+                items.add(SummaryItem.header(formatHistoryDate(scheduled.timeMillis)));
+                lastDate = parts[0];
+            }
+
+            String status = parts[1] + " " + (taken
+                    ? "\u2713"
+                    : active ? getString(R.string.not_taken) : getString(R.string.paused));
+            String details = formatQuantity(reminder.getDose()) + " " + getString(R.string.pill);
             items.add(new SummaryItem(
                     reminder.getTitle(),
-                    scheduled.scheduledAt,
+                    "",
                     details,
                     status,
                     reminder.getIconType(),
                     reminder.getIconUri(),
-                    reminder.getActive()));
+                    reminder.getActive(),
+                    taken));
         }
         return items;
+    }
+
+    private String formatHistoryDate(long timeMillis) {
+        Calendar calendar = Calendar.getInstance();
+        calendar.setTimeInMillis(timeMillis);
+        return new SimpleDateFormat("EEEE, yy/M/d", java.util.Locale.getDefault()).format(calendar.getTime());
     }
 
     private List<SummaryItem> generateCourseData() {
