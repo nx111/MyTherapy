@@ -493,6 +493,35 @@ public class ReminderDatabase extends SQLiteOpenHelper {
                 accountArgs(normalizeTitle(title)));
     }
 
+    public void updateMedicineInfo(String oldTitle, String newTitle, String iconType, String iconUri) {
+        String oldName = normalizeTitle(oldTitle);
+        String newName = normalizeTitle(newTitle);
+        SQLiteDatabase db = this.getWritableDatabase();
+        db.beginTransaction();
+        try {
+            ContentValues reminderValues = new ContentValues();
+            reminderValues.put(KEY_TITLE, newName);
+            reminderValues.put(KEY_ICON_TYPE, iconType);
+            reminderValues.put(KEY_ICON_URI, iconUri == null ? "" : iconUri);
+            db.update(TABLE_REMINDERS, reminderValues, accountSelection(KEY_ACCOUNT_ID, KEY_TITLE + "=?"),
+                    accountArgs(oldName));
+
+            ContentValues stockValues = new ContentValues();
+            stockValues.put(STOCK_TITLE, newName);
+            db.update(TABLE_STOCK_BATCHES, stockValues, accountSelection(STOCK_ACCOUNT_ID, STOCK_TITLE + "=?"),
+                    accountArgs(oldName));
+
+            ContentValues logValues = new ContentValues();
+            logValues.put(LOG_TITLE, newName);
+            db.update(TABLE_INTAKE_LOGS, logValues, accountSelection(LOG_ACCOUNT_ID, LOG_TITLE + "=?"),
+                    accountArgs(oldName));
+
+            db.setTransactionSuccessful();
+        } finally {
+            db.endTransaction();
+        }
+    }
+
     public void addStockBatch(String title, double quantity) {
         SQLiteDatabase db = this.getWritableDatabase();
         ContentValues values = new ContentValues();

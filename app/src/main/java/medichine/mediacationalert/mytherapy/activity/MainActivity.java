@@ -18,11 +18,11 @@ import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
 import android.view.Window;
-import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.CheckBox;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -69,6 +69,7 @@ import medichine.mediacationalert.mytherapy.model.SummaryItem;
 import medichine.mediacationalert.mytherapy.utils.AlarmReceiver;
 import medichine.mediacationalert.mytherapy.utils.Fun;
 import medichine.mediacationalert.mytherapy.utils.ItemClickListener;
+import medichine.mediacationalert.mytherapy.utils.MedicineIconFactory;
 import medichine.mediacationalert.mytherapy.utils.MyTherapyArchiveImporter;
 import medichine.mediacationalert.mytherapy.utils.Prefs;
 import medichine.mediacationalert.mytherapy.utils.Reminder;
@@ -84,7 +85,6 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     private static final int PAGE_REPORT = 4;
     private static final int PAGE_HISTORY = 5;
     private static final int REQUEST_IMPORT_ARCHIVE = 3001;
-    private static final int REQUEST_EDIT_COURSE_REMINDER = 3002;
 
     private BillingClient billingClient;
     private Prefs prefs;
@@ -107,7 +107,6 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     private AlarmReceiver mAlarmReceiver;
     private int mCurrentPage = PAGE_TODAY;
     private Calendar mSelectedDate;
-    private String mPendingCourseDetailTitle;
 
     private List<ReminderItem> medicineList = new ArrayList<>();
     private List<SummaryItem> summaryList = new ArrayList<>();
@@ -313,11 +312,6 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode == REQUEST_EDIT_COURSE_REMINDER) {
-            handleCourseEditResult(resultCode, data);
-            return;
-        }
-
         if (requestCode != REQUEST_IMPORT_ARCHIVE || resultCode != RESULT_OK || data == null) {
             return;
         }
@@ -326,23 +320,6 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         if (uri != null) {
             importArchive(uri);
         }
-    }
-
-    private void handleCourseEditResult(int resultCode, Intent data) {
-        String title = mPendingCourseDetailTitle;
-        if (resultCode == RESULT_OK && data != null) {
-            String updatedTitle = data.getStringExtra(ReminderEditActivity.EXTRA_RESULT_TITLE);
-            if (updatedTitle != null && updatedTitle.trim().length() > 0) {
-                title = updatedTitle;
-            }
-        }
-        mPendingCourseDetailTitle = null;
-        if (resultCode != RESULT_OK || title == null || title.length() == 0) {
-            return;
-        }
-        mCurrentPage = PAGE_COURSE;
-        loadCurrentPage();
-        showCourseMedicationDetails(title);
     }
 
     private void importArchive(Uri uri) {
@@ -1412,13 +1389,6 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         startActivity(i);
     }
 
-    private void editCourseReminder(Reminder reminder) {
-        mPendingCourseDetailTitle = reminder.getTitle();
-        Intent intent = new Intent(this, ReminderEditActivity.class);
-        intent.putExtra(ReminderEditActivity.EXTRA_REMINDER_ID, Integer.toString(reminder.getID()));
-        startActivityForResult(intent, REQUEST_EDIT_COURSE_REMINDER);
-    }
-
     @Override
     public void clickListener(int pos) {
         if (mCurrentPage == PAGE_TODAY && IDmap.containsKey(pos)) {
@@ -1460,6 +1430,21 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
         final AlertDialog[] dialogHolder = new AlertDialog[1];
+        content.addView(createCourseActionRow(
+                R.drawable.baseline_edit_24,
+                getString(R.string.edit_medicine_info),
+                v -> showMedicineInfoEditor(normalizedTitle, reminders.get(0), dialogHolder[0])));
+
+        TextView planHeader = new TextView(this);
+        planHeader.setText(R.string.medicine_plans);
+        planHeader.setTextColor(getResources().getColor(R.color.text_primary));
+        planHeader.setTypeface(Typeface.DEFAULT_BOLD);
+        planHeader.setTextSize(15);
+        LinearLayout.LayoutParams headerParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        headerParams.topMargin = dp(12);
+        content.addView(planHeader, headerParams);
+
         for (Reminder reminder : reminders) {
             content.addView(createCoursePlanRow(reminder, normalizedTitle, dialogHolder));
         }
@@ -1504,34 +1489,384 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         row.addView(range, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
-        LinearLayout actions = new LinearLayout(this);
-        actions.setOrientation(LinearLayout.HORIZONTAL);
-        actions.setGravity(Gravity.END);
-
-        Button toggle = new Button(this);
-        toggle.setText("true".equals(reminder.getActive()) ? R.string.disable_plan : R.string.enable_plan);
-        toggle.setOnClickListener(v -> toggleCoursePlan(reminder, title, dialogHolder[0]));
-        actions.addView(toggle);
-
-        Button delete = new Button(this);
-        delete.setText(R.string.delete_plan);
-        delete.setOnClickListener(v -> confirmDeleteCoursePlan(reminder, title, dialogHolder[0]));
-        actions.addView(delete);
-
-        row.addView(actions, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-        row.setOnClickListener(v -> {
-            if (dialogHolder[0] != null) {
-                dialogHolder[0].dismiss();
-            }
-            editCourseReminder(reminder);
-        });
+        row.setOnClickListener(v -> showCoursePlanOptions(reminder, title, dialogHolder[0]));
 
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         params.topMargin = dp(10);
         row.setLayoutParams(params);
         return row;
+    }
+
+    private View createCourseActionRow(int iconRes, String label, View.OnClickListener listener) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setClickable(true);
+        row.setPadding(dp(12), dp(10), dp(12), dp(10));
+        row.setOnClickListener(listener);
+
+        ImageView icon = new ImageView(this);
+        icon.setImageResource(iconRes);
+        icon.setColorFilter(getResources().getColor(R.color.text_primary));
+        LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(dp(24), dp(24));
+        row.addView(icon, iconParams);
+
+        TextView text = new TextView(this);
+        text.setText(label);
+        text.setTextColor(getResources().getColor(R.color.text_primary));
+        text.setTextSize(16);
+        LinearLayout.LayoutParams textParams = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
+        textParams.leftMargin = dp(12);
+        row.addView(text, textParams);
+
+        LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        rowParams.topMargin = dp(10);
+        row.setLayoutParams(rowParams);
+        return row;
+    }
+
+    private void showCoursePlanOptions(Reminder reminder, String title, AlertDialog currentDialog) {
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        int padding = dp(12);
+        content.setPadding(padding, dp(8), padding, dp(8));
+
+        AlertDialog optionDialog = new AlertDialog.Builder(this)
+                .setTitle(R.string.select_plan_action)
+                .setView(content)
+                .create();
+
+        content.addView(createCourseActionRow(
+                R.drawable.baseline_edit_24,
+                getString(R.string.edit_plan),
+                v -> {
+                    optionDialog.dismiss();
+                    showCoursePlanEditor(reminder, title, currentDialog);
+                }));
+        content.addView(createCourseActionRow(
+                "true".equals(reminder.getActive()) ? R.drawable.baseline_notifications_off_24 : R.drawable.baseline_done_24,
+                getString("true".equals(reminder.getActive()) ? R.string.disable_plan : R.string.enable_plan),
+                v -> {
+                    optionDialog.dismiss();
+                    toggleCoursePlan(reminder, title, currentDialog);
+                }));
+        content.addView(createCourseActionRow(
+                R.drawable.baseline_delete_24,
+                getString(R.string.delete_plan),
+                v -> {
+                    optionDialog.dismiss();
+                    confirmDeleteCoursePlan(reminder, title, currentDialog);
+                }));
+        optionDialog.show();
+    }
+
+    private void showMedicineInfoEditor(String title, Reminder displayReminder, AlertDialog currentDialog) {
+        LinearLayout form = new LinearLayout(this);
+        form.setOrientation(LinearLayout.VERTICAL);
+        int padding = dp(20);
+        form.setPadding(padding, dp(8), padding, 0);
+
+        EditText name = new EditText(this);
+        name.setHint(R.string.add_Medicion);
+        name.setSingleLine(true);
+        name.setText(title);
+        form.addView(name, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        String[] selectedIconType = new String[]{displayReminder.getIconType()};
+        String[] selectedIconUri = new String[]{displayReminder.getIconUri()};
+        LinearLayout iconRow = new LinearLayout(this);
+        iconRow.setOrientation(LinearLayout.HORIZONTAL);
+        iconRow.setGravity(Gravity.CENTER_VERTICAL);
+        iconRow.setClickable(true);
+        iconRow.setPadding(0, dp(12), 0, dp(4));
+
+        ImageView preview = new ImageView(this);
+        MedicineIconFactory.apply(preview, selectedIconType[0], selectedIconUri[0]);
+        iconRow.addView(preview, new LinearLayout.LayoutParams(dp(48), dp(48)));
+
+        TextView iconLabel = new TextView(this);
+        iconLabel.setText(MedicineIconFactory.label(this, selectedIconType[0]));
+        iconLabel.setTextColor(getResources().getColor(R.color.text_primary));
+        iconLabel.setTextSize(16);
+        LinearLayout.LayoutParams iconLabelParams = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
+        iconLabelParams.leftMargin = dp(12);
+        iconRow.addView(iconLabel, iconLabelParams);
+        iconRow.setOnClickListener(v -> MedicineIconFactory.showPicker(this, iconType -> {
+            selectedIconType[0] = iconType;
+            selectedIconUri[0] = "";
+            MedicineIconFactory.apply(preview, selectedIconType[0], selectedIconUri[0]);
+            iconLabel.setText(MedicineIconFactory.label(this, selectedIconType[0]));
+        }));
+        form.addView(iconRow, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(R.string.edit_medicine_info)
+                .setView(form)
+                .setPositiveButton(R.string.saved, null)
+                .setNegativeButton(R.string.cancel, null)
+                .create();
+        dialog.setOnShowListener(d -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            String newTitle = name.getText().toString().trim();
+            if (newTitle.length() == 0) {
+                name.setError(getString(R.string.reminder_title_blank));
+                return;
+            }
+            if (wouldCreateDuplicateMedicinePlans(title, newTitle)) {
+                name.setError(getString(R.string.duplicate_reminder_plan));
+                return;
+            }
+            rb.updateMedicineInfo(title, newTitle, selectedIconType[0], selectedIconUri[0]);
+            Toast.makeText(getApplicationContext(), R.string.saved, Toast.LENGTH_SHORT).show();
+            dialog.dismiss();
+            refreshCourseDetail(newTitle, currentDialog);
+        }));
+        dialog.show();
+    }
+
+    private void showCoursePlanEditor(Reminder reminder, String title, AlertDialog currentDialog) {
+        Reminder fresh = rb.getReminder(reminder.getID());
+        if (fresh == null) {
+            return;
+        }
+
+        LinearLayout form = new LinearLayout(this);
+        form.setOrientation(LinearLayout.VERTICAL);
+        int padding = dp(20);
+        form.setPadding(padding, dp(8), padding, 0);
+
+        EditText dose = new EditText(this);
+        dose.setHint(R.string.dose);
+        dose.setSingleLine(true);
+        dose.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        dose.setText(formatQuantity(fresh.getDose()));
+        form.addView(dose, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        EditText doseTimes = new EditText(this);
+        doseTimes.setHint(R.string.dose_times_hint);
+        doseTimes.setSingleLine(true);
+        doseTimes.setText(fresh.getDoseTimes().replace(",", ", "));
+        form.addView(doseTimes, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        String[] startDate = new String[]{fresh.getDate()};
+        String[] endDate = new String[]{fresh.getEndDate()};
+        TextView startDateText = dateSelectorText(R.string.start_date, startDate[0]);
+        startDateText.setOnClickListener(v -> showCourseDatePicker(startDate[0], date -> {
+            startDate[0] = date;
+            startDateText.setText(dateSelectorLabel(R.string.start_date, startDate[0]));
+        }));
+        form.addView(startDateText);
+
+        TextView endDateText = dateSelectorText(R.string.end_date, endDate[0]);
+        CheckBox noEnd = new CheckBox(this);
+        noEnd.setText(R.string.no_expiration);
+        noEnd.setTextColor(getResources().getColor(R.color.text_primary));
+        noEnd.setChecked(Reminder.isNoEndDate(endDate[0]));
+        endDateText.setEnabled(!noEnd.isChecked());
+        endDateText.setOnClickListener(v -> showCourseDatePicker(
+                Reminder.isNoEndDate(endDate[0]) ? startDate[0] : endDate[0],
+                date -> {
+                    endDate[0] = date;
+                    endDateText.setText(dateSelectorLabel(R.string.end_date, endDate[0]));
+                }));
+        noEnd.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            endDateText.setEnabled(!isChecked);
+            if (isChecked) {
+                endDate[0] = Reminder.NO_END_DATE;
+            } else if (Reminder.isNoEndDate(endDate[0])) {
+                endDate[0] = startDate[0];
+            }
+            endDateText.setText(dateSelectorLabel(R.string.end_date, endDate[0]));
+        });
+        form.addView(endDateText);
+        form.addView(noEnd);
+
+        CheckBox active = new CheckBox(this);
+        active.setText(R.string.active);
+        active.setTextColor(getResources().getColor(R.color.text_primary));
+        active.setChecked("true".equals(fresh.getActive()));
+        form.addView(active);
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(R.string.edit_plan)
+                .setView(form)
+                .setPositiveButton(R.string.saved, null)
+                .setNegativeButton(R.string.cancel, null)
+                .create();
+        dialog.setOnShowListener(d -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            if (saveSimpleCoursePlan(fresh, dose, doseTimes, startDate[0], endDate[0], active.isChecked())) {
+                dialog.dismiss();
+                refreshCourseDetail(title, currentDialog);
+            }
+        }));
+        dialog.show();
+    }
+
+    private boolean saveSimpleCoursePlan(Reminder reminder, EditText doseInput, EditText doseTimesInput,
+                                         String startDate, String endDate, boolean active) {
+        double dose;
+        try {
+            dose = Double.parseDouble(doseInput.getText().toString().trim());
+        } catch (NumberFormatException e) {
+            doseInput.setError(getString(R.string.enter_valid_dose));
+            return false;
+        }
+        if (dose <= 0) {
+            doseInput.setError(getString(R.string.dose_must_be_positive));
+            return false;
+        }
+
+        String doseTimes = normalizeDoseTimesInput(doseTimesInput.getText().toString());
+        if (doseTimes.length() == 0) {
+            doseTimesInput.setError(getString(R.string.dose_times_invalid));
+            return false;
+        }
+
+        Calendar start = parseCourseDate(startDate);
+        Calendar end = Reminder.isNoEndDate(endDate) ? null : parseCourseDate(endDate);
+        if (start == null || (!Reminder.isNoEndDate(endDate)
+                && (end == null || end.getTimeInMillis() < start.getTimeInMillis()))) {
+            Toast.makeText(getApplicationContext(), R.string.end_date_before_start, Toast.LENGTH_SHORT).show();
+            return false;
+        }
+
+        reminder.setDate(startDate);
+        reminder.setEndDate(endDate);
+        reminder.setDose(dose);
+        reminder.setDoseTimes(doseTimes);
+        reminder.setTime(doseTimes.split(",")[0]);
+        reminder.setRepeatNo(String.valueOf(doseTimes.split(",").length));
+        reminder.setActive(active ? "true" : "false");
+
+        if (active && ReminderSchedule.nextOccurrenceAfter(reminder, System.currentTimeMillis()) == null) {
+            Toast.makeText(getApplicationContext(), R.string.choose_future_time, Toast.LENGTH_SHORT).show();
+            return false;
+        }
+        if (rb.findDuplicateReminder(reminder, reminder.getID()) != null) {
+            Toast.makeText(getApplicationContext(), R.string.duplicate_reminder_plan, Toast.LENGTH_SHORT).show();
+            return false;
+        }
+
+        rb.updateReminder(reminder);
+        mAlarmReceiver.cancelAlarm(getApplicationContext(), reminder.getID());
+        if (active) {
+            mAlarmReceiver.scheduleReminder(getApplicationContext(), reminder);
+        }
+        Toast.makeText(getApplicationContext(), R.string.edited, Toast.LENGTH_SHORT).show();
+        return true;
+    }
+
+    private TextView dateSelectorText(int labelRes, String date) {
+        TextView text = new TextView(this);
+        text.setText(dateSelectorLabel(labelRes, date));
+        text.setTextColor(getResources().getColor(R.color.text_primary));
+        text.setTextSize(16);
+        text.setPadding(0, dp(14), 0, dp(8));
+        return text;
+    }
+
+    private String dateSelectorLabel(int labelRes, String date) {
+        return getString(labelRes) + ": " + formatCourseDate(date);
+    }
+
+    private void showCourseDatePicker(String currentDate, CourseDateSelectedListener listener) {
+        Calendar calendar = parseCourseDate(currentDate);
+        if (calendar == null) {
+            calendar = Calendar.getInstance();
+        }
+        DatePickerDialog dialog = new DatePickerDialog(
+                this,
+                (view, year, month, dayOfMonth) -> {
+                    Calendar selected = Calendar.getInstance();
+                    selected.set(Calendar.YEAR, year);
+                    selected.set(Calendar.MONTH, month);
+                    selected.set(Calendar.DAY_OF_MONTH, dayOfMonth);
+                    normalizeDate(selected);
+                    listener.onDateSelected(ReminderSchedule.formatDate(selected));
+                },
+                calendar.get(Calendar.YEAR),
+                calendar.get(Calendar.MONTH),
+                calendar.get(Calendar.DAY_OF_MONTH));
+        dialog.show();
+        Window window = dialog.getWindow();
+        if (window != null) {
+            window.setBackgroundDrawableResource(R.drawable.dialog_panel_bg);
+        }
+    }
+
+    private String normalizeDoseTimesInput(String raw) {
+        String[] parts = raw == null ? new String[0] : raw.replace(";", ",").split(",");
+        ArrayList<String> times = new ArrayList<>();
+        for (String part : parts) {
+            String time = normalizeDoseTime(part.trim());
+            if (time.length() == 0) {
+                return "";
+            }
+            if (!times.contains(time)) {
+                times.add(time);
+            }
+        }
+        return ReminderSchedule.joinDoseTimes(times);
+    }
+
+    private String normalizeDoseTime(String value) {
+        String[] parts = value.split(":");
+        if (parts.length != 2) {
+            return "";
+        }
+        try {
+            int hour = Integer.parseInt(parts[0].trim());
+            int minute = Integer.parseInt(parts[1].trim());
+            if (hour < 0 || hour > 23 || minute < 0 || minute > 59) {
+                return "";
+            }
+            return hour + ":" + (minute < 10 ? "0" + minute : String.valueOf(minute));
+        } catch (NumberFormatException e) {
+            return "";
+        }
+    }
+
+    private boolean wouldCreateDuplicateMedicinePlans(String oldTitle, String newTitle) {
+        String oldName = normalizeTitle(oldTitle);
+        String newName = normalizeTitle(newTitle);
+        if (oldName.equals(newName)) {
+            return false;
+        }
+        List<Reminder> reminders = rb.getAllReminders();
+        for (Reminder changed : reminders) {
+            if (!oldName.equals(normalizeTitle(changed.getTitle()))) {
+                continue;
+            }
+            for (Reminder other : reminders) {
+                if (changed.getID() == other.getID()) {
+                    continue;
+                }
+                if (newName.equals(normalizeTitle(other.getTitle()))
+                        && Math.abs(changed.getDose() - other.getDose()) < 0.000001
+                        && hasOverlappingDoseTime(changed, other)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    private boolean hasOverlappingDoseTime(Reminder left, Reminder right) {
+        List<String> leftTimes = ReminderSchedule.doseTimes(left);
+        List<String> rightTimes = ReminderSchedule.doseTimes(right);
+        for (String time : leftTimes) {
+            if (rightTimes.contains(time)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private List<Reminder> courseRemindersForTitle(String title) {
@@ -1602,9 +1937,17 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         if (Reminder.isNoEndDate(date)) {
             return getString(R.string.no_expiration);
         }
+        Calendar calendar = parseCourseDate(date);
+        if (calendar == null) {
+            return date == null ? "" : date;
+        }
+        return formatDateLocalized(calendar, DateFormat.MEDIUM);
+    }
+
+    private Calendar parseCourseDate(String date) {
         String[] parts = date == null ? new String[0] : date.split("/");
         if (parts.length != 3) {
-            return date == null ? "" : date;
+            return null;
         }
         try {
             Calendar calendar = Calendar.getInstance();
@@ -1612,9 +1955,9 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
             calendar.set(Calendar.MONTH, Integer.parseInt(parts[1]) - 1);
             calendar.set(Calendar.YEAR, Integer.parseInt(parts[2]));
             normalizeDate(calendar);
-            return formatDateLocalized(calendar, DateFormat.MEDIUM);
+            return calendar;
         } catch (NumberFormatException e) {
-            return date;
+            return null;
         }
     }
 
@@ -1734,5 +2077,9 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
             this.iconType = firstReminder.getIconType();
             this.iconUri = firstReminder.getIconUri();
         }
+    }
+
+    private interface CourseDateSelectedListener {
+        void onDateSelected(String date);
     }
 }

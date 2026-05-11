@@ -132,6 +132,12 @@
     <string name="disable_plan">停用</string>
     <string name="delete_plan">删除</string>
     <string name="delete_plan_message">删除这个计划？</string>
+    <string name="edit_medicine_info">编辑药品信息</string>
+    <string name="medicine_plans">计划</string>
+    <string name="select_plan_action">计划选项</string>
+    <string name="edit_plan">修改计划</string>
+    <string name="dose_times_hint">时间，例如 8:00, 20:00</string>
+    <string name="dose_times_invalid">请输入有效时间，例如 8:00, 20:00</string>
     <string name="start_date">开始日期</string>
     <string name="end_date">结束日期</string>
     <string name="no_expiration">不过期</string>
