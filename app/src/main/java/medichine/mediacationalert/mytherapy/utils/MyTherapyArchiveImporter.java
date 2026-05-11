@@ -117,18 +117,6 @@ public class MyTherapyArchiveImporter {
                 reminderId = database.addReminder(reminder);
                 result.createdReminders++;
             } else {
-                Reminder existing = database.getReminder(reminderId);
-                String mergedEndDate = existing == null ? segment.endDate : mergeEndDate(existing.getEndDate(), segment.endDate);
-                String mergedActive = existing != null && "true".equals(existing.getActive()) || isOngoing(mergedEndDate)
-                        ? "true"
-                        : "false";
-                if (existing != null
-                        && (!mergedEndDate.equals(existing.getEndDate())
-                        || !mergedActive.equals(existing.getActive()))) {
-                    existing.setEndDate(mergedEndDate);
-                    existing.setActive(mergedActive);
-                    database.updateReminder(existing);
-                }
                 result.reusedReminders++;
             }
 
@@ -251,15 +239,6 @@ public class MyTherapyArchiveImporter {
             }
         }
         return -1;
-    }
-
-    private String mergeEndDate(String currentEndDate, String importedEndDate) {
-        if (Reminder.isNoEndDate(currentEndDate) || Reminder.isNoEndDate(importedEndDate)) {
-            return Reminder.NO_END_DATE;
-        }
-        Calendar current = ReminderSchedule.parseDate(currentEndDate);
-        Calendar imported = ReminderSchedule.parseDate(importedEndDate);
-        return imported.getTimeInMillis() > current.getTimeInMillis() ? importedEndDate : currentEndDate;
     }
 
     private boolean isOngoing(String endDate) {

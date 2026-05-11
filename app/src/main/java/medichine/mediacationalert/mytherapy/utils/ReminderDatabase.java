@@ -622,15 +622,37 @@ public class ReminderDatabase extends SQLiteOpenHelper {
 
     public boolean insertIntakeLog(int reminderId, String title, double dose, String scheduledAt, String takenAt) {
         SQLiteDatabase db = this.getWritableDatabase();
+        String normalizedTitle = normalizeTitle(title);
+        if (intakeLogExists(db, reminderId, normalizedTitle, dose, scheduledAt)) {
+            return false;
+        }
         ContentValues values = new ContentValues();
         values.put(LOG_ACCOUNT_ID, mCurrentAccountId);
         values.put(LOG_REMINDER_ID, reminderId);
-        values.put(LOG_TITLE, normalizeTitle(title));
+        values.put(LOG_TITLE, normalizedTitle);
         values.put(LOG_DOSE, dose);
         values.put(LOG_SCHEDULED_AT, scheduledAt);
         values.put(LOG_TAKEN_AT, takenAt == null || takenAt.length() == 0 ? nowText() : takenAt);
         long id = db.insertWithOnConflict(TABLE_INTAKE_LOGS, null, values, SQLiteDatabase.CONFLICT_IGNORE);
         return id != -1;
+    }
+
+    private boolean intakeLogExists(SQLiteDatabase db, int reminderId, String title, double dose, String scheduledAt) {
+        Cursor cursor = db.query(TABLE_INTAKE_LOGS, new String[]{LOG_ID},
+                LOG_ACCOUNT_ID + "=? AND " + LOG_SCHEDULED_AT + "=? AND ("
+                        + LOG_REMINDER_ID + "=? OR ("
+                        + LOG_TITLE + "=? AND ABS(" + LOG_DOSE + "-?)<0.000001))",
+                new String[]{
+                        accountIdText(),
+                        scheduledAt,
+                        String.valueOf(reminderId),
+                        title,
+                        String.valueOf(dose)
+                },
+                null, null, null, "1");
+        boolean exists = cursor.moveToFirst();
+        cursor.close();
+        return exists;
     }
 
     public int getIntakeLogCountSince(String takenAtLowerBound) {
