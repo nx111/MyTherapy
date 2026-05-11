@@ -1575,14 +1575,13 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         content.addView(createMedicineHeaderRow(normalizedTitle, reminders.get(0), dialogHolder));
 
         TextView summary = new TextView(this);
-        summary.setText(getString(R.string.stock_amount, formatQuantity(rb.getTotalStock(normalizedTitle)))
-                + " · " + getString(R.string.reminder_count, reminders.size()));
+        summary.setText(getString(R.string.stock_amount, formatQuantity(rb.getTotalStock(normalizedTitle))));
         summary.setTextColor(getResources().getColor(R.color.text_secondary));
         summary.setTextSize(14);
         content.addView(summary, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
-        content.addView(createPlanHeaderRow(normalizedTitle, reminders.get(0), dialogHolder));
+        content.addView(createPlanHeaderRow(normalizedTitle, reminders.get(0), reminders.size(), dialogHolder));
 
         for (Reminder reminder : reminders) {
             content.addView(createCoursePlanRow(reminder, normalizedTitle, dialogHolder));
@@ -1622,7 +1621,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         return row;
     }
 
-    private View createPlanHeaderRow(String title, Reminder displayReminder, AlertDialog[] dialogHolder) {
+    private View createPlanHeaderRow(String title, Reminder displayReminder, int reminderCount, AlertDialog[] dialogHolder) {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
@@ -1632,7 +1631,8 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         row.setLayoutParams(rowParams);
 
         TextView planHeader = new TextView(this);
-        planHeader.setText(R.string.medicine_plans);
+        planHeader.setText(getString(R.string.medicine_plans)
+                + "    (" + getString(R.string.reminder_count, reminderCount) + ")");
         planHeader.setTextColor(getResources().getColor(R.color.text_primary));
         planHeader.setTypeface(Typeface.DEFAULT_BOLD);
         planHeader.setTextSize(15);
