@@ -16,7 +16,7 @@ import java.util.Map;
 import medichine.mediacationalert.mytherapy.R;
 
 public class ReminderDatabase extends SQLiteOpenHelper {
-    private static final int DATABASE_VERSION = 2;
+    private static final int DATABASE_VERSION = 3;
     private static final String DATABASE_NAME = "MedicationDbTab";
 
     private static final String TABLE_REMINDERS = "TableMedRe";
@@ -31,6 +31,8 @@ public class ReminderDatabase extends SQLiteOpenHelper {
     private static final String KEY_DOSE = "dose";
     private static final String KEY_ICON_TYPE = "icon_type";
     private static final String KEY_ICON_URI = "icon_uri";
+    private static final String KEY_END_DATE = "end_date";
+    private static final String KEY_DOSE_TIMES = "dose_times";
 
     private static final String TABLE_STOCK_BATCHES = "StockBatches";
     private static final String STOCK_ID = "id";
@@ -81,6 +83,14 @@ public class ReminderDatabase extends SQLiteOpenHelper {
             createStockTable(db);
             createIntakeLogTable(db);
         }
+        if (oldVersion < 3) {
+            db.execSQL("ALTER TABLE " + TABLE_REMINDERS + " ADD COLUMN " + KEY_END_DATE + " TEXT DEFAULT ''");
+            db.execSQL("ALTER TABLE " + TABLE_REMINDERS + " ADD COLUMN " + KEY_DOSE_TIMES + " TEXT DEFAULT ''");
+            db.execSQL("UPDATE " + TABLE_REMINDERS + " SET "
+                    + KEY_END_DATE + "=" + KEY_DATE + " WHERE " + KEY_END_DATE + "=''");
+            db.execSQL("UPDATE " + TABLE_REMINDERS + " SET "
+                    + KEY_DOSE_TIMES + "=" + KEY_TIME + " WHERE " + KEY_DOSE_TIMES + "=''");
+        }
     }
 
     private void createReminderTable(SQLiteDatabase db) {
@@ -95,7 +105,9 @@ public class ReminderDatabase extends SQLiteOpenHelper {
                 + KEY_ACTIVE + " TEXT,"
                 + KEY_DOSE + " REAL DEFAULT 1.0,"
                 + KEY_ICON_TYPE + " TEXT DEFAULT 'pill',"
-                + KEY_ICON_URI + " TEXT DEFAULT ''"
+                + KEY_ICON_URI + " TEXT DEFAULT '',"
+                + KEY_END_DATE + " TEXT DEFAULT '',"
+                + KEY_DOSE_TIMES + " TEXT DEFAULT ''"
                 + ")";
         db.execSQL(sql);
     }
@@ -164,17 +176,22 @@ public class ReminderDatabase extends SQLiteOpenHelper {
 
     public List<Reminder> getActiveRemindersAt(String date, String time) {
         List<Reminder> reminderList = new ArrayList<>();
-        SQLiteDatabase db = this.getReadableDatabase();
-        Cursor cursor = db.query(TABLE_REMINDERS, reminderColumns(),
-                KEY_DATE + "=? AND " + KEY_TIME + "=? AND " + KEY_ACTIVE + "=?",
-                new String[]{date, time, "true"}, null, null, KEY_ID + " ASC");
-
-        if (cursor.moveToFirst()) {
-            do {
-                reminderList.add(readReminder(cursor));
-            } while (cursor.moveToNext());
+        String scheduledAt = date + " " + time;
+        for (Reminder reminder : getAllReminders()) {
+            if ("true".equals(reminder.getActive()) && ReminderSchedule.hasOccurrenceAt(reminder, scheduledAt)) {
+                reminderList.add(reminder);
+            }
         }
-        cursor.close();
+        return reminderList;
+    }
+
+    public List<Reminder> getActiveRemindersAt(String scheduledAt) {
+        List<Reminder> reminderList = new ArrayList<>();
+        for (Reminder reminder : getAllReminders()) {
+            if ("true".equals(reminder.getActive()) && ReminderSchedule.hasOccurrenceAt(reminder, scheduledAt)) {
+                reminderList.add(reminder);
+            }
+        }
         return reminderList;
     }
 
@@ -341,6 +358,8 @@ public class ReminderDatabase extends SQLiteOpenHelper {
         values.put(KEY_DOSE, reminder.getDose());
         values.put(KEY_ICON_TYPE, reminder.getIconType());
         values.put(KEY_ICON_URI, reminder.getIconUri());
+        values.put(KEY_END_DATE, reminder.getEndDate());
+        values.put(KEY_DOSE_TIMES, reminder.getDoseTimes());
         return values;
     }
 
@@ -357,6 +376,8 @@ public class ReminderDatabase extends SQLiteOpenHelper {
         reminder.setDose(cursor.getDouble(cursor.getColumnIndexOrThrow(KEY_DOSE)));
         reminder.setIconType(cursor.getString(cursor.getColumnIndexOrThrow(KEY_ICON_TYPE)));
         reminder.setIconUri(cursor.getString(cursor.getColumnIndexOrThrow(KEY_ICON_URI)));
+        reminder.setEndDate(cursor.getString(cursor.getColumnIndexOrThrow(KEY_END_DATE)));
+        reminder.setDoseTimes(cursor.getString(cursor.getColumnIndexOrThrow(KEY_DOSE_TIMES)));
         return reminder;
     }
 
@@ -372,7 +393,9 @@ public class ReminderDatabase extends SQLiteOpenHelper {
                 KEY_ACTIVE,
                 KEY_DOSE,
                 KEY_ICON_TYPE,
-                KEY_ICON_URI
+                KEY_ICON_URI,
+                KEY_END_DATE,
+                KEY_DOSE_TIMES
         };
     }
 

@@ -313,7 +313,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                     details.append("\n");
                 }
                 details.append(getString(R.string.course_schedule_line,
-                        reminder.getTime(),
+                        reminder.getDoseTimes().replace(",", ", "),
                         formatQuantity(reminder.getDose()),
                         "true".equals(reminder.getActive()) ? getString(R.string.active) : getString(R.string.paused)));
             }
@@ -335,35 +335,9 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
 
     private List<ScheduledReminder> collectOccurrences(Reminder reminder, long startMillis, long endMillis) {
         ArrayList<ScheduledReminder> occurrences = new ArrayList<>();
-        long timeMillis = ReminderSchedule.parse(reminder).getTimeInMillis();
-
-        if (!"true".equals(reminder.getRepeat())) {
-            if (timeMillis >= startMillis && timeMillis <= endMillis) {
-                occurrences.add(new ScheduledReminder(reminder, formatTime(timeMillis), timeMillis));
-            }
-            return occurrences;
-        }
-
-        long repeatMillis = ReminderSchedule.repeatMillis(reminder);
-        if (repeatMillis <= 0 || timeMillis > endMillis) {
-            return occurrences;
-        }
-
-        if (timeMillis < startMillis) {
-            long steps = (startMillis - timeMillis) / repeatMillis;
-            timeMillis += steps * repeatMillis;
-            while (timeMillis < startMillis) {
-                timeMillis += repeatMillis;
-            }
-        }
-
-        while (timeMillis <= endMillis) {
-            occurrences.add(new ScheduledReminder(reminder, formatTime(timeMillis), timeMillis));
-            long next = timeMillis + repeatMillis;
-            if (next <= timeMillis) {
-                break;
-            }
-            timeMillis = next;
+        for (Calendar occurrence : ReminderSchedule.occurrencesBetween(reminder, startMillis, endMillis)) {
+            long timeMillis = occurrence.getTimeInMillis();
+            occurrences.add(new ScheduledReminder(reminder, ReminderSchedule.format(occurrence), timeMillis));
         }
         return occurrences;
     }
@@ -451,7 +425,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         for (int i = 0; i < reminders.size(); i++) {
             Reminder reminder = reminders.get(i);
             labels[i] = getString(R.string.course_schedule_line,
-                    reminder.getTime(),
+                    reminder.getDoseTimes().replace(",", ", "),
                     formatQuantity(reminder.getDose()),
                     "true".equals(reminder.getActive()) ? getString(R.string.active) : getString(R.string.paused));
         }
@@ -469,6 +443,16 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         ReminderItem item = medicineList.get(pos);
         ReminderDatabase.ConfirmResult result = rb.confirmReminderGroup(item.mReminderIds, item.mScheduledAt);
         Toast.makeText(getApplicationContext(), result.message, Toast.LENGTH_SHORT).show();
+        if (result.success) {
+            long afterMillis = ReminderSchedule.parseScheduledAt(item.mScheduledAt).getTimeInMillis() + 60000L;
+            for (Integer reminderId : item.mReminderIds) {
+                Reminder reminder = rb.getReminder(reminderId);
+                if (reminder != null && "true".equals(reminder.getActive())) {
+                    mAlarmReceiver.cancelAlarm(getApplicationContext(), reminder.getID());
+                    mAlarmReceiver.scheduleReminderAfter(getApplicationContext(), reminder, afterMillis);
+                }
+            }
+        }
         loadReminderList();
     }
 

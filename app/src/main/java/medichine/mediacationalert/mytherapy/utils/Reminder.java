@@ -13,6 +13,8 @@ public class Reminder {
     private double mDose;
     private String mIconType;
     private String mIconUri;
+    private String mEndDate;
+    private String mDoseTimes;
 
     public Reminder(int ID, String Title, String Date, String Time, String Repeat, String RepeatNo, String RepeatType, String Active) {
         this(ID, Title, Date, Time, Repeat, RepeatNo, RepeatType, Active, 1.0, "pill", "");
@@ -20,6 +22,11 @@ public class Reminder {
 
     public Reminder(int ID, String Title, String Date, String Time, String Repeat, String RepeatNo, String RepeatType, String Active,
                     double Dose, String IconType, String IconUri) {
+        this(ID, Title, Date, Time, Repeat, RepeatNo, RepeatType, Active, Dose, IconType, IconUri, Date, Time);
+    }
+
+    public Reminder(int ID, String Title, String Date, String Time, String Repeat, String RepeatNo, String RepeatType, String Active,
+                    double Dose, String IconType, String IconUri, String EndDate, String DoseTimes) {
         mID = ID;
         mTitle = Title;
         mDate = Date;
@@ -31,6 +38,8 @@ public class Reminder {
         mDose = Dose;
         mIconType = IconType == null || IconType.length() == 0 ? "pill" : IconType;
         mIconUri = IconUri == null ? "" : IconUri;
+        mEndDate = EndDate == null || EndDate.length() == 0 ? Date : EndDate;
+        mDoseTimes = DoseTimes == null || DoseTimes.length() == 0 ? Time : DoseTimes;
     }
 
     public Reminder(String Title, String Date, String Time, String Repeat, String RepeatNo, String RepeatType, String Active) {
@@ -39,6 +48,11 @@ public class Reminder {
 
     public Reminder(String Title, String Date, String Time, String Repeat, String RepeatNo, String RepeatType, String Active,
                     double Dose, String IconType, String IconUri) {
+        this(Title, Date, Time, Repeat, RepeatNo, RepeatType, Active, Dose, IconType, IconUri, Date, Time);
+    }
+
+    public Reminder(String Title, String Date, String Time, String Repeat, String RepeatNo, String RepeatType, String Active,
+                    double Dose, String IconType, String IconUri, String EndDate, String DoseTimes) {
         mTitle = Title;
         mDate = Date;
         mTime = Time;
@@ -49,12 +63,16 @@ public class Reminder {
         mDose = Dose;
         mIconType = IconType == null || IconType.length() == 0 ? "pill" : IconType;
         mIconUri = IconUri == null ? "" : IconUri;
+        mEndDate = EndDate == null || EndDate.length() == 0 ? Date : EndDate;
+        mDoseTimes = DoseTimes == null || DoseTimes.length() == 0 ? Time : DoseTimes;
     }
 
     public Reminder() {
         mDose = 1.0;
         mIconType = "pill";
         mIconUri = "";
+        mEndDate = "";
+        mDoseTimes = "";
     }
 
     public int getID() {
@@ -143,5 +161,21 @@ public class Reminder {
 
     public void setIconUri(String iconUri) {
         mIconUri = iconUri == null ? "" : iconUri;
+    }
+
+    public String getEndDate() {
+        return mEndDate == null || mEndDate.length() == 0 ? mDate : mEndDate;
+    }
+
+    public void setEndDate(String endDate) {
+        mEndDate = endDate == null || endDate.length() == 0 ? mDate : endDate;
+    }
+
+    public String getDoseTimes() {
+        return mDoseTimes == null || mDoseTimes.length() == 0 ? mTime : mDoseTimes;
+    }
+
+    public void setDoseTimes(String doseTimes) {
+        mDoseTimes = doseTimes == null || doseTimes.length() == 0 ? mTime : doseTimes;
     }
 }

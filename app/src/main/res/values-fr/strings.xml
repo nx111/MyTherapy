@@ -95,4 +95,12 @@
     <string name="stock_amount">Stock : %1$s</string>
     <string name="reminder_count">%1$d rappel(s)</string>
     <string name="course_schedule_line">%1$s x%2$s • %3$s</string>
+    <string name="start_date">Date de début</string>
+    <string name="end_date">Date de fin</string>
+    <string name="dose_times">Heures de prise</string>
+    <string name="dose_time_item">Dose %1$d : %2$s</string>
+    <string name="times_per_repeat">Nombre de prises</string>
+    <string name="times_per_period">%1$s fois</string>
+    <string name="schedule_summary">%1$s • %2$s • %3$s</string>
+    <string name="end_date_before_start">La date de fin ne peut pas précéder la date de début</string>
 </resources>

@@ -32,6 +32,7 @@ import com.wdullaer.materialdatetimepicker.time.TimePickerDialog;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Locale;
 
@@ -48,7 +49,7 @@ public class ReminderEditActivity extends AppCompatActivity implements
     private Toolbar mToolbar;
     private EditText mTitleText;
     private EditText mDoseText;
-    private TextView mDateText, mTimeText, mRepeatText, mRepeatNoText, mRepeatTypeText, mStockText, mIconTypeText, mIconPhotoText;
+    private TextView mDateText, mEndDateText, mTimeText, mRepeatText, mRepeatNoText, mRepeatTypeText, mStockText, mIconTypeText, mIconPhotoText;
     private ImageView mIconPreview;
     private FloatingActionButton mFAB1;
     private FloatingActionButton mFAB2;
@@ -56,6 +57,7 @@ public class ReminderEditActivity extends AppCompatActivity implements
     private String mTitle;
     private String mTime;
     private String mDate;
+    private String mEndDate;
     private String mRepeatNo;
     private String mRepeatType;
     private String mActive;
@@ -63,11 +65,13 @@ public class ReminderEditActivity extends AppCompatActivity implements
     private double mDose;
     private String mIconType;
     private String mIconUri;
+    private final ArrayList<String> mDoseTimes = new ArrayList<>();
+    private int mDatePickerTarget;
+    private int mTimePickerIndex;
     private String[] mDateSplit;
     private String[] mTimeSplit;
     private int mReceivedID;
     private int mYear, mMonth, mHour, mMinute, mDay;
-    private long mRepeatTime;
     private Reminder mReceivedReminder;
     private ReminderDatabase rb;
     private AlarmReceiver mAlarmReceiver;
@@ -79,6 +83,8 @@ public class ReminderEditActivity extends AppCompatActivity implements
     private static final String KEY_TITLE = "title_key";
     private static final String KEY_TIME = "time_key";
     private static final String KEY_DATE = "date_key";
+    private static final String KEY_END_DATE = "end_date_key";
+    private static final String KEY_DOSE_TIMES = "dose_times_key";
     private static final String KEY_REPEAT = "repeat_key";
     private static final String KEY_REPEAT_NO = "repeat_no_key";
     private static final String KEY_REPEAT_TYPE = "repeat_type_key";
@@ -89,14 +95,8 @@ public class ReminderEditActivity extends AppCompatActivity implements
 
     private static final int REQUEST_PICK_IMAGE = 2001;
     private static final int REQUEST_CAPTURE_IMAGE = 2002;
-
-    // Constant values in milliseconds
-    private static final long milMinute = 60000L;
-    private static final long milHour = 3600000L;
-    private static final long milDay = 86400000L;
-    private static final long milWeek = 604800000L;
-    private static final long milMonth = 2592000000L;
-
+    private static final int DATE_TARGET_START = 1;
+    private static final int DATE_TARGET_END = 2;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -107,6 +107,7 @@ public class ReminderEditActivity extends AppCompatActivity implements
         mToolbar = (Toolbar) findViewById(R.id.toolbar);
         mTitleText = (EditText) findViewById(R.id.reminder_title);
         mDateText = (TextView) findViewById(R.id.set_date);
+        mEndDateText = (TextView) findViewById(R.id.set_end_date);
         mTimeText = (TextView) findViewById(R.id.set_time);
         mRepeatText = (TextView) findViewById(R.id.set_repeat);
         mRepeatNoText = (TextView) findViewById(R.id.set_repeat_no);
@@ -161,6 +162,7 @@ public class ReminderEditActivity extends AppCompatActivity implements
         // Get values from reminder
         mTitle = mReceivedReminder.getTitle();
         mDate = mReceivedReminder.getDate();
+        mEndDate = mReceivedReminder.getEndDate();
         mTime = mReceivedReminder.getTime();
         mRepeat = mReceivedReminder.getRepeat();
         mRepeatNo = mReceivedReminder.getRepeatNo();
@@ -173,8 +175,10 @@ public class ReminderEditActivity extends AppCompatActivity implements
         // Setup TextViews using reminder values
         mTitleText.setText(mTitle);
         mDateText.setText(mDate);
-        mTimeText.setText(mTime);
-        mRepeatNoText.setText(mRepeatNo);
+        mEndDateText.setText(mEndDate);
+        restoreDoseTimes(mReceivedReminder.getDoseTimes());
+        updateDoseTimesText();
+        mRepeatNoText.setText(timesCountLabel());
         mRepeatTypeText.setText(repeatTypeLabel(mRepeatType));
         mDoseText.setText(formatQuantity(mDose));
         updateRepeatText();
@@ -195,11 +199,19 @@ public class ReminderEditActivity extends AppCompatActivity implements
             mDateText.setText(savedDate);
             mDate = savedDate;
 
+            String savedEndDate = savedInstanceState.getString(KEY_END_DATE);
+            mEndDate = savedEndDate == null ? mDate : savedEndDate;
+            mEndDateText.setText(mEndDate);
+
+            restoreDoseTimes(savedInstanceState.getString(KEY_DOSE_TIMES, mTime));
+
             mRepeat = savedInstanceState.getString(KEY_REPEAT);
 
             String savedRepeatNo = savedInstanceState.getString(KEY_REPEAT_NO);
-            mRepeatNoText.setText(savedRepeatNo);
             mRepeatNo = savedRepeatNo;
+            adjustDoseTimes(repeatCount());
+            mRepeatNoText.setText(timesCountLabel());
+            updateDoseTimesText();
 
             String savedRepeatType = savedInstanceState.getString(KEY_REPEAT_TYPE);
             mRepeatType = savedRepeatType;
@@ -249,9 +261,11 @@ public class ReminderEditActivity extends AppCompatActivity implements
         outState.putCharSequence(KEY_TITLE, mTitleText.getText());
         outState.putCharSequence(KEY_TIME, mTimeText.getText());
         outState.putCharSequence(KEY_DATE, mDateText.getText());
+        outState.putString(KEY_END_DATE, mEndDate);
+        outState.putString(KEY_DOSE_TIMES, joinDoseTimes());
         outState.putString(KEY_REPEAT, mRepeat);
-        outState.putCharSequence(KEY_REPEAT_NO, mRepeatNoText.getText());
-        outState.putCharSequence(KEY_REPEAT_TYPE, mRepeatTypeText.getText());
+        outState.putString(KEY_REPEAT_NO, mRepeatNo);
+        outState.putString(KEY_REPEAT_TYPE, mRepeatType);
         outState.putCharSequence(KEY_ACTIVE, mActive);
         try {
             outState.putDouble(KEY_DOSE, Double.parseDouble(mDoseText.getText().toString().trim()));
@@ -265,11 +279,30 @@ public class ReminderEditActivity extends AppCompatActivity implements
 
     // On clicking Time picker
     public void setTime(View v) {
+        if (mDoseTimes.size() <= 1) {
+            selectDoseTime(0);
+            return;
+        }
+        String[] labels = new String[mDoseTimes.size()];
+        for (int i = 0; i < mDoseTimes.size(); i++) {
+            labels[i] = getString(R.string.dose_time_item, i + 1, mDoseTimes.get(i));
+        }
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.dose_times)
+                .setItems(labels, (dialog, which) -> selectDoseTime(which))
+                .show();
+    }
+
+    private void selectDoseTime(int index) {
+        mTimePickerIndex = index;
+        String[] parts = mDoseTimes.get(index).split(":");
+        int hour = Integer.parseInt(parts[0]);
+        int minute = Integer.parseInt(parts[1]);
         Calendar now = Calendar.getInstance();
         TimePickerDialog tpd = TimePickerDialog.newInstance(
                 this,
-                now.get(Calendar.HOUR_OF_DAY),
-                now.get(Calendar.MINUTE),
+                hour,
+                minute,
                 false
         );
         tpd.setThemeDark(false);
@@ -278,12 +311,23 @@ public class ReminderEditActivity extends AppCompatActivity implements
 
     // On clicking Date picker
     public void setDate(View v) {
+        mDatePickerTarget = DATE_TARGET_START;
+        showDatePicker(mDate);
+    }
+
+    public void setEndDate(View v) {
+        mDatePickerTarget = DATE_TARGET_END;
+        showDatePicker(mEndDate);
+    }
+
+    private void showDatePicker(String dateText) {
         Calendar now = Calendar.getInstance();
+        Calendar selected = parseDate(dateText);
         DatePickerDialog dpd = DatePickerDialog.newInstance(
                 this,
-                now.get(Calendar.YEAR),
-                now.get(Calendar.MONTH),
-                now.get(Calendar.DAY_OF_MONTH)
+                selected == null ? now.get(Calendar.YEAR) : selected.get(Calendar.YEAR),
+                selected == null ? now.get(Calendar.MONTH) : selected.get(Calendar.MONTH),
+                selected == null ? now.get(Calendar.DAY_OF_MONTH) : selected.get(Calendar.DAY_OF_MONTH)
         );
         dpd.show(getSupportFragmentManager(), "Datepickerdialog");
     }
@@ -296,8 +340,14 @@ public class ReminderEditActivity extends AppCompatActivity implements
         mDay = dayOfMonth;
         mMonth = monthOfYear;
         mYear = year;
-        mDate = dayOfMonth + "/" + monthOfYear + "/" + year;
-        mDateText.setText(mDate);
+        String selectedDate = dayOfMonth + "/" + monthOfYear + "/" + year;
+        if (mDatePickerTarget == DATE_TARGET_END) {
+            mEndDate = selectedDate;
+            mEndDateText.setText(mEndDate);
+        } else {
+            mDate = selectedDate;
+            mDateText.setText(mDate);
+        }
     }
 
     // On clicking the active button
@@ -328,13 +378,11 @@ public class ReminderEditActivity extends AppCompatActivity implements
     // On clicking repeat type button
     public void selectRepeatType(View v) {
         final String[] items = new String[]{
-                getString(R.string.minute),
-                getString(R.string.hour),
                 getString(R.string.day),
                 getString(R.string.week),
                 getString(R.string.month)
         };
-        final String[] values = new String[]{"Minute", "Hour", "Day", "Week", "Month"};
+        final String[] values = new String[]{"Day", "Week", "Month"};
 
         // Create List Dialog
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
@@ -354,38 +402,21 @@ public class ReminderEditActivity extends AppCompatActivity implements
 
     // On clicking repeat interval button
     public void setRepeatNo(View v) {
-        AlertDialog.Builder alert = new AlertDialog.Builder(this);
-        alert.setTitle(R.string.enter_number);
-
-        // Create EditText box to input repeat number
-        final EditText input = new EditText(this);
-        input.setInputType(InputType.TYPE_CLASS_NUMBER);
-        alert.setView(input);
-        alert.setPositiveButton(R.string.ok,
-                new DialogInterface.OnClickListener() {
-                    public void onClick(DialogInterface dialog, int whichButton) {
-
-                        if (input.getText().toString().length() == 0) {
-                            mRepeatNo = Integer.toString(1);
-                            mRepeatNoText.setText(mRepeatNo);
-                            updateRepeatText();
-                        } else {
-                            int repeatNo = Integer.parseInt(input.getText().toString().trim());
-                            if (repeatNo <= 0) {
-                                repeatNo = 1;
-                            }
-                            mRepeatNo = Integer.toString(repeatNo);
-                            mRepeatNoText.setText(mRepeatNo);
-                            updateRepeatText();
-                        }
-                    }
-                });
-        alert.setNegativeButton(R.string.cancel, new DialogInterface.OnClickListener() {
-            public void onClick(DialogInterface dialog, int whichButton) {
-                // Do nothing
-            }
-        });
-        alert.show();
+        final String[] counts = new String[]{"1", "2", "3", "4", "5", "6"};
+        final String[] labels = new String[counts.length];
+        for (int i = 0; i < counts.length; i++) {
+            labels[i] = getString(R.string.times_per_period, counts[i]);
+        }
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.times_per_repeat)
+                .setItems(labels, (dialog, item) -> {
+                    mRepeatNo = counts[item];
+                    adjustDoseTimes(Integer.parseInt(mRepeatNo));
+                    mRepeatNoText.setText(timesCountLabel());
+                    updateDoseTimesText();
+                    updateRepeatText();
+                })
+                .show();
     }
 
     public void addStockBatch(View v) {
@@ -473,7 +504,10 @@ public class ReminderEditActivity extends AppCompatActivity implements
 
     private void updateRepeatText() {
         if ("true".equals(mRepeat)) {
-            mRepeatText.setText(getString(R.string.repeat_every, mRepeatNo, repeatTypeLabel(mRepeatType)));
+            mRepeatText.setText(getString(R.string.schedule_summary,
+                    repeatTypeLabel(mRepeatType),
+                    timesCountLabel(),
+                    formatDoseTimes()));
         } else {
             mRepeatText.setText(R.string.repeat_off);
         }
@@ -535,9 +569,7 @@ public class ReminderEditActivity extends AppCompatActivity implements
     }
 
     private String repeatTypeLabel(String repeatType) {
-        if ("Hour".equals(repeatType)) {
-            return getString(R.string.hour);
-        } else if ("Day".equals(repeatType)) {
+        if ("Day".equals(repeatType)) {
             return getString(R.string.day);
         } else if ("Week".equals(repeatType)) {
             return getString(R.string.week);
@@ -547,33 +579,6 @@ public class ReminderEditActivity extends AppCompatActivity implements
         return getString(R.string.minute);
     }
 
-    private Calendar buildReminderCalendar() {
-        Calendar calendar = Calendar.getInstance();
-        calendar.set(Calendar.MONTH, mMonth - 1);
-        calendar.set(Calendar.YEAR, mYear);
-        calendar.set(Calendar.DAY_OF_MONTH, mDay);
-        calendar.set(Calendar.HOUR_OF_DAY, mHour);
-        calendar.set(Calendar.MINUTE, mMinute);
-        calendar.set(Calendar.SECOND, 0);
-        calendar.set(Calendar.MILLISECOND, 0);
-        return calendar;
-    }
-
-    private long getRepeatTime() {
-        if (mRepeatType.equals("Minute")) {
-            return Integer.parseInt(mRepeatNo) * milMinute;
-        } else if (mRepeatType.equals("Hour")) {
-            return Integer.parseInt(mRepeatNo) * milHour;
-        } else if (mRepeatType.equals("Day")) {
-            return Integer.parseInt(mRepeatNo) * milDay;
-        } else if (mRepeatType.equals("Week")) {
-            return Integer.parseInt(mRepeatNo) * milWeek;
-        } else if (mRepeatType.equals("Month")) {
-            return Integer.parseInt(mRepeatNo) * milMonth;
-        }
-        return milDay;
-    }
-
     private boolean validateReminderInput() {
         mTitle = mTitleText.getText().toString().trim();
         if (mTitle.length() == 0) {
@@ -581,17 +586,18 @@ public class ReminderEditActivity extends AppCompatActivity implements
             return false;
         }
 
-        try {
-            int repeatNo = Integer.parseInt(mRepeatNoText.getText().toString().trim());
-            if (repeatNo <= 0) {
-                mRepeatNoText.setText("1");
-                mRepeatNo = "1";
-            } else {
-                mRepeatNo = Integer.toString(repeatNo);
-            }
-        } catch (NumberFormatException e) {
-            mRepeatNoText.setText("1");
-            mRepeatNo = "1";
+        int repeatNo = repeatCount();
+        if (repeatNo < 1 || repeatNo > 6) {
+            repeatNo = 1;
+        }
+        mRepeatNo = Integer.toString(repeatNo);
+        adjustDoseTimes(repeatNo);
+
+        Calendar start = parseDate(mDate);
+        Calendar end = parseDate(mEndDate);
+        if (start == null || end == null || end.getTimeInMillis() < start.getTimeInMillis()) {
+            Toast.makeText(getApplicationContext(), R.string.end_date_before_start, Toast.LENGTH_SHORT).show();
+            return false;
         }
 
         try {
@@ -607,6 +613,79 @@ public class ReminderEditActivity extends AppCompatActivity implements
 
         updateRepeatText();
         return true;
+    }
+
+    private void adjustDoseTimes(int count) {
+        while (mDoseTimes.size() < count) {
+            mDoseTimes.add(mDoseTimes.isEmpty() ? mTime : mDoseTimes.get(mDoseTimes.size() - 1));
+        }
+        while (mDoseTimes.size() > count) {
+            mDoseTimes.remove(mDoseTimes.size() - 1);
+        }
+        if (!mDoseTimes.isEmpty()) {
+            mTime = mDoseTimes.get(0);
+        }
+    }
+
+    private int repeatCount() {
+        try {
+            return Integer.parseInt(mRepeatNo);
+        } catch (NumberFormatException e) {
+            return 1;
+        }
+    }
+
+    private String timesCountLabel() {
+        return getString(R.string.times_per_period, mRepeatNo);
+    }
+
+    private void updateDoseTimesText() {
+        mTimeText.setText(formatDoseTimes());
+    }
+
+    private String formatDoseTimes() {
+        return joinDoseTimes().replace(",", ", ");
+    }
+
+    private String joinDoseTimes() {
+        return medichine.mediacationalert.mytherapy.utils.ReminderSchedule.joinDoseTimes(mDoseTimes);
+    }
+
+    private void restoreDoseTimes(String raw) {
+        mDoseTimes.clear();
+        if (raw != null) {
+            String[] parts = raw.split(",");
+            for (String part : parts) {
+                String time = part.trim();
+                if (time.length() > 0) {
+                    mDoseTimes.add(time);
+                }
+            }
+        }
+        if (mDoseTimes.isEmpty()) {
+            mDoseTimes.add(mTime);
+        }
+        mTime = mDoseTimes.get(0);
+    }
+
+    private Calendar parseDate(String date) {
+        String[] parts = date == null ? new String[0] : date.split("/");
+        if (parts.length != 3) {
+            return null;
+        }
+        try {
+            Calendar calendar = Calendar.getInstance();
+            calendar.set(Calendar.DAY_OF_MONTH, Integer.parseInt(parts[0]));
+            calendar.set(Calendar.MONTH, Integer.parseInt(parts[1]) - 1);
+            calendar.set(Calendar.YEAR, Integer.parseInt(parts[2]));
+            calendar.set(Calendar.HOUR_OF_DAY, 0);
+            calendar.set(Calendar.MINUTE, 0);
+            calendar.set(Calendar.SECOND, 0);
+            calendar.set(Calendar.MILLISECOND, 0);
+            return calendar;
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     private String formatQuantity(double value) {
@@ -666,14 +745,6 @@ public class ReminderEditActivity extends AppCompatActivity implements
             return;
         }
 
-        Calendar reminderCalendar = buildReminderCalendar();
-        if ("true".equals(mActive) && "false".equals(mRepeat)
-                && reminderCalendar.getTimeInMillis() <= System.currentTimeMillis()) {
-            Toast.makeText(getApplicationContext(), R.string.choose_future_time, Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        // Set new values in the reminder
         mReceivedReminder.setTitle(mTitle);
         mReceivedReminder.setDate(mDate);
         mReceivedReminder.setTime(mTime);
@@ -684,6 +755,14 @@ public class ReminderEditActivity extends AppCompatActivity implements
         mReceivedReminder.setDose(mDose);
         mReceivedReminder.setIconType(mIconType);
         mReceivedReminder.setIconUri(mIconUri);
+        mReceivedReminder.setEndDate(mEndDate);
+        mReceivedReminder.setDoseTimes(joinDoseTimes());
+
+        if ("true".equals(mActive)
+                && medichine.mediacationalert.mytherapy.utils.ReminderSchedule.nextOccurrenceAfter(mReceivedReminder, System.currentTimeMillis()) == null) {
+            Toast.makeText(getApplicationContext(), R.string.choose_future_time, Toast.LENGTH_SHORT).show();
+            return;
+        }
 
         // Update reminder
         rb.updateReminder(mReceivedReminder);
@@ -696,12 +775,7 @@ public class ReminderEditActivity extends AppCompatActivity implements
 
         // Create a new notification
         if (mActive.equals("true")) {
-            mRepeatTime = getRepeatTime();
-            if (mRepeat.equals("true")) {
-                mAlarmReceiver.setRepeatAlarm(getApplicationContext(), reminderCalendar, mReceivedID, mRepeatTime);
-            } else if (mRepeat.equals("false")) {
-                mAlarmReceiver.setAlarm(getApplicationContext(), reminderCalendar, mReceivedID);
-            }
+            mAlarmReceiver.scheduleReminder(getApplicationContext(), mReceivedReminder);
         }
         Fun.addShow();
         // Create toast to confirm update
@@ -765,7 +839,13 @@ public class ReminderEditActivity extends AppCompatActivity implements
     public void onTimeSet(TimePickerDialog view, int hourOfDay, int minute, int second) {
         mHour = hourOfDay;
         mMinute = minute;
-        mTime = formatTime(hourOfDay, minute);
-        mTimeText.setText(mTime);
+        String selectedTime = formatTime(hourOfDay, minute);
+        if (mTimePickerIndex < 0 || mTimePickerIndex >= mDoseTimes.size()) {
+            mTimePickerIndex = 0;
+        }
+        mDoseTimes.set(mTimePickerIndex, selectedTime);
+        mTime = mDoseTimes.get(0);
+        updateDoseTimesText();
+        updateRepeatText();
     }
 }

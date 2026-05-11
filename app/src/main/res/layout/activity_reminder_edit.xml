@@ -145,7 +145,7 @@
                             android:id="@+id/date_text"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="@string/date"
+                            android:text="@string/start_date"
                             android:textColor="@color/black"
                             android:textSize="15dp" />
 
@@ -159,6 +159,51 @@
 
                     </LinearLayout>
 
+                </RelativeLayout>
+
+                <RelativeLayout
+                    android:id="@+id/end_date"
+                    android:layout_width="match_parent"
+                    android:layout_height="70dp"
+                    android:layout_marginStart="10dp"
+                    android:layout_marginTop="10dp"
+                    android:layout_marginEnd="10dp"
+                    android:background="@drawable/corner1"
+                    android:clickable="true"
+                    android:onClick="setEndDate">
+
+                    <ImageView
+                        android:id="@+id/end_date_icon"
+                        android:layout_width="50dp"
+                        android:layout_height="50dp"
+                        android:layout_alignParentLeft="true"
+                        android:layout_centerVertical="true"
+                        android:layout_marginLeft="16dp"
+                        android:layout_marginRight="32dp"
+                        android:background="@drawable/baseline_calendar_month_24" />
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_centerVertical="true"
+                        android:layout_toRightOf="@id/end_date_icon"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/end_date"
+                            android:textColor="@color/black"
+                            android:textSize="15dp" />
+
+                        <TextView
+                            android:id="@+id/set_end_date"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/end_date"
+                            android:textColor="@color/grey_calendar"
+                            android:textSize="15dp" />
+                    </LinearLayout>
                 </RelativeLayout>
 
                 <RelativeLayout
@@ -193,7 +238,7 @@
                             android:id="@+id/time_text"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="@string/time"
+                            android:text="@string/dose_times"
                             android:textColor="@color/black"
                             android:textSize="15dp" />
 
@@ -201,7 +246,7 @@
                             android:id="@+id/set_time"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="@string/time"
+                            android:text="@string/dose_times"
                             android:textColor="@color/grey_calendar"
                             android:textSize="15dp" />
 
@@ -301,7 +346,7 @@
                             android:id="@+id/repeat_no_text"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="@string/repeat_no"
+                            android:text="@string/times_per_repeat"
                             android:textColor="@color/black"
                             android:textSize="15dp" />
 

@@ -73,24 +73,26 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
             return;
         }
 
-        List<Reminder> group = rb.getActiveRemindersAt(reminder.getDate(), reminder.getTime());
+        String scheduledAt = intent.getStringExtra(EXTRA_SCHEDULED_AT);
+        if (scheduledAt == null || scheduledAt.length() == 0) {
+            scheduledAt = ReminderSchedule.format(ReminderSchedule.currentOccurrence(reminder, rb));
+        }
+        List<Reminder> group = rb.getActiveRemindersAt(scheduledAt);
         if (group.isEmpty()) {
             group.add(reminder);
         }
-        String scheduledAt = ReminderSchedule.format(ReminderSchedule.currentOccurrence(reminder, rb));
         showReminderNotification(context, reminder, group, scheduledAt);
+        scheduleReminderAfter(context, reminder, System.currentTimeMillis() + 60000L);
     }
 
     private void confirmGroupFromNotification(Context context, Intent intent) {
-        String date = intent.getStringExtra(EXTRA_GROUP_DATE);
-        String time = intent.getStringExtra(EXTRA_GROUP_TIME);
         String scheduledAt = intent.getStringExtra(EXTRA_SCHEDULED_AT);
-        if (date == null || time == null || scheduledAt == null) {
+        if (scheduledAt == null) {
             return;
         }
 
         ReminderDatabase rb = new ReminderDatabase(context);
-        List<Reminder> group = rb.getActiveRemindersAt(date, time);
+        List<Reminder> group = rb.getActiveRemindersAt(scheduledAt);
         ArrayList<Integer> reminderIds = new ArrayList<>();
         for (Reminder reminder : group) {
             reminderIds.add(reminder.getID());
@@ -98,7 +100,7 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
 
         ReminderDatabase.ConfirmResult result = rb.confirmReminderGroup(reminderIds, scheduledAt);
         NotificationManager notificationManager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
-        int notificationId = notificationIdFor(date, time);
+        int notificationId = notificationIdFor(scheduledAt);
         if (result.success) {
             notificationManager.cancel(CHANNEL_ID, notificationId);
         } else {
@@ -115,16 +117,14 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
     private void showReminderNotification(Context context, Reminder reminder, List<Reminder> group, String scheduledAt) {
         // Create intent to open ReminderEditActivity on notification click
         Intent mainIntent = new Intent(context, MainActivity.class);
-        PendingIntent mClick = PendingIntent.getActivity(context, notificationIdFor(reminder.getDate(), reminder.getTime()), mainIntent, AppUtils.Companion.getFlag());
+        PendingIntent mClick = PendingIntent.getActivity(context, notificationIdFor(scheduledAt), mainIntent, AppUtils.Companion.getFlag());
 
         Intent takenIntent = new Intent(context, AlarmReceiver.class);
         takenIntent.setAction(ACTION_TAKE_GROUP);
-        takenIntent.putExtra(EXTRA_GROUP_DATE, reminder.getDate());
-        takenIntent.putExtra(EXTRA_GROUP_TIME, reminder.getTime());
         takenIntent.putExtra(EXTRA_SCHEDULED_AT, scheduledAt);
         PendingIntent takenClick = PendingIntent.getBroadcast(
                 context,
-                notificationIdFor(reminder.getDate(), reminder.getTime()) + 1,
+                notificationIdFor(scheduledAt) + 1,
                 takenIntent,
                 AppUtils.Companion.getFlag());
 
@@ -152,7 +152,7 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
         createNotificationChannel(this.manager);
         myNotication2 = mBuilder.build();
 
-        this.manager.notify(CHANNEL_ID, notificationIdFor(reminder.getDate(), reminder.getTime()), mBuilder.build());
+        this.manager.notify(CHANNEL_ID, notificationIdFor(scheduledAt), mBuilder.build());
     }
 
     private String buildGroupText(List<Reminder> group) {
@@ -177,8 +177,8 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
         }
     }
 
-    private int notificationIdFor(String date, String time) {
-        return Math.abs((date + " " + time).hashCode());
+    private int notificationIdFor(String scheduledAt) {
+        return Math.abs(scheduledAt.hashCode());
     }
 
     private String formatQuantity(double value) {
@@ -194,6 +194,7 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
         // Put Reminder ID in Intent Extra
         Intent intent = new Intent(context, AlarmReceiver.class);
         intent.putExtra(ReminderEditActivity.EXTRA_REMINDER_ID, Integer.toString(ID));
+        intent.putExtra(EXTRA_SCHEDULED_AT, ReminderSchedule.format(calendar));
         mPendingIntent = PendingIntent.getBroadcast(context, ID, intent, AppUtils.Companion.getFlag());
 
         // Calculate notification time
@@ -215,32 +216,56 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
     }
 
     public boolean setRepeatAlarm(Context context, Calendar calendar, int ID, long RepeatTime) {
-        if (RepeatTime <= 0) {
+        Reminder reminder = new ReminderDatabase(context).getReminder(ID);
+        if (reminder == null) {
+            return false;
+        }
+        return scheduleReminder(context, reminder);
+    }
+
+    public boolean scheduleReminder(Context context, Reminder reminder) {
+        return scheduleReminderAfter(context, reminder, System.currentTimeMillis());
+    }
+
+    public boolean scheduleReminderAfter(Context context, Reminder reminder, long afterMillis) {
+        Calendar next = nextPendingOccurrence(context, reminder, afterMillis);
+        if (next == null) {
             return false;
         }
         mAlarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
 
-        // Put Reminder ID in Intent Extra
         Intent intent = new Intent(context, AlarmReceiver.class);
-        intent.putExtra(ReminderEditActivity.EXTRA_REMINDER_ID, Integer.toString(ID));
-        mPendingIntent = PendingIntent.getBroadcast(context, ID, intent, AppUtils.Companion.getFlag());
+        intent.putExtra(ReminderEditActivity.EXTRA_REMINDER_ID, Integer.toString(reminder.getID()));
+        intent.putExtra(EXTRA_SCHEDULED_AT, ReminderSchedule.format(next));
+        mPendingIntent = PendingIntent.getBroadcast(context, reminder.getID(), intent, AppUtils.Companion.getFlag());
 
-        // Calculate notification timein
-        Calendar c = Calendar.getInstance();
-        long currentTime = c.getTimeInMillis();
-        long diffTime = calendar.getTimeInMillis() - currentTime;
-        while (diffTime <= 0) {
-            diffTime += RepeatTime;
+        long diffTime = next.getTimeInMillis() - System.currentTimeMillis();
+        if (diffTime <= 0) {
+            diffTime = 1000L;
         }
-
-        // Start alarm using initial notification time and repeat interval time
-        mAlarmManager.setRepeating(AlarmManager.ELAPSED_REALTIME_WAKEUP,
+        mAlarmManager.set(AlarmManager.ELAPSED_REALTIME_WAKEUP,
                 SystemClock.elapsedRealtime() + diffTime,
-                RepeatTime , mPendingIntent);
+                mPendingIntent);
 
-        // Restart alarm if device is rebooted
         setBootReceiverEnabled(context, true);
         return true;
+    }
+
+    private Calendar nextPendingOccurrence(Context context, Reminder reminder, long afterMillis) {
+        ReminderDatabase rb = new ReminderDatabase(context);
+        long endMillis = ReminderSchedule.parseDate(reminder.getEndDate()).getTimeInMillis()
+                + 24L * 60L * 60L * 1000L - 1L;
+        Calendar next = null;
+        for (Calendar occurrence : ReminderSchedule.occurrencesBetween(reminder, afterMillis, endMillis)) {
+            String scheduledAt = ReminderSchedule.format(occurrence);
+            if (rb.isReminderTaken(reminder.getID(), scheduledAt)) {
+                continue;
+            }
+            if (next == null || occurrence.getTimeInMillis() < next.getTimeInMillis()) {
+                next = occurrence;
+            }
+        }
+        return next;
     }
 
     public void cancelAlarm(Context context, int ID) {
