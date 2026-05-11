@@ -8,10 +8,12 @@ import android.database.sqlite.SQLiteOpenHelper;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 import medichine.mediacationalert.mytherapy.model.HealthEntry;
 import medichine.mediacationalert.mytherapy.model.LabResult;
@@ -619,6 +621,62 @@ public class ReminderDatabase extends SQLiteOpenHelper {
         return count;
     }
 
+    public String exportCurrentAccountArchiveCsv() {
+        StringBuilder builder = new StringBuilder();
+        builder.append("scheduled_date,actual_date,type,name,value,unit,status,end_date\n");
+        Set<String> exportedLogs = appendIntakeLogExportRows(builder);
+        for (Reminder reminder : getAllReminders()) {
+            for (String time : ReminderSchedule.doseTimes(reminder)) {
+                String scheduledAt = reminder.getDate() + " " + time;
+                if (exportedLogs.contains(logExportKey(reminder.getID(), scheduledAt))) {
+                    continue;
+                }
+                appendCsvRow(builder,
+                        archiveDateTime(scheduledAt),
+                        "",
+                        "drug",
+                        reminder.getTitle(),
+                        String.valueOf(reminder.getDose()),
+                        "",
+                        "planned",
+                        archiveEndDate(reminder.getEndDate()));
+            }
+        }
+        return builder.toString();
+    }
+
+    private Set<String> appendIntakeLogExportRows(StringBuilder builder) {
+        Set<String> exportedLogs = new HashSet<>();
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = db.rawQuery("SELECT l." + LOG_REMINDER_ID + ", l." + LOG_TITLE
+                        + ", l." + LOG_DOSE + ", l." + LOG_SCHEDULED_AT + ", l." + LOG_TAKEN_AT
+                        + ", r." + KEY_END_DATE
+                        + " FROM " + TABLE_INTAKE_LOGS + " l"
+                        + " LEFT JOIN " + TABLE_REMINDERS + " r ON r." + KEY_ID + "=l." + LOG_REMINDER_ID
+                        + " AND r." + KEY_ACCOUNT_ID + "=l." + LOG_ACCOUNT_ID
+                        + " WHERE l." + LOG_ACCOUNT_ID + "=?"
+                        + " ORDER BY l." + LOG_SCHEDULED_AT + " ASC, l." + LOG_ID + " ASC",
+                new String[]{accountIdText()});
+        if (cursor.moveToFirst()) {
+            do {
+                int reminderId = cursor.getInt(0);
+                String scheduledAt = cursor.getString(3);
+                exportedLogs.add(logExportKey(reminderId, scheduledAt));
+                appendCsvRow(builder,
+                        archiveDateTime(scheduledAt),
+                        cursor.getString(4),
+                        "drug",
+                        cursor.getString(1),
+                        String.valueOf(cursor.getDouble(2)),
+                        "",
+                        "confirmed",
+                        archiveEndDate(cursor.getString(5)));
+            } while (cursor.moveToNext());
+        }
+        cursor.close();
+        return exportedLogs;
+    }
+
     public long addHealthEntry(HealthEntry entry) {
         SQLiteDatabase db = this.getWritableDatabase();
         ContentValues values = new ContentValues();
@@ -1077,6 +1135,46 @@ public class ReminderDatabase extends SQLiteOpenHelper {
 
     private String normalizeTitle(String title) {
         return title == null ? "" : title.trim();
+    }
+
+    private String logExportKey(int reminderId, String scheduledAt) {
+        return reminderId + "|" + (scheduledAt == null ? "" : scheduledAt);
+    }
+
+    private String archiveDateTime(String scheduledAt) {
+        if (scheduledAt == null || scheduledAt.length() == 0) {
+            return "";
+        }
+        return new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US)
+                .format(ReminderSchedule.parseScheduledAt(scheduledAt).getTime());
+    }
+
+    private String archiveEndDate(String endDate) {
+        if (endDate == null || endDate.length() == 0 || Reminder.isNoEndDate(endDate)) {
+            return "";
+        }
+        return new SimpleDateFormat("yyyy-MM-dd", Locale.US)
+                .format(ReminderSchedule.parseDate(endDate).getTime());
+    }
+
+    private void appendCsvRow(StringBuilder builder, String... values) {
+        for (int i = 0; i < values.length; i++) {
+            if (i > 0) {
+                builder.append(',');
+            }
+            builder.append(csvValue(values[i]));
+        }
+        builder.append('\n');
+    }
+
+    private String csvValue(String value) {
+        if (value == null) {
+            return "";
+        }
+        if (value.contains(",") || value.contains("\"") || value.contains("\n")) {
+            return "\"" + value.replace("\"", "\"\"") + "\"";
+        }
+        return value;
     }
 
     private boolean hasMatchingDoseTime(Reminder left, Reminder right) {

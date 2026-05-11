@@ -122,9 +122,14 @@
     <string name="course_show_all">所有</string>
     <string name="duplicate_reminder_plan">已存在相同药品、时间和剂量的计划</string>
     <string name="default_account">默认账户</string>
+    <string name="account_info">账户信息</string>
     <string name="switch_account">切换账户</string>
     <string name="add_account">添加账户</string>
     <string name="rename_account">修改账户名称</string>
+    <string name="import_data">导入数据</string>
+    <string name="export_data">导出数据</string>
+    <string name="export_success">数据已导出</string>
+    <string name="export_failed">导出失败</string>
     <string name="account_name_hint">账户名称</string>
     <string name="account_name_required">账户名称不能为空</string>
     <string name="account_name_exists">账户名称已存在</string>

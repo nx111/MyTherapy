@@ -44,6 +44,9 @@ import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.OutputStreamWriter;
+import java.nio.charset.StandardCharsets;
 import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
@@ -85,6 +88,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     private static final int PAGE_REPORT = 4;
     private static final int PAGE_HISTORY = 5;
     private static final int REQUEST_IMPORT_ARCHIVE = 3001;
+    private static final int REQUEST_EXPORT_ARCHIVE = 3002;
 
     private BillingClient billingClient;
     private Prefs prefs;
@@ -98,7 +102,6 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     private CheckBox mCourseShowAll;
     private LinearLayout mWeekCalendarRow;
     private FloatingActionButton mAddReminderButton;
-    private FloatingActionButton mImportArchiveButton;
     private BottomNavigationView mBottomNavigation;
     private final LinkedHashMap<Integer, Integer> IDmap = new LinkedHashMap<>();
     private final LinkedHashMap<Integer, Integer> summaryIDmap = new LinkedHashMap<>();
@@ -136,7 +139,6 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         FrameLayout adContainerView = findViewById(R.id.ad_view_container);
         showBanner(this, adContainerView);
         mAddReminderButton = findViewById(R.id.add_reminder);
-        mImportArchiveButton = findViewById(R.id.import_archive);
         mList = findViewById(R.id.reminder_list);
         mNoReminderView = findViewById(R.id.no_reminder_text);
         mSelectedDateText = findViewById(R.id.selected_date_text);
@@ -172,9 +174,12 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
             }
         });
 
-        mImportArchiveButton.setOnClickListener(v -> openArchiveImport());
         mCalendarButton.setOnClickListener(v -> showSelectedDatePicker());
-        mAccountButton.setOnClickListener(v -> showAccountDialog());
+        mAccountButton.setOnClickListener(v -> showAccountInfoDialog());
+        mAccountButton.setOnLongClickListener(v -> {
+            showAccountDialog();
+            return true;
+        });
         mCourseShowAll.setOnCheckedChangeListener((buttonView, isChecked) -> {
             if (mCurrentPage == PAGE_COURSE) {
                 loadCurrentPage();
@@ -220,6 +225,28 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         loadCurrentPage();
     }
 
+    private void showAccountInfoDialog() {
+        String[] actions = new String[]{
+                getString(R.string.import_data),
+                getString(R.string.export_data),
+                getString(R.string.rename_account)
+        };
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.account_info)
+                .setMessage(rb.getCurrentAccountName())
+                .setItems(actions, (dialog, which) -> {
+                    if (which == 0) {
+                        openArchiveImport();
+                    } else if (which == 1) {
+                        openArchiveExport();
+                    } else {
+                        showRenameAccountDialog();
+                    }
+                })
+                .setNegativeButton(R.string.cancel, null)
+                .show();
+    }
+
     private void showAccountDialog() {
         List<Account> accounts = rb.getAccounts();
         String[] labels = new String[accounts.size()];
@@ -235,7 +262,6 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 .setTitle(R.string.switch_account)
                 .setItems(labels, (dialog, which) -> switchToAccount(accounts.get(which).mId))
                 .setPositiveButton(R.string.add_account, (dialog, which) -> showAddAccountDialog())
-                .setNeutralButton(R.string.rename_account, (dialog, which) -> showRenameAccountDialog())
                 .setNegativeButton(R.string.cancel, null)
                 .show();
     }
@@ -337,16 +363,54 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         startActivityForResult(intent, REQUEST_IMPORT_ARCHIVE);
     }
 
+    private void openArchiveExport() {
+        Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("text/csv");
+        intent.putExtra(Intent.EXTRA_TITLE, exportFileName());
+        startActivityForResult(intent, REQUEST_EXPORT_ARCHIVE);
+    }
+
+    private String exportFileName() {
+        String accountName = rb.getCurrentAccountName();
+        String safeName = accountName == null ? "" : accountName.replaceAll("[\\\\/:*?\"<>|]+", "_").trim();
+        if (safeName.length() == 0) {
+            safeName = getString(R.string.app_name);
+        }
+        String timestamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Calendar.getInstance().getTime());
+        return safeName + "-" + timestamp + ".csv";
+    }
+
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        if (requestCode != REQUEST_IMPORT_ARCHIVE || resultCode != RESULT_OK || data == null) {
+        if (resultCode != RESULT_OK || data == null) {
             return;
         }
 
         Uri uri = data.getData();
-        if (uri != null) {
+        if (uri == null) {
+            return;
+        }
+        if (requestCode == REQUEST_IMPORT_ARCHIVE) {
             importArchive(uri);
+        } else if (requestCode == REQUEST_EXPORT_ARCHIVE) {
+            exportArchive(uri);
+        }
+    }
+
+    private void exportArchive(Uri uri) {
+        try (OutputStream outputStream = getContentResolver().openOutputStream(uri)) {
+            if (outputStream == null) {
+                Toast.makeText(this, R.string.export_failed, Toast.LENGTH_SHORT).show();
+                return;
+            }
+            OutputStreamWriter writer = new OutputStreamWriter(outputStream, StandardCharsets.UTF_8);
+            writer.write(rb.exportCurrentAccountArchiveCsv());
+            writer.flush();
+            Toast.makeText(this, R.string.export_success, Toast.LENGTH_SHORT).show();
+        } catch (IOException | RuntimeException e) {
+            Toast.makeText(this, R.string.export_failed, Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -718,12 +782,12 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     }
 
     private void updateActionButtons() {
-        if (mAddReminderButton == null || mImportArchiveButton == null || mCalendarButton == null
-                || mAccountButton == null || mCourseShowAll == null) {
+        if (mAddReminderButton == null || mCalendarButton == null || mAccountButton == null
+                || mCourseShowAll == null) {
             return;
         }
         mAccountButton.setVisibility(View.VISIBLE);
-        mAccountButton.setContentDescription(getString(R.string.switch_account)
+        mAccountButton.setContentDescription(getString(R.string.account_info)
                 + ": " + rb.getCurrentAccountName());
         mCourseShowAll.setVisibility(mCurrentPage == PAGE_COURSE ? View.VISIBLE : View.GONE);
         if (mCurrentPage == PAGE_COURSE) {
@@ -733,10 +797,8 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 Intent intent = new Intent(v.getContext(), ReminderAddActivity.class);
                 startActivity(intent);
             });
-            mImportArchiveButton.setVisibility(View.VISIBLE);
         } else {
             mAddReminderButton.setVisibility(View.GONE);
-            mImportArchiveButton.setVisibility(View.GONE);
         }
         mCalendarButton.setVisibility(mCurrentPage == PAGE_TODAY ? View.VISIBLE : View.GONE);
     }

@@ -142,9 +142,14 @@
     <string name="course_show_all">All</string>
     <string name="duplicate_reminder_plan">A plan with the same medicine, time, and dose already exists</string>
     <string name="default_account">Default account</string>
+    <string name="account_info">Account Info</string>
     <string name="switch_account">Switch Account</string>
     <string name="add_account">Add Account</string>
     <string name="rename_account">Rename Account</string>
+    <string name="import_data">Import Data</string>
+    <string name="export_data">Export Data</string>
+    <string name="export_success">Data exported</string>
+    <string name="export_failed">Export failed</string>
     <string name="account_name_hint">Account name</string>
     <string name="account_name_required">Account name is required</string>
     <string name="account_name_exists">Account name already exists</string>
