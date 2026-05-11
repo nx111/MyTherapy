@@ -291,12 +291,20 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         content.addView(accountName, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
-        Button importButton = accountActionButton(R.string.import_data);
-        Button exportButton = accountActionButton(R.string.export_data);
-        Button renameButton = accountActionButton(R.string.rename_account);
-        content.addView(importButton);
-        content.addView(exportButton);
-        content.addView(renameButton);
+        LinearLayout actions = new LinearLayout(this);
+        actions.setOrientation(LinearLayout.HORIZONTAL);
+        actions.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams actionsParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        actionsParams.topMargin = dp(14);
+        content.addView(actions, actionsParams);
+
+        Button importButton = accountActionButton(R.string.import_data, R.drawable.ic_import_24);
+        Button exportButton = accountActionButton(R.string.export_data, R.drawable.ic_export_24);
+        Button renameButton = accountActionButton(R.string.rename_account, R.drawable.baseline_edit_24);
+        actions.addView(importButton);
+        actions.addView(exportButton);
+        actions.addView(renameButton);
 
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle(R.string.account_info)
@@ -318,13 +326,20 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         dialog.show();
     }
 
-    private Button accountActionButton(int textRes) {
+    private Button accountActionButton(int textRes, int iconRes) {
         Button button = new Button(this);
         button.setText(textRes);
         button.setAllCaps(false);
+        button.setTextSize(12);
+        button.setGravity(Gravity.CENTER);
+        button.setMinHeight(dp(76));
+        button.setCompoundDrawablesWithIntrinsicBounds(0, iconRes, 0, 0);
+        button.setCompoundDrawablePadding(dp(6));
+        button.setMaxLines(2);
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        params.topMargin = dp(10);
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
+        params.leftMargin = dp(4);
+        params.rightMargin = dp(4);
         button.setLayoutParams(params);
         return button;
     }
