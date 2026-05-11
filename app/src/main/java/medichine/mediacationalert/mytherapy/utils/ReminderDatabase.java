@@ -186,11 +186,13 @@ public class ReminderDatabase extends SQLiteOpenHelper {
     }
 
     private void ensureDefaultAccount(SQLiteDatabase db) {
-        Cursor cursor = db.query(TABLE_ACCOUNTS, new String[]{ACCOUNT_ID}, ACCOUNT_ID + "=?",
+        Cursor cursor = db.query(TABLE_ACCOUNTS, new String[]{ACCOUNT_ID, ACCOUNT_NAME}, ACCOUNT_ID + "=?",
                 new String[]{String.valueOf(DEFAULT_ACCOUNT_ID)}, null, null, null, "1");
         boolean exists = cursor.moveToFirst();
+        String existingName = exists ? cursor.getString(cursor.getColumnIndexOrThrow(ACCOUNT_NAME)) : "";
         cursor.close();
         if (exists) {
+            updateLegacyDefaultAccountName(db, existingName);
             return;
         }
 
@@ -199,6 +201,21 @@ public class ReminderDatabase extends SQLiteOpenHelper {
         values.put(ACCOUNT_NAME, mContext.getString(R.string.default_account));
         values.put(ACCOUNT_CREATED_AT, nowText());
         db.insertWithOnConflict(TABLE_ACCOUNTS, null, values, SQLiteDatabase.CONFLICT_IGNORE);
+    }
+
+    private void updateLegacyDefaultAccountName(SQLiteDatabase db, String existingName) {
+        String defaultName = mContext.getString(R.string.default_account);
+        if (!isLegacyDefaultAccountName(existingName) || defaultName.equals(existingName)) {
+            return;
+        }
+        ContentValues values = new ContentValues();
+        values.put(ACCOUNT_NAME, defaultName);
+        db.update(TABLE_ACCOUNTS, values, ACCOUNT_ID + "=?",
+                new String[]{String.valueOf(DEFAULT_ACCOUNT_ID)});
+    }
+
+    private boolean isLegacyDefaultAccountName(String name) {
+        return "默认账户".equals(name) || "Default account".equals(name);
     }
 
     private void ensureActiveAccount() {

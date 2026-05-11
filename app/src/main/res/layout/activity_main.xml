@@ -63,7 +63,7 @@
                 android:paddingEnd="2dp"
                 android:textColor="@color/text_primary"
                 android:textSize="14sp"
-                tools:text="默认账户" />
+                tools:text="我" />
 
             <ImageButton
                 android:id="@+id/account_button"
