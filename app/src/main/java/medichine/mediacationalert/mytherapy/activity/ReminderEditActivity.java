@@ -54,7 +54,6 @@ public class ReminderEditActivity extends AppCompatActivity implements
     private int mReceivedID;
     private int mYear, mMonth, mHour, mMinute, mDay;
     private long mRepeatTime;
-    private Calendar mCalendar;
     private Reminder mReceivedReminder;
     private ReminderDatabase rb;
     private AlarmReceiver mAlarmReceiver;
@@ -148,7 +147,7 @@ public class ReminderEditActivity extends AppCompatActivity implements
         mTimeText.setText(mTime);
         mRepeatNoText.setText(mRepeatNo);
         mRepeatTypeText.setText(mRepeatType);
-        mRepeatText.setText("Every " + mRepeatNo + " " + mRepeatType + "(s)");
+        updateRepeatText();
 
         // To save state on device rotation
         if (savedInstanceState != null) {
@@ -164,9 +163,7 @@ public class ReminderEditActivity extends AppCompatActivity implements
             mDateText.setText(savedDate);
             mDate = savedDate;
 
-            String saveRepeat = savedInstanceState.getString(KEY_REPEAT);
-            mRepeatText.setText(saveRepeat);
-            mRepeat = saveRepeat;
+            mRepeat = savedInstanceState.getString(KEY_REPEAT);
 
             String savedRepeatNo = savedInstanceState.getString(KEY_REPEAT_NO);
             mRepeatNoText.setText(savedRepeatNo);
@@ -177,6 +174,7 @@ public class ReminderEditActivity extends AppCompatActivity implements
             mRepeatType = savedRepeatType;
 
             mActive = savedInstanceState.getString(KEY_ACTIVE);
+            updateRepeatText();
         }
 
         // Setup up active buttons
@@ -192,14 +190,14 @@ public class ReminderEditActivity extends AppCompatActivity implements
         // Setup repeat switch
         if (mRepeat.equals("false")) {
             mRepeatSwitch.setChecked(false);
-            mRepeatText.setText(R.string.repeat_off);
+            updateRepeatText();
 
         } else if (mRepeat.equals("true")) {
             mRepeatSwitch.setChecked(true);
+            updateRepeatText();
         }
 
         // Obtain Date and Time details
-        mCalendar = Calendar.getInstance();
         mAlarmReceiver = new AlarmReceiver();
 
         mDateSplit = mDate.split("/");
@@ -220,7 +218,7 @@ public class ReminderEditActivity extends AppCompatActivity implements
         outState.putCharSequence(KEY_TITLE, mTitleText.getText());
         outState.putCharSequence(KEY_TIME, mTimeText.getText());
         outState.putCharSequence(KEY_DATE, mDateText.getText());
-        outState.putCharSequence(KEY_REPEAT, mRepeatText.getText());
+        outState.putString(KEY_REPEAT, mRepeat);
         outState.putCharSequence(KEY_REPEAT_NO, mRepeatNoText.getText());
         outState.putCharSequence(KEY_REPEAT_TYPE, mRepeatTypeText.getText());
         outState.putCharSequence(KEY_ACTIVE, mActive);
@@ -287,11 +285,11 @@ public class ReminderEditActivity extends AppCompatActivity implements
         boolean on = ((Switch) view).isChecked();
         if (on) {
             mRepeat = "true";
-            mRepeatText.setText("Every " + mRepeatNo + " " + mRepeatType + "(s)");
+            updateRepeatText();
 
         } else {
             mRepeat = "false";
-            mRepeatText.setText(R.string.repeat_off);
+            updateRepeatText();
         }
     }
 
@@ -314,7 +312,7 @@ public class ReminderEditActivity extends AppCompatActivity implements
 
                 mRepeatType = items[item];
                 mRepeatTypeText.setText(mRepeatType);
-                mRepeatText.setText("Every " + mRepeatNo + " " + mRepeatType + "(s)");
+                updateRepeatText();
             }
         });
         AlertDialog alert = builder.create();
@@ -337,11 +335,15 @@ public class ReminderEditActivity extends AppCompatActivity implements
                         if (input.getText().toString().length() == 0) {
                             mRepeatNo = Integer.toString(1);
                             mRepeatNoText.setText(mRepeatNo);
-                            mRepeatText.setText("Every " + mRepeatNo + " " + mRepeatType + "(s)");
+                            updateRepeatText();
                         } else {
-                            mRepeatNo = input.getText().toString().trim();
+                            int repeatNo = Integer.parseInt(input.getText().toString().trim());
+                            if (repeatNo <= 0) {
+                                repeatNo = 1;
+                            }
+                            mRepeatNo = Integer.toString(repeatNo);
                             mRepeatNoText.setText(mRepeatNo);
-                            mRepeatText.setText("Every " + mRepeatNo + " " + mRepeatType + "(s)");
+                            updateRepeatText();
                         }
                     }
                 });
@@ -353,8 +355,84 @@ public class ReminderEditActivity extends AppCompatActivity implements
         alert.show();
     }
 
+    private void updateRepeatText() {
+        if ("true".equals(mRepeat)) {
+            mRepeatText.setText("Every " + mRepeatNo + " " + mRepeatType + "(s)");
+        } else {
+            mRepeatText.setText(R.string.repeat_off);
+        }
+    }
+
+    private Calendar buildReminderCalendar() {
+        Calendar calendar = Calendar.getInstance();
+        calendar.set(Calendar.MONTH, mMonth - 1);
+        calendar.set(Calendar.YEAR, mYear);
+        calendar.set(Calendar.DAY_OF_MONTH, mDay);
+        calendar.set(Calendar.HOUR_OF_DAY, mHour);
+        calendar.set(Calendar.MINUTE, mMinute);
+        calendar.set(Calendar.SECOND, 0);
+        calendar.set(Calendar.MILLISECOND, 0);
+        return calendar;
+    }
+
+    private long getRepeatTime() {
+        if (mRepeatType.equals("Minute")) {
+            return Integer.parseInt(mRepeatNo) * milMinute;
+        } else if (mRepeatType.equals("Hour")) {
+            return Integer.parseInt(mRepeatNo) * milHour;
+        } else if (mRepeatType.equals("Day")) {
+            return Integer.parseInt(mRepeatNo) * milDay;
+        } else if (mRepeatType.equals("Week")) {
+            return Integer.parseInt(mRepeatNo) * milWeek;
+        } else if (mRepeatType.equals("Month")) {
+            return Integer.parseInt(mRepeatNo) * milMonth;
+        }
+        return milDay;
+    }
+
+    private boolean validateReminderInput() {
+        mTitle = mTitleText.getText().toString().trim();
+        if (mTitle.length() == 0) {
+            mTitleText.setError("Reminder Title cannot be blank!");
+            return false;
+        }
+
+        try {
+            int repeatNo = Integer.parseInt(mRepeatNoText.getText().toString().trim());
+            if (repeatNo <= 0) {
+                mRepeatNoText.setText("1");
+                mRepeatNo = "1";
+            } else {
+                mRepeatNo = Integer.toString(repeatNo);
+            }
+        } catch (NumberFormatException e) {
+            mRepeatNoText.setText("1");
+            mRepeatNo = "1";
+        }
+        updateRepeatText();
+        return true;
+    }
+
+    private String formatTime(int hour, int minute) {
+        if (minute < 10) {
+            return hour + ":0" + minute;
+        }
+        return hour + ":" + minute;
+    }
+
     // On clicking the update button
     public void updateReminder() {
+        if (!validateReminderInput()) {
+            return;
+        }
+
+        Calendar reminderCalendar = buildReminderCalendar();
+        if ("true".equals(mActive) && "false".equals(mRepeat)
+                && reminderCalendar.getTimeInMillis() <= System.currentTimeMillis()) {
+            Toast.makeText(getApplicationContext(), "Choose a future time", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
         // Set new values in the reminder
         mReceivedReminder.setTitle(mTitle);
         mReceivedReminder.setDate(mDate);
@@ -367,43 +445,23 @@ public class ReminderEditActivity extends AppCompatActivity implements
         // Update reminder
         rb.updateReminder(mReceivedReminder);
 
-        // Set up calender for creating the notification
-        mCalendar.set(Calendar.MONTH, --mMonth);
-        mCalendar.set(Calendar.YEAR, mYear);
-        mCalendar.set(Calendar.DAY_OF_MONTH, mDay);
-        mCalendar.set(Calendar.HOUR_OF_DAY, mHour);
-        mCalendar.set(Calendar.MINUTE, mMinute);
-        mCalendar.set(Calendar.SECOND, 0);
-
         // Cancel existing notification of the reminder by using its ID
         mAlarmReceiver.cancelAlarm(getApplicationContext(), mReceivedID);
 
-        // Check repeat type
-        if (mRepeatType.equals("Minute")) {
-            mRepeatTime = Integer.parseInt(mRepeatNo) * milMinute;
-        } else if (mRepeatType.equals("Hour")) {
-            mRepeatTime = Integer.parseInt(mRepeatNo) * milHour;
-        } else if (mRepeatType.equals("Day")) {
-            mRepeatTime = Integer.parseInt(mRepeatNo) * milDay;
-        } else if (mRepeatType.equals("Week")) {
-            mRepeatTime = Integer.parseInt(mRepeatNo) * milWeek;
-        } else if (mRepeatType.equals("Month")) {
-            mRepeatTime = Integer.parseInt(mRepeatNo) * milMonth;
-        }
-
         // Create a new notification
         if (mActive.equals("true")) {
+            mRepeatTime = getRepeatTime();
             if (mRepeat.equals("true")) {
-                mAlarmReceiver.setRepeatAlarm(getApplicationContext(), mCalendar, mReceivedID, mRepeatTime);
+                mAlarmReceiver.setRepeatAlarm(getApplicationContext(), reminderCalendar, mReceivedID, mRepeatTime);
             } else if (mRepeat.equals("false")) {
-                mAlarmReceiver.setAlarm(getApplicationContext(), mCalendar, mReceivedID);
+                mAlarmReceiver.setAlarm(getApplicationContext(), reminderCalendar, mReceivedID);
             }
         }
         Fun.addShow();
         // Create toast to confirm update
         Toast.makeText(getApplicationContext(), "Edited",
                 Toast.LENGTH_SHORT).show();
-        onBackPressed();
+        finish();
     }
 
     // On pressing the back button
@@ -433,14 +491,7 @@ public class ReminderEditActivity extends AppCompatActivity implements
             // On clicking save reminder button
             // Update reminder
             case R.id.save_reminder:
-                mTitleText.setText(mTitle);
-
-                if (mTitleText.getText().toString().length() == 0)
-                    mTitleText.setError("Reminder Title cannot be blank!");
-
-                else {
-                    updateReminder();
-                }
+                updateReminder();
                 return true;
 
             // On clicking discard reminder button
@@ -450,11 +501,13 @@ public class ReminderEditActivity extends AppCompatActivity implements
                         Toast.LENGTH_SHORT).show();
                 Reminder temp = rb.getReminder(mReceivedID);
 
-                rb.deleteReminder(temp);
+                if (temp != null) {
+                    rb.deleteReminder(temp);
+                }
                 mAlarmReceiver.cancelAlarm(getApplicationContext(), mReceivedID);
                 Fun.addShow();
 
-                onBackPressed();
+                finish();
                 return true;
 
             default:
@@ -466,11 +519,7 @@ public class ReminderEditActivity extends AppCompatActivity implements
     public void onTimeSet(TimePickerDialog view, int hourOfDay, int minute, int second) {
         mHour = hourOfDay;
         mMinute = minute;
-        if (minute < 10) {
-            mTime = hourOfDay + ":" + "0" + minute;
-        } else {
-            mTime = hourOfDay + ":" + minute;
-        }
+        mTime = formatTime(hourOfDay, minute);
         mTimeText.setText(mTime);
     }
 }
