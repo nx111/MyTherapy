@@ -35,7 +35,7 @@
                 android:ellipsize="end"
                 android:maxLines="1"
                 android:textColor="@color/text_primary"
-                android:textSize="24sp"
+                android:textSize="18sp"
                 android:textStyle="bold"
                 tools:text="今日 2026/5/11" />
 

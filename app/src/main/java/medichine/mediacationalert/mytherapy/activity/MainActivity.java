@@ -476,7 +476,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                     "",
                     reminderIds.isEmpty() ? "false" : "true",
                     details.toString(),
-                    reminderIds.isEmpty() ? getString(R.string.already_confirmed) : getString(R.string.stock_ready),
+                    "",
                     scheduledAt,
                     firstReminder.getIconType(),
                     firstReminder.getIconUri(),
@@ -1356,7 +1356,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         TextView date = new TextView(this);
         date.setGravity(Gravity.CENTER);
         date.setText(String.valueOf(day.get(Calendar.DAY_OF_MONTH)));
-        date.setTextSize(20);
+        date.setTextSize(13);
         date.setTypeface(Typeface.DEFAULT_BOLD);
         date.setTextColor(selected ? getResources().getColor(R.color.on_accent) : getResources().getColor(R.color.text_primary));
         LinearLayout.LayoutParams dateParams = new LinearLayout.LayoutParams(dp(42), dp(36));

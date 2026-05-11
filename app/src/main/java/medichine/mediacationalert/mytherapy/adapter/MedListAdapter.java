@@ -94,6 +94,7 @@ public class MedListAdapter extends RecyclerView.Adapter<MedListAdapter.SimpleHo
 
         public void setStockInfo(String stockInfo) {
             mStockInfoText.setText(stockInfo);
+            mStockInfoText.setVisibility(stockInfo == null || stockInfo.length() == 0 ? View.GONE : View.VISIBLE);
         }
 
         public void setActiveImage(String active) {
