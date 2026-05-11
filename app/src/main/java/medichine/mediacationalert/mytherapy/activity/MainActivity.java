@@ -176,11 +176,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         });
 
         mCalendarButton.setOnClickListener(v -> showSelectedDatePicker());
-        mAccountButton.setOnClickListener(v -> showAccountInfoDialog());
-        mAccountButton.setOnLongClickListener(v -> {
-            showAccountDialog();
-            return true;
-        });
+        bindAccountButtonActions();
         mCourseShowAll.setOnCheckedChangeListener((buttonView, isChecked) -> {
             if (mCurrentPage == PAGE_COURSE) {
                 loadCurrentPage();
@@ -190,6 +186,18 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         mAlarmReceiver = new AlarmReceiver();
         updateCalendarHeader();
         loadCurrentPage();
+    }
+
+    private void bindAccountButtonActions() {
+        if (mAccountButton == null) {
+            return;
+        }
+        mAccountButton.setOnClickListener(v -> showAccountInfoDialog());
+        mAccountButton.setLongClickable(true);
+        mAccountButton.setOnLongClickListener(v -> {
+            showAccountDialog();
+            return true;
+        });
     }
 
     private void requestNotificationPermission() {
@@ -838,6 +846,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         mAccountButton.setVisibility(View.VISIBLE);
         mAccountButton.setContentDescription(getString(R.string.account_info)
                 + ": " + rb.getCurrentAccountName());
+        bindAccountButtonActions();
         mCourseShowAll.setVisibility(mCurrentPage == PAGE_COURSE ? View.VISIBLE : View.GONE);
         if (mCurrentPage == PAGE_COURSE) {
             mAddReminderButton.setVisibility(View.VISIBLE);
