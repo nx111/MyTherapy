@@ -1575,7 +1575,12 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         content.addView(createMedicineHeaderRow(normalizedTitle, reminders.get(0), dialogHolder));
 
         TextView summary = new TextView(this);
-        summary.setText(getString(R.string.stock_amount, formatQuantity(rb.getTotalStock(normalizedTitle))));
+        String summaryText = getString(R.string.stock_amount, formatQuantity(rb.getTotalStock(normalizedTitle)));
+        String specText = courseSpec(reminders);
+        if (specText.length() > 0) {
+            summaryText += "        " + getString(R.string.medicine_spec) + ": " + specText;
+        }
+        summary.setText(summaryText);
         summary.setTextColor(getResources().getColor(R.color.text_secondary));
         summary.setTextSize(14);
         content.addView(summary, new LinearLayout.LayoutParams(
@@ -1672,15 +1677,6 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         textGroup.addView(plan, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
-        if (reminder.getSpec().length() > 0) {
-            TextView spec = new TextView(this);
-            spec.setText(getString(R.string.medicine_spec_format, reminder.getSpec()));
-            spec.setTextColor(getResources().getColor(R.color.text_secondary));
-            spec.setTextSize(13);
-            textGroup.addView(spec, new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-        }
-
         TextView range = new TextView(this);
         range.setText(formatCourseDateRange(reminder));
         range.setTextColor(getResources().getColor(R.color.text_secondary));
@@ -1710,6 +1706,16 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         params.topMargin = dp(10);
         row.setLayoutParams(params);
         return row;
+    }
+
+    private String courseSpec(List<Reminder> reminders) {
+        for (Reminder reminder : reminders) {
+            String spec = reminder.getSpec();
+            if (spec.length() > 0) {
+                return spec;
+            }
+        }
+        return "";
     }
 
     private View createCourseActionRow(int iconRes, String label, View.OnClickListener listener) {
