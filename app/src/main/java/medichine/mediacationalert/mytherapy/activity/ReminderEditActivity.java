@@ -469,22 +469,24 @@ public class ReminderEditActivity extends AppCompatActivity implements
     }
 
     public void selectIconImage(View v) {
-        final String[] items = new String[]{getString(R.string.gallery), getString(R.string.camera), getString(R.string.use_icon)};
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle(R.string.medicine_photo);
-        builder.setItems(items, new DialogInterface.OnClickListener() {
-            public void onClick(DialogInterface dialog, int item) {
-                if (item == 0) {
-                    openGallery();
-                } else if (item == 1) {
-                    openCamera();
-                } else {
-                    mIconUri = "";
-                    updateIconPreview();
-                }
+        MedicineIconFactory.showImageSourcePicker(this, mIconType, mIconUri,
+                new MedicineIconFactory.ImageSourceListener() {
+            @Override
+            public void onGallerySelected() {
+                openGallery();
+            }
+
+            @Override
+            public void onCameraSelected() {
+                openCamera();
+            }
+
+            @Override
+            public void onUseIconSelected() {
+                mIconUri = "";
+                updateIconPreview();
             }
         });
-        builder.create().show();
     }
 
     private void openGallery() {

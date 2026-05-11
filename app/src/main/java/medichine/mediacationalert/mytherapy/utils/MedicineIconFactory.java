@@ -11,8 +11,15 @@ import android.graphics.Path;
 import android.graphics.PixelFormat;
 import android.graphics.RectF;
 import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
+import android.view.Gravity;
+import android.view.View;
+import android.widget.GridLayout;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.widget.TextView;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -26,6 +33,14 @@ public class MedicineIconFactory {
 
     public interface IconSelectedListener {
         void onIconSelected(String iconType);
+    }
+
+    public interface ImageSourceListener {
+        void onGallerySelected();
+
+        void onCameraSelected();
+
+        void onUseIconSelected();
     }
 
     private static class IconShape {
@@ -87,10 +102,55 @@ public class MedicineIconFactory {
                 context.getString(R.string.liquid)
         };
         String[] families = new String[]{"pill", "capsule", "liquid"};
-        new AlertDialog.Builder(context)
-                .setTitle(R.string.select_icon)
-                .setItems(labels, (dialog, which) -> showShapePicker(context, families[which], listener))
-                .show();
+        String[] previews = new String[]{
+                "pill_circle_white",
+                "capsule_slim_white",
+                "liquid_oral_bottle_white"
+        };
+        showPreviewDialog(context, context.getString(R.string.select_icon), labels, previews, true, which ->
+                showShapePicker(context, families[which], listener));
+    }
+
+    public static void showImageSourcePicker(Context context, String iconType, String iconUri,
+                                             ImageSourceListener listener) {
+        boolean hasPhoto = iconUri != null && iconUri.length() > 0;
+        int size = hasPhoto ? 4 : 3;
+        String[] labels = new String[size];
+        String[] previews = new String[size];
+        String[] previewUris = new String[size];
+        int index = 0;
+        if (hasPhoto) {
+            labels[index] = context.getString(R.string.photo_selected);
+            previews[index] = normalize(iconType);
+            previewUris[index] = iconUri;
+            index++;
+        }
+        labels[index] = context.getString(R.string.gallery);
+        previews[index] = "pill_square_blue";
+        previewUris[index] = "";
+        index++;
+        labels[index] = context.getString(R.string.camera);
+        previews[index] = "pill_circle_yellow";
+        previewUris[index] = "";
+        index++;
+        labels[index] = context.getString(R.string.use_icon);
+        previews[index] = normalize(iconType);
+        previewUris[index] = "";
+
+        showPreviewDialog(context, context.getString(R.string.medicine_photo),
+                labels, previews, previewUris, true, which -> {
+                    if (hasPhoto && which == 0) {
+                        return;
+                    }
+                    int action = hasPhoto ? which - 1 : which;
+                    if (action == 0) {
+                        listener.onGallerySelected();
+                    } else if (action == 1) {
+                        listener.onCameraSelected();
+                    } else {
+                        listener.onUseIconSelected();
+                    }
+                });
     }
 
     public static void apply(ImageView imageView, String iconType, String iconUri) {
@@ -145,25 +205,117 @@ public class MedicineIconFactory {
     private static void showShapePicker(Context context, String family, IconSelectedListener listener) {
         IconShape[] shapes = shapesForFamily(family);
         String[] labels = new String[shapes.length];
+        String[] previews = new String[shapes.length];
         for (int i = 0; i < shapes.length; i++) {
             labels[i] = context.getString(shapes[i].labelRes);
+            previews[i] = family + "_" + shapes[i].key + "_white";
         }
-        new AlertDialog.Builder(context)
-                .setTitle(familyLabel(context, family))
-                .setItems(labels, (dialog, which) -> showColorPicker(context, family, shapes[which].key, listener))
-                .show();
+        showPreviewDialog(context, familyLabel(context, family), labels, previews, true, which ->
+                showColorPicker(context, family, shapes[which].key, listener));
     }
 
     private static void showColorPicker(Context context, String family, String shape, IconSelectedListener listener) {
         String[] labels = new String[COLORS.length];
+        String[] previews = new String[COLORS.length];
         for (int i = 0; i < COLORS.length; i++) {
             labels[i] = context.getString(COLORS[i].labelRes);
+            previews[i] = family + "_" + shape + "_" + COLORS[i].key;
         }
-        new AlertDialog.Builder(context)
-                .setTitle(shapeLabel(context, family, shape))
-                .setItems(labels, (dialog, which) ->
-                        listener.onIconSelected(family + "_" + shape + "_" + COLORS[which].key))
-                .show();
+        showPreviewDialog(context, shapeLabel(context, family, shape), labels, previews, false, which ->
+                listener.onIconSelected(family + "_" + shape + "_" + COLORS[which].key));
+    }
+
+    private interface PreviewSelectedListener {
+        void onSelected(int index);
+    }
+
+    private static void showPreviewDialog(Context context, String title, String[] labels, String[] iconTypes,
+                                          boolean showLabels, PreviewSelectedListener listener) {
+        String[] iconUris = new String[iconTypes.length];
+        for (int i = 0; i < iconUris.length; i++) {
+            iconUris[i] = "";
+        }
+        showPreviewDialog(context, title, labels, iconTypes, iconUris, showLabels, listener);
+    }
+
+    private static void showPreviewDialog(Context context, String title, String[] labels, String[] iconTypes,
+                                          String[] iconUris, boolean showLabels,
+                                          PreviewSelectedListener listener) {
+        int padding = dp(context, 14);
+        GridLayout grid = new GridLayout(context);
+        grid.setColumnCount(showLabels ? Math.min(iconTypes.length, 3) : Math.min(iconTypes.length, 4));
+        grid.setPadding(padding, padding, padding, padding);
+        grid.setUseDefaultMargins(false);
+
+        AlertDialog[] dialogHolder = new AlertDialog[1];
+        for (int i = 0; i < iconTypes.length; i++) {
+            View tile = previewTile(context, labels[i], iconTypes[i], iconUris[i], showLabels);
+            final int index = i;
+            tile.setOnClickListener(v -> {
+                if (dialogHolder[0] != null) {
+                    dialogHolder[0].dismiss();
+                }
+                listener.onSelected(index);
+            });
+            GridLayout.LayoutParams params = new GridLayout.LayoutParams();
+            params.width = dp(context, showLabels ? 86 : 60);
+            params.height = GridLayout.LayoutParams.WRAP_CONTENT;
+            params.setMargins(dp(context, 4), dp(context, 4), dp(context, 4), dp(context, 4));
+            grid.addView(tile, params);
+        }
+
+        ScrollView scrollView = new ScrollView(context);
+        scrollView.addView(grid);
+        dialogHolder[0] = new AlertDialog.Builder(context)
+                .setTitle(title)
+                .setView(scrollView)
+                .setNegativeButton(R.string.cancel, null)
+                .create();
+        dialogHolder[0].show();
+    }
+
+    private static View previewTile(Context context, String label, String iconType, boolean showLabel) {
+        return previewTile(context, label, iconType, "", showLabel);
+    }
+
+    private static View previewTile(Context context, String label, String iconType, String iconUri,
+                                    boolean showLabel) {
+        LinearLayout tile = new LinearLayout(context);
+        tile.setOrientation(LinearLayout.VERTICAL);
+        tile.setGravity(Gravity.CENTER);
+        tile.setClickable(true);
+        tile.setFocusable(true);
+        tile.setContentDescription(label);
+        tile.setPadding(dp(context, 8), dp(context, 8), dp(context, 8), dp(context, 8));
+
+        GradientDrawable background = new GradientDrawable();
+        background.setColor(Color.TRANSPARENT);
+        background.setCornerRadius(dp(context, 8));
+        background.setStroke(dp(context, 1), Color.argb(80, 130, 138, 146));
+        tile.setBackground(background);
+
+        ImageView preview = new ImageView(context);
+        apply(preview, iconType, iconUri);
+        LinearLayout.LayoutParams imageParams = new LinearLayout.LayoutParams(dp(context, 48), dp(context, 48));
+        tile.addView(preview, imageParams);
+
+        if (showLabel) {
+            TextView text = new TextView(context);
+            text.setText(label);
+            text.setGravity(Gravity.CENTER);
+            text.setSingleLine(false);
+            text.setTextSize(12);
+            LinearLayout.LayoutParams textParams = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT);
+            textParams.topMargin = dp(context, 6);
+            tile.addView(text, textParams);
+        }
+        return tile;
+    }
+
+    private static int dp(Context context, int value) {
+        return Math.round(value * context.getResources().getDisplayMetrics().density);
     }
 
     private static String normalize(String iconType) {
@@ -313,15 +465,7 @@ public class MedicineIconFactory {
             } else if ("rectangle".equals(shape)) {
                 drawRound(canvas, new RectF(48, 62, 202, 188), 16);
             } else if ("oval_triangle".equals(shape)) {
-                Path path = new Path();
-                path.moveTo(72, 55);
-                path.lineTo(148, 55);
-                path.lineTo(218, 125);
-                path.lineTo(148, 195);
-                path.lineTo(72, 195);
-                path.cubicTo(30, 190, 30, 60, 72, 55);
-                path.close();
-                drawPathWithHighlight(canvas, path);
+                drawPathWithHighlight(canvas, ovalTrianglePath());
             } else if ("triangle".equals(shape)) {
                 Path path = regularPolygon(3, 125, 130, 84, -90);
                 drawPathWithHighlight(canvas, path);
@@ -407,6 +551,16 @@ public class MedicineIconFactory {
                     path.lineTo(x, y);
                 }
             }
+            path.close();
+            return path;
+        }
+
+        private Path ovalTrianglePath() {
+            Path path = new Path();
+            path.moveTo(125, 42);
+            path.cubicTo(180, 58, 218, 122, 215, 188);
+            path.cubicTo(174, 218, 76, 218, 35, 188);
+            path.cubicTo(32, 122, 70, 58, 125, 42);
             path.close();
             return path;
         }
