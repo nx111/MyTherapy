@@ -81,6 +81,7 @@ public class ReminderEditActivity extends AppCompatActivity implements
 
     // Constant Intent String
     public static final String EXTRA_REMINDER_ID = "Reminder_ID";
+    public static final String EXTRA_RESULT_TITLE = "Result_Title";
 
     // Values for orientation change
     private static final String KEY_TITLE = "title_key";
@@ -765,9 +766,6 @@ public class ReminderEditActivity extends AppCompatActivity implements
 
         // Update reminder
         rb.updateReminder(mReceivedReminder);
-        if ("false".equals(mActive)) {
-            rb.setActiveForTitle(mTitle, false);
-        }
 
         // Cancel existing notification of the reminder by using its ID
         mAlarmReceiver.cancelAlarm(getApplicationContext(), mReceivedID);
@@ -780,6 +778,9 @@ public class ReminderEditActivity extends AppCompatActivity implements
         // Create toast to confirm update
         Toast.makeText(getApplicationContext(), R.string.edited,
                 Toast.LENGTH_SHORT).show();
+        Intent result = new Intent();
+        result.putExtra(EXTRA_RESULT_TITLE, mReceivedReminder.getTitle());
+        setResult(RESULT_OK, result);
         finish();
     }
 
@@ -826,6 +827,9 @@ public class ReminderEditActivity extends AppCompatActivity implements
                 mAlarmReceiver.cancelAlarm(getApplicationContext(), mReceivedID);
                 Fun.addShow();
 
+                Intent result = new Intent();
+                result.putExtra(EXTRA_RESULT_TITLE, temp == null ? mTitle : temp.getTitle());
+                setResult(RESULT_OK, result);
                 finish();
                 return true;
 

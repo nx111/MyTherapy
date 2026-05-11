@@ -18,11 +18,13 @@ import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
 import android.view.Window;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.ImageButton;
 import android.widget.CheckBox;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -82,6 +84,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     private static final int PAGE_REPORT = 4;
     private static final int PAGE_HISTORY = 5;
     private static final int REQUEST_IMPORT_ARCHIVE = 3001;
+    private static final int REQUEST_EDIT_COURSE_REMINDER = 3002;
 
     private BillingClient billingClient;
     private Prefs prefs;
@@ -104,6 +107,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     private AlarmReceiver mAlarmReceiver;
     private int mCurrentPage = PAGE_TODAY;
     private Calendar mSelectedDate;
+    private String mPendingCourseDetailTitle;
 
     private List<ReminderItem> medicineList = new ArrayList<>();
     private List<SummaryItem> summaryList = new ArrayList<>();
@@ -309,15 +313,36 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQUEST_EDIT_COURSE_REMINDER) {
+            handleCourseEditResult(resultCode, data);
+            return;
+        }
+
         if (requestCode != REQUEST_IMPORT_ARCHIVE || resultCode != RESULT_OK || data == null) {
             return;
         }
 
         Uri uri = data.getData();
-        if (uri == null) {
+        if (uri != null) {
+            importArchive(uri);
+        }
+    }
+
+    private void handleCourseEditResult(int resultCode, Intent data) {
+        String title = mPendingCourseDetailTitle;
+        if (resultCode == RESULT_OK && data != null) {
+            String updatedTitle = data.getStringExtra(ReminderEditActivity.EXTRA_RESULT_TITLE);
+            if (updatedTitle != null && updatedTitle.trim().length() > 0) {
+                title = updatedTitle;
+            }
+        }
+        mPendingCourseDetailTitle = null;
+        if (resultCode != RESULT_OK || title == null || title.length() == 0) {
             return;
         }
-        importArchive(uri);
+        mCurrentPage = PAGE_COURSE;
+        loadCurrentPage();
+        showCourseMedicationDetails(title);
     }
 
     private void importArchive(Uri uri) {
@@ -1387,6 +1412,13 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         startActivity(i);
     }
 
+    private void editCourseReminder(Reminder reminder) {
+        mPendingCourseDetailTitle = reminder.getTitle();
+        Intent intent = new Intent(this, ReminderEditActivity.class);
+        intent.putExtra(ReminderEditActivity.EXTRA_REMINDER_ID, Integer.toString(reminder.getID()));
+        startActivityForResult(intent, REQUEST_EDIT_COURSE_REMINDER);
+    }
+
     @Override
     public void clickListener(int pos) {
         if (mCurrentPage == PAGE_TODAY && IDmap.containsKey(pos)) {
@@ -1401,23 +1433,189 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         if (reminders == null || reminders.isEmpty()) {
             return;
         }
-        if (reminders.size() == 1) {
-            selectReminder(reminders.get(0).getID());
+        showCourseMedicationDetails(reminders.get(0).getTitle());
+    }
+
+    private void showCourseMedicationDetails(String title) {
+        String normalizedTitle = normalizeTitle(title);
+        List<Reminder> reminders = courseRemindersForTitle(normalizedTitle);
+        if (reminders.isEmpty()) {
+            loadCurrentPage();
             return;
         }
 
-        String[] labels = new String[reminders.size()];
-        for (int i = 0; i < reminders.size(); i++) {
-            Reminder reminder = reminders.get(i);
-            labels[i] = getString(R.string.course_schedule_line,
-                    reminder.getDoseTimes().replace(",", ", "),
-                    formatQuantity(reminder.getDose()),
-                    "true".equals(reminder.getActive()) ? getString(R.string.active) : getString(R.string.paused));
+        Collections.sort(reminders, Comparator.comparingLong(item -> ReminderSchedule.parse(item).getTimeInMillis()));
+
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        int padding = dp(20);
+        content.setPadding(padding, dp(8), padding, 0);
+
+        TextView summary = new TextView(this);
+        summary.setText(getString(R.string.stock_amount, formatQuantity(rb.getTotalStock(normalizedTitle)))
+                + " · " + getString(R.string.reminder_count, reminders.size()));
+        summary.setTextColor(getResources().getColor(R.color.text_secondary));
+        summary.setTextSize(14);
+        content.addView(summary, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        final AlertDialog[] dialogHolder = new AlertDialog[1];
+        for (Reminder reminder : reminders) {
+            content.addView(createCoursePlanRow(reminder, normalizedTitle, dialogHolder));
         }
+
+        ScrollView scrollView = new ScrollView(this);
+        scrollView.addView(content);
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(normalizedTitle)
+                .setView(scrollView)
+                .setNegativeButton(R.string.cancel, null)
+                .create();
+        dialogHolder[0] = dialog;
+        dialog.show();
+    }
+
+    private View createCoursePlanRow(Reminder reminder, String title, AlertDialog[] dialogHolder) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.VERTICAL);
+        row.setClickable(true);
+        row.setPadding(dp(12), dp(10), dp(12), dp(10));
+
+        GradientDrawable background = new GradientDrawable();
+        background.setColor(getResources().getColor(R.color.surface_variant));
+        background.setStroke(dp(1), getResources().getColor(R.color.outline));
+        background.setCornerRadius(dp(8));
+        row.setBackground(background);
+
+        TextView plan = new TextView(this);
+        plan.setText(getString(R.string.course_schedule_line,
+                reminder.getDoseTimes().replace(",", ", "),
+                formatQuantity(reminder.getDose()),
+                "true".equals(reminder.getActive()) ? getString(R.string.active) : getString(R.string.paused)));
+        plan.setTextColor(getResources().getColor(R.color.text_primary));
+        plan.setTextSize(16);
+        row.addView(plan, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        TextView range = new TextView(this);
+        range.setText(formatCourseDate(reminder.getDate()) + " - " + formatCourseDate(reminder.getEndDate()));
+        range.setTextColor(getResources().getColor(R.color.text_secondary));
+        range.setTextSize(13);
+        row.addView(range, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        LinearLayout actions = new LinearLayout(this);
+        actions.setOrientation(LinearLayout.HORIZONTAL);
+        actions.setGravity(Gravity.END);
+
+        Button toggle = new Button(this);
+        toggle.setText("true".equals(reminder.getActive()) ? R.string.disable_plan : R.string.enable_plan);
+        toggle.setOnClickListener(v -> toggleCoursePlan(reminder, title, dialogHolder[0]));
+        actions.addView(toggle);
+
+        Button delete = new Button(this);
+        delete.setText(R.string.delete_plan);
+        delete.setOnClickListener(v -> confirmDeleteCoursePlan(reminder, title, dialogHolder[0]));
+        actions.addView(delete);
+
+        row.addView(actions, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        row.setOnClickListener(v -> {
+            if (dialogHolder[0] != null) {
+                dialogHolder[0].dismiss();
+            }
+            editCourseReminder(reminder);
+        });
+
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        params.topMargin = dp(10);
+        row.setLayoutParams(params);
+        return row;
+    }
+
+    private List<Reminder> courseRemindersForTitle(String title) {
+        ArrayList<Reminder> reminders = new ArrayList<>();
+        String normalizedTitle = normalizeTitle(title);
+        for (Reminder reminder : rb.getAllReminders()) {
+            if (normalizedTitle.equals(normalizeTitle(reminder.getTitle()))) {
+                reminders.add(reminder);
+            }
+        }
+        return reminders;
+    }
+
+    private void toggleCoursePlan(Reminder reminder, String title, AlertDialog currentDialog) {
+        Reminder fresh = rb.getReminder(reminder.getID());
+        if (fresh == null) {
+            return;
+        }
+
+        boolean activate = !"true".equals(fresh.getActive());
+        if (activate && ReminderSchedule.nextOccurrenceAfter(fresh, System.currentTimeMillis()) == null) {
+            Toast.makeText(getApplicationContext(), R.string.choose_future_time, Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        fresh.setActive(activate ? "true" : "false");
+        rb.updateReminder(fresh);
+        mAlarmReceiver.cancelAlarm(getApplicationContext(), fresh.getID());
+        if (activate) {
+            mAlarmReceiver.scheduleReminder(getApplicationContext(), fresh);
+        }
+        Toast.makeText(getApplicationContext(), R.string.edited, Toast.LENGTH_SHORT).show();
+        refreshCourseDetail(title, currentDialog);
+    }
+
+    private void confirmDeleteCoursePlan(Reminder reminder, String title, AlertDialog currentDialog) {
         new AlertDialog.Builder(this)
-                .setTitle(reminders.get(0).getTitle())
-                .setItems(labels, (dialog, which) -> selectReminder(reminders.get(which).getID()))
+                .setTitle(R.string.delete_plan)
+                .setMessage(R.string.delete_plan_message)
+                .setPositiveButton(R.string.delete_plan, (dialog, which) -> deleteCoursePlan(reminder, title, currentDialog))
+                .setNegativeButton(R.string.cancel, null)
                 .show();
+    }
+
+    private void deleteCoursePlan(Reminder reminder, String title, AlertDialog currentDialog) {
+        Reminder fresh = rb.getReminder(reminder.getID());
+        if (fresh == null) {
+            refreshCourseDetail(title, currentDialog);
+            return;
+        }
+        rb.deleteReminder(fresh);
+        mAlarmReceiver.cancelAlarm(getApplicationContext(), fresh.getID());
+        Toast.makeText(getApplicationContext(), R.string.deleted, Toast.LENGTH_SHORT).show();
+        refreshCourseDetail(title, currentDialog);
+    }
+
+    private void refreshCourseDetail(String title, AlertDialog currentDialog) {
+        if (currentDialog != null && currentDialog.isShowing()) {
+            currentDialog.dismiss();
+        }
+        loadCurrentPage();
+        if (!courseRemindersForTitle(title).isEmpty()) {
+            showCourseMedicationDetails(title);
+        }
+    }
+
+    private String formatCourseDate(String date) {
+        if (Reminder.isNoEndDate(date)) {
+            return getString(R.string.no_expiration);
+        }
+        String[] parts = date == null ? new String[0] : date.split("/");
+        if (parts.length != 3) {
+            return date == null ? "" : date;
+        }
+        try {
+            Calendar calendar = Calendar.getInstance();
+            calendar.set(Calendar.DAY_OF_MONTH, Integer.parseInt(parts[0]));
+            calendar.set(Calendar.MONTH, Integer.parseInt(parts[1]) - 1);
+            calendar.set(Calendar.YEAR, Integer.parseInt(parts[2]));
+            normalizeDate(calendar);
+            return formatDateLocalized(calendar, DateFormat.MEDIUM);
+        } catch (NumberFormatException e) {
+            return date;
+        }
     }
 
     @Override

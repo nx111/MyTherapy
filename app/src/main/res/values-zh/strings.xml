@@ -128,6 +128,10 @@
     <string name="account_switched">已切换到 %1$s</string>
     <string name="current_account_format">%1$s（当前）</string>
     <string name="header_account_format">%1$s · %2$s</string>
+    <string name="enable_plan">启用</string>
+    <string name="disable_plan">停用</string>
+    <string name="delete_plan">删除</string>
+    <string name="delete_plan_message">删除这个计划？</string>
     <string name="start_date">开始日期</string>
     <string name="end_date">结束日期</string>
     <string name="no_expiration">不过期</string>
