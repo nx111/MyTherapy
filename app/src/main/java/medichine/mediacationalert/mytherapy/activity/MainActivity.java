@@ -71,6 +71,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         }
         // Initialize reminder database
         rb = new ReminderDatabase(getApplicationContext());
+        prefs = new Prefs(this);
         new Fun(this);
 
         if (BuildConfig.ADS_ENABLED && Fun.checkInternet()) {
