@@ -6,6 +6,9 @@ public interface ItemClickListener {
     default void confirmListener(int pos) {
     }
 
+    default void reminderClickListener(int reminderId) {
+    }
+
     default boolean longClickListener(int pos) {
         return false;
     }

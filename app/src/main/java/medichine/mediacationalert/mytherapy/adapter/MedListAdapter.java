@@ -128,7 +128,9 @@ public class MedListAdapter extends RecyclerView.Adapter<MedListAdapter.SimpleHo
                 LinearLayout row = new LinearLayout(activity);
                 row.setOrientation(LinearLayout.HORIZONTAL);
                 row.setGravity(Gravity.CENTER_VERTICAL);
+                row.setClickable(true);
                 row.setPadding(0, dp(6), 0, dp(6));
+                row.setOnClickListener(v -> listener.reminderClickListener(line.reminderId));
 
                 ImageView icon = new ImageView(activity);
                 icon.setScaleType(ImageView.ScaleType.CENTER_CROP);

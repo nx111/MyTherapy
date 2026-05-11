@@ -1804,6 +1804,13 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     }
 
     @Override
+    public void reminderClickListener(int reminderId) {
+        if (mCurrentPage == PAGE_TODAY && reminderId > 0) {
+            selectReminder(reminderId);
+        }
+    }
+
+    @Override
     public boolean longClickListener(int pos) {
         if (mCurrentPage != PAGE_HISTORY || pos < 0 || pos >= summaryList.size()) {
             return false;
