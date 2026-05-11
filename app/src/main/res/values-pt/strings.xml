@@ -64,7 +64,7 @@
     <string name="dose_must_be_positive">A dose deve ser maior que 0</string>
     <string name="enter_valid_dose">Insira uma dose válida</string>
     <string name="could_not_save_photo">Não foi possível salvar a foto</string>
-    <string name="choose_future_time">Escolha um horário futuro</string>
+    <string name="choose_future_time">Escolha uma data final</string>
     <string name="could_not_save_reminder">Não foi possível salvar o lembrete</string>
     <string name="no_reminders_selected">Nenhum lembrete selecionado</string>
     <string name="already_confirmed">Já confirmado</string>

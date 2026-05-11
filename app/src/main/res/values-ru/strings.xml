@@ -64,7 +64,7 @@
     <string name="dose_must_be_positive">Доза должна быть больше 0</string>
     <string name="enter_valid_dose">Введите допустимую дозу</string>
     <string name="could_not_save_photo">Не удалось сохранить фото</string>
-    <string name="choose_future_time">Выберите будущее время</string>
+    <string name="choose_future_time">Выберите дату окончания</string>
     <string name="could_not_save_reminder">Не удалось сохранить напоминание</string>
     <string name="no_reminders_selected">Напоминания не выбраны</string>
     <string name="already_confirmed">Уже подтверждено</string>

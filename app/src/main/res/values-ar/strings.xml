@@ -64,7 +64,7 @@
     <string name="dose_must_be_positive">يجب أن تكون الجرعة أكبر من 0</string>
     <string name="enter_valid_dose">أدخل جرعة صالحة</string>
     <string name="could_not_save_photo">تعذر حفظ الصورة</string>
-    <string name="choose_future_time">اختر وقتا مستقبليا</string>
+    <string name="choose_future_time">اختر تاريخ الانتهاء</string>
     <string name="could_not_save_reminder">تعذر حفظ التذكير</string>
     <string name="no_reminders_selected">لم يتم اختيار أي تذكيرات</string>
     <string name="already_confirmed">تم التأكيد بالفعل</string>

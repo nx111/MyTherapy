@@ -64,7 +64,7 @@
     <string name="dose_must_be_positive">खुराक 0 से अधिक होनी चाहिए</string>
     <string name="enter_valid_dose">मान्य खुराक दर्ज करें</string>
     <string name="could_not_save_photo">फोटो सेव नहीं हो सकी</string>
-    <string name="choose_future_time">भविष्य का समय चुनें</string>
+    <string name="choose_future_time">समाप्ति तारीख चुनें</string>
     <string name="could_not_save_reminder">रिमाइंडर सेव नहीं हो सका</string>
     <string name="no_reminders_selected">कोई रिमाइंडर चयनित नहीं है</string>
     <string name="already_confirmed">पहले ही पुष्टि हो चुकी है</string>

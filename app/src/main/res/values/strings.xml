@@ -103,7 +103,7 @@
     <string name="dose_must_be_positive">Dose must be greater than 0</string>
     <string name="enter_valid_dose">Enter a valid dose</string>
     <string name="could_not_save_photo">Could not save photo</string>
-    <string name="choose_future_time">Choose a future time</string>
+    <string name="choose_future_time">Choose an end date</string>
     <string name="could_not_save_reminder">Could not save reminder</string>
     <string name="no_reminders_selected">No reminders selected</string>
     <string name="already_confirmed">Already confirmed</string>

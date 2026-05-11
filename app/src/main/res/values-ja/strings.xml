@@ -64,7 +64,7 @@
     <string name="dose_must_be_positive">用量は 0 より大きい必要があります</string>
     <string name="enter_valid_dose">有効な用量を入力してください</string>
     <string name="could_not_save_photo">写真を保存できませんでした</string>
-    <string name="choose_future_time">未来の時刻を選択してください</string>
+    <string name="choose_future_time">終了日を選択してください</string>
     <string name="could_not_save_reminder">リマインダーを保存できませんでした</string>
     <string name="no_reminders_selected">リマインダーが選択されていません</string>
     <string name="already_confirmed">すでに確認済み</string>

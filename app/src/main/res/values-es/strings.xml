@@ -64,7 +64,7 @@
     <string name="dose_must_be_positive">La dosis debe ser mayor que 0</string>
     <string name="enter_valid_dose">Ingresa una dosis válida</string>
     <string name="could_not_save_photo">No se pudo guardar la foto</string>
-    <string name="choose_future_time">Elige una hora futura</string>
+    <string name="choose_future_time">Elige una fecha de fin</string>
     <string name="could_not_save_reminder">No se pudo guardar el recordatorio</string>
     <string name="no_reminders_selected">No hay recordatorios seleccionados</string>
     <string name="already_confirmed">Ya confirmado</string>

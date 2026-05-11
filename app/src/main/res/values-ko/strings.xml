@@ -64,7 +64,7 @@
     <string name="dose_must_be_positive">복용량은 0보다 커야 합니다</string>
     <string name="enter_valid_dose">올바른 복용량을 입력하세요</string>
     <string name="could_not_save_photo">사진을 저장할 수 없습니다</string>
-    <string name="choose_future_time">미래 시간을 선택하세요</string>
+    <string name="choose_future_time">종료일을 선택하세요</string>
     <string name="could_not_save_reminder">알림을 저장할 수 없습니다</string>
     <string name="no_reminders_selected">선택된 알림이 없습니다</string>
     <string name="already_confirmed">이미 확인됨</string>
