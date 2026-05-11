@@ -449,8 +449,8 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                     reminderIds.add(reminder.getID());
                 }
                 double stock = rb.getTotalStock(reminder.getTitle());
-                String doseText = formatQuantity(reminder.getDose()) + " " + getString(R.string.pill);
-                String stockText = getString(R.string.stock_amount, formatQuantity(stock));
+                String doseText = formatDoseQuantity(reminder);
+                String stockText = getString(R.string.stock_amount, formatDoseQuantity(reminder, stock));
                 medicineLines.add(new ReminderItem.MedicineLine(
                         reminder.getID(),
                         reminder.getTitle(),
@@ -464,8 +464,8 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 }
                 details.append(getString(R.string.medicine_detail_line,
                         reminder.getTitle(),
-                        formatQuantity(reminder.getDose()),
-                        formatQuantity(stock)));
+                        formatDoseQuantity(reminder),
+                        formatDoseQuantity(reminder, stock)));
             }
 
             items.add(new ReminderItem(
@@ -522,7 +522,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
             String status = parts[1] + " " + (taken
                     ? "\u2713"
                     : active ? getString(R.string.not_taken) : getString(R.string.paused));
-            String details = formatQuantity(reminder.getDose()) + " " + getString(R.string.pill);
+            String details = formatDoseQuantity(reminder);
             items.add(new SummaryItem(
                     reminder.getTitle(),
                     "",
@@ -574,7 +574,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 }
                 details.append(getString(R.string.course_plan_line,
                         reminder.getDoseTimes().replace(",", ", "),
-                        formatQuantity(reminder.getDose())));
+                        formatDoseQuantity(reminder)));
             }
             if (shownCount == 0 || displayReminder == null) {
                 continue;
@@ -631,6 +631,23 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
             return String.valueOf((long) Math.round(value));
         }
         return String.format(java.util.Locale.US, "%.2f", value);
+    }
+
+    private String formatDoseQuantity(Reminder reminder) {
+        return formatDoseQuantity(reminder, reminder.getDose());
+    }
+
+    private String formatDoseQuantity(Reminder reminder, double value) {
+        String quantity = formatQuantity(value);
+        return usesPieceUnit(reminder) ? getString(R.string.dose_quantity_piece, quantity) : quantity;
+    }
+
+    private boolean usesPieceUnit(Reminder reminder) {
+        String iconType = reminder == null ? "" : reminder.getIconType();
+        return iconType == null
+                || iconType.length() == 0
+                || iconType.startsWith("pill")
+                || iconType.startsWith("capsule");
     }
 
     @Override
@@ -1549,7 +1566,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         TextView plan = new TextView(this);
         plan.setText(getString(R.string.course_plan_line,
                 reminder.getDoseTimes().replace(",", ", "),
-                formatQuantity(reminder.getDose())));
+                formatDoseQuantity(reminder)));
         plan.setTextColor(getResources().getColor(R.color.text_primary));
         plan.setTextSize(16);
         textGroup.addView(plan, new LinearLayout.LayoutParams(

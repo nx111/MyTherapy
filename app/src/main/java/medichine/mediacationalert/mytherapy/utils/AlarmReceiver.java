@@ -128,7 +128,7 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
                 takenIntent,
                 AppUtils.Companion.getFlag());
 
-        String contentText = buildGroupText(group);
+        String contentText = buildGroupText(context, group);
         String title = group.size() > 1
                 ? context.getString(R.string.medication_time_count, group.size())
                 : context.getString(R.string.time_to_take_medication);
@@ -155,13 +155,13 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
         this.manager.notify(CHANNEL_ID, notificationIdFor(scheduledAt), mBuilder.build());
     }
 
-    private String buildGroupText(List<Reminder> group) {
+    private String buildGroupText(Context context, List<Reminder> group) {
         StringBuilder builder = new StringBuilder();
         for (Reminder reminder : group) {
             if (builder.length() > 0) {
                 builder.append("\n");
             }
-            builder.append(reminder.getTitle()).append(" x").append(formatQuantity(reminder.getDose()));
+            builder.append(reminder.getTitle()).append(" ").append(formatDoseQuantity(context, reminder));
         }
         return builder.toString();
     }
@@ -186,6 +186,17 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
             return String.valueOf((long) Math.round(value));
         }
         return String.format(java.util.Locale.US, "%.2f", value);
+    }
+
+    private String formatDoseQuantity(Context context, Reminder reminder) {
+        String quantity = formatQuantity(reminder.getDose());
+        String iconType = reminder.getIconType();
+        if (iconType == null || iconType.length() == 0
+                || iconType.startsWith("pill")
+                || iconType.startsWith("capsule")) {
+            return context.getString(R.string.dose_quantity_piece, quantity);
+        }
+        return quantity;
     }
 
     public boolean setAlarm(Context context, Calendar calendar, int ID) {

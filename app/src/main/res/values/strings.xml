@@ -39,6 +39,7 @@
     <string name="pill">Pill</string>
     <string name="capsule">Capsule</string>
     <string name="liquid">Liquid</string>
+    <string name="dose_quantity_piece">%1$s pcs</string>
     <string name="icon_label_format">%1$s · %2$s</string>
     <string name="icon_color_white">White</string>
     <string name="icon_color_yellow">Yellow</string>
@@ -64,7 +65,7 @@
     <string name="stock_ready">Confirm all after taking every medicine in this time group</string>
     <string name="medicine_count_one">%1$d medicine</string>
     <string name="medicine_count_many">%1$d medicines</string>
-    <string name="medicine_detail_line">%1$s x%2$s • stock %3$s</string>
+    <string name="medicine_detail_line">%1$s %2$s • stock %3$s</string>
     <string name="medicine_detail_paused">%1$s • paused</string>
     <string name="medicine_detail_taken">%1$s • taken</string>
     <string name="status_paused_suffix"> • paused</string>
@@ -136,8 +137,8 @@
     <string name="active">Active</string>
     <string name="stock_amount">Stock: %1$s</string>
     <string name="reminder_count">%1$d reminder(s)</string>
-    <string name="course_schedule_line">%1$s x%2$s • %3$s</string>
-    <string name="course_plan_line">%1$s x%2$s</string>
+    <string name="course_schedule_line">%1$s %2$s • %3$s</string>
+    <string name="course_plan_line">%1$s %2$s</string>
     <string name="course_show_all">All</string>
     <string name="duplicate_reminder_plan">A plan with the same medicine, time, and dose already exists</string>
     <string name="default_account">Default account</string>
