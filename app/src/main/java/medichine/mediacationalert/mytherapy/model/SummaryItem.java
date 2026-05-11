@@ -10,6 +10,8 @@ public class SummaryItem {
     public String mActive;
     public boolean mHeader;
     public boolean mTaken;
+    public int mReminderId;
+    public String mScheduledAt;
 
     public SummaryItem(String title, String subtitle, String details, String status,
                        String iconType, String iconUri, String active) {
@@ -32,9 +34,17 @@ public class SummaryItem {
         this.mActive = active;
         this.mHeader = header;
         this.mTaken = taken;
+        this.mReminderId = -1;
+        this.mScheduledAt = "";
     }
 
     public static SummaryItem header(String title) {
         return new SummaryItem(title, "", "", "", "", "", "false", true, false);
+    }
+
+    public SummaryItem withHistoryMeta(int reminderId, String scheduledAt) {
+        this.mReminderId = reminderId;
+        this.mScheduledAt = scheduledAt == null ? "" : scheduledAt;
+        return this;
     }
 }

@@ -5,4 +5,8 @@ public interface ItemClickListener {
 
     default void confirmListener(int pos) {
     }
+
+    default boolean longClickListener(int pos) {
+        return false;
+    }
 }

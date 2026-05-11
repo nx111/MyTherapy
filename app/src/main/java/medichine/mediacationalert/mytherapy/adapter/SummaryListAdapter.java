@@ -71,6 +71,7 @@ public class SummaryListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHo
         holder.bindMode(item, mClickable);
         holder.itemView.setOnClickListener(mClickable ? v -> mListener.clickListener(position) : null);
         holder.itemView.setClickable(mClickable);
+        holder.itemView.setOnLongClickListener(v -> mListener.longClickListener(position));
     }
 
     @Override

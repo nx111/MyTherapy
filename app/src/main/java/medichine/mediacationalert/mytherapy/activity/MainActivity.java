@@ -531,7 +531,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                     reminder.getIconType(),
                     reminder.getIconUri(),
                     reminder.getActive(),
-                    taken));
+                    taken).withHistoryMeta(reminder.getID(), scheduled.scheduledAt));
         }
         return items;
     }
@@ -1394,6 +1394,38 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
             selectReminder(IDmap.get(pos));
         } else if (mCurrentPage == PAGE_COURSE && summaryIDmap.containsKey(pos)) {
             selectCourseReminder(pos);
+        }
+    }
+
+    @Override
+    public boolean longClickListener(int pos) {
+        if (mCurrentPage != PAGE_HISTORY || pos < 0 || pos >= summaryList.size()) {
+            return false;
+        }
+        SummaryItem item = summaryList.get(pos);
+        if (item.mHeader || item.mReminderId <= 0 || item.mScheduledAt.length() == 0) {
+            return false;
+        }
+        showHistoryStatusDialog(item);
+        return true;
+    }
+
+    private void showHistoryStatusDialog(SummaryItem item) {
+        String[] labels = new String[]{
+                getString(R.string.taken),
+                getString(R.string.not_taken)
+        };
+        new AlertDialog.Builder(this)
+                .setTitle(item.mTitle)
+                .setItems(labels, (dialog, which) -> updateHistoryStatus(item, which == 0))
+                .show();
+    }
+
+    private void updateHistoryStatus(SummaryItem item, boolean taken) {
+        ReminderDatabase.ConfirmResult result = rb.setReminderTakenStatus(item.mReminderId, item.mScheduledAt, taken);
+        Toast.makeText(getApplicationContext(), result.message, Toast.LENGTH_SHORT).show();
+        if (result.success) {
+            loadCurrentPage();
         }
     }
 

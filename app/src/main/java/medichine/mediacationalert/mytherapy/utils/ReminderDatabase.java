@@ -101,6 +101,18 @@ public class ReminderDatabase extends SQLiteOpenHelper {
         }
     }
 
+    private static class IntakeLog {
+        final int id;
+        final String title;
+        final double dose;
+
+        IntakeLog(int id, String title, double dose) {
+            this.id = id;
+            this.title = title;
+            this.dose = dose;
+        }
+    }
+
     public ReminderDatabase(Context context) {
         super(context, DATABASE_NAME, null, DATABASE_VERSION);
         mContext = context.getApplicationContext();
@@ -797,6 +809,55 @@ public class ReminderDatabase extends SQLiteOpenHelper {
         }
     }
 
+    public ConfirmResult setReminderTakenStatus(int reminderId, String scheduledAt, boolean taken) {
+        Reminder reminder = getReminder(reminderId);
+        if (reminder == null || scheduledAt == null || scheduledAt.length() == 0) {
+            return new ConfirmResult(false, mContext.getString(R.string.reminder_not_found), 0);
+        }
+
+        SQLiteDatabase db = this.getWritableDatabase();
+        db.beginTransaction();
+        try {
+            IntakeLog existingLog = getIntakeLog(db, reminderId, scheduledAt);
+            if (taken) {
+                if (existingLog != null) {
+                    db.setTransactionSuccessful();
+                    return new ConfirmResult(true, mContext.getString(R.string.already_confirmed), 0);
+                }
+                double stock = getTotalStock(reminder.getTitle());
+                if (stock + 0.000001 < reminder.getDose()) {
+                    return new ConfirmResult(false,
+                            mContext.getString(R.string.insufficient_stock,
+                                    reminder.getTitle(),
+                                    formatQuantity(reminder.getDose()),
+                                    formatQuantity(stock)), 0);
+                }
+                consumeStock(db, reminder.getTitle(), reminder.getDose());
+                ContentValues values = new ContentValues();
+                values.put(LOG_ACCOUNT_ID, mCurrentAccountId);
+                values.put(LOG_REMINDER_ID, reminder.getID());
+                values.put(LOG_TITLE, normalizeTitle(reminder.getTitle()));
+                values.put(LOG_DOSE, reminder.getDose());
+                values.put(LOG_SCHEDULED_AT, scheduledAt);
+                values.put(LOG_TAKEN_AT, nowText());
+                db.insertWithOnConflict(TABLE_INTAKE_LOGS, null, values, SQLiteDatabase.CONFLICT_IGNORE);
+            } else {
+                if (existingLog == null) {
+                    db.setTransactionSuccessful();
+                    return new ConfirmResult(true, mContext.getString(R.string.not_taken), 0);
+                }
+                db.delete(TABLE_INTAKE_LOGS,
+                        LOG_ID + "=? AND " + LOG_ACCOUNT_ID + "=?",
+                        new String[]{String.valueOf(existingLog.id), accountIdText()});
+                restoreStock(db, existingLog.title, existingLog.dose);
+            }
+            db.setTransactionSuccessful();
+            return new ConfirmResult(true, mContext.getString(taken ? R.string.taken : R.string.not_taken), 1);
+        } finally {
+            db.endTransaction();
+        }
+    }
+
     private void consumeStock(SQLiteDatabase db, String title, double amount) {
         double remaining = amount;
         Cursor cursor = db.query(TABLE_STOCK_BATCHES,
@@ -816,6 +877,37 @@ public class ReminderDatabase extends SQLiteOpenHelper {
             } while (remaining > 0.000001 && cursor.moveToNext());
         }
         cursor.close();
+    }
+
+    private void restoreStock(SQLiteDatabase db, String title, double amount) {
+        if (amount <= 0) {
+            return;
+        }
+        ContentValues values = new ContentValues();
+        values.put(STOCK_ACCOUNT_ID, mCurrentAccountId);
+        values.put(STOCK_TITLE, normalizeTitle(title));
+        values.put(STOCK_ORIGINAL_QUANTITY, amount);
+        values.put(STOCK_REMAINING_QUANTITY, amount);
+        values.put(STOCK_CREATED_AT, nowText());
+        db.insert(TABLE_STOCK_BATCHES, null, values);
+    }
+
+    private IntakeLog getIntakeLog(SQLiteDatabase db, int reminderId, String scheduledAt) {
+        Cursor cursor = db.query(TABLE_INTAKE_LOGS,
+                new String[]{LOG_ID, LOG_TITLE, LOG_DOSE},
+                LOG_REMINDER_ID + "=? AND " + LOG_SCHEDULED_AT + "=? AND " + LOG_ACCOUNT_ID + "=?",
+                new String[]{String.valueOf(reminderId), scheduledAt, accountIdText()},
+                null, null, null, "1");
+        if (!cursor.moveToFirst()) {
+            cursor.close();
+            return null;
+        }
+        IntakeLog log = new IntakeLog(
+                cursor.getInt(cursor.getColumnIndexOrThrow(LOG_ID)),
+                cursor.getString(cursor.getColumnIndexOrThrow(LOG_TITLE)),
+                cursor.getDouble(cursor.getColumnIndexOrThrow(LOG_DOSE)));
+        cursor.close();
+        return log;
     }
 
     private ContentValues toReminderValues(Reminder reminder) {
