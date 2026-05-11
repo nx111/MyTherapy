@@ -774,17 +774,6 @@ public class ReminderDatabase extends SQLiteOpenHelper {
             }
 
             for (Map.Entry<String, Double> entry : requiredByTitle.entrySet()) {
-                double stock = getTotalStock(entry.getKey());
-                if (stock + 0.000001 < entry.getValue()) {
-                    return new ConfirmResult(false,
-                            mContext.getString(R.string.insufficient_stock,
-                                    entry.getKey(),
-                                    formatQuantity(entry.getValue()),
-                                    formatQuantity(stock)), 0);
-                }
-            }
-
-            for (Map.Entry<String, Double> entry : requiredByTitle.entrySet()) {
                 consumeStock(db, entry.getKey(), entry.getValue());
             }
 
@@ -823,14 +812,6 @@ public class ReminderDatabase extends SQLiteOpenHelper {
                 if (existingLog != null) {
                     db.setTransactionSuccessful();
                     return new ConfirmResult(true, mContext.getString(R.string.already_confirmed), 0);
-                }
-                double stock = getTotalStock(reminder.getTitle());
-                if (stock + 0.000001 < reminder.getDose()) {
-                    return new ConfirmResult(false,
-                            mContext.getString(R.string.insufficient_stock,
-                                    reminder.getTitle(),
-                                    formatQuantity(reminder.getDose()),
-                                    formatQuantity(stock)), 0);
                 }
                 consumeStock(db, reminder.getTitle(), reminder.getDose());
                 ContentValues values = new ContentValues();
@@ -877,12 +858,19 @@ public class ReminderDatabase extends SQLiteOpenHelper {
             } while (remaining > 0.000001 && cursor.moveToNext());
         }
         cursor.close();
+        if (remaining > 0.000001) {
+            addStockAdjustment(db, title, -remaining);
+        }
     }
 
     private void restoreStock(SQLiteDatabase db, String title, double amount) {
         if (amount <= 0) {
             return;
         }
+        addStockAdjustment(db, title, amount);
+    }
+
+    private void addStockAdjustment(SQLiteDatabase db, String title, double amount) {
         ContentValues values = new ContentValues();
         values.put(STOCK_ACCOUNT_ID, mCurrentAccountId);
         values.put(STOCK_TITLE, normalizeTitle(title));
