@@ -39,7 +39,7 @@
     <string name="pill">Pill</string>
     <string name="capsule">Capsule</string>
     <string name="liquid">Liquid</string>
-    <string name="icon_label_format">%1$s · %2$s · %3$s</string>
+    <string name="icon_label_format">%1$s · %2$s</string>
     <string name="icon_color_white">White</string>
     <string name="icon_color_yellow">Yellow</string>
     <string name="icon_color_blue">Blue</string>

@@ -114,8 +114,7 @@ public class MedicineIconFactory {
         String shape = normalized.substring(family.length() + 1, normalized.length() - color.length() - 1);
         return context.getString(R.string.icon_label_format,
                 familyLabel(context, family),
-                shapeLabel(context, family, shape),
-                colorLabel(context, color));
+                shapeLabel(context, family, shape));
     }
 
     public static String saveScaledIcon(Context context, Uri uri) throws IOException {
