@@ -8,6 +8,7 @@ import android.app.DatePickerDialog;
 import android.app.ProgressDialog;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
@@ -15,6 +16,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.provider.MediaStore;
 import android.text.InputType;
 import android.util.Log;
 import android.view.Gravity;
@@ -96,6 +98,8 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     private static final int PAGE_HISTORY = 5;
     private static final int REQUEST_IMPORT_ARCHIVE = 3001;
     private static final int REQUEST_EXPORT_ARCHIVE = 3002;
+    private static final int REQUEST_PICK_COURSE_ICON_IMAGE = 3003;
+    private static final int REQUEST_CAPTURE_COURSE_ICON_IMAGE = 3004;
     private static final String COURSE_PLAN_SEPARATOR = "    ";
 
     private BillingClient billingClient;
@@ -118,6 +122,20 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     private final LinkedHashMap<Integer, List<Reminder>> courseReminderMap = new LinkedHashMap<>();
     private ReminderDatabase rb;
     private AlarmReceiver mAlarmReceiver;
+    private CourseIconEditState mCourseIconEditState;
+
+    private static class CourseIconEditState {
+        String iconType;
+        String iconUri;
+        ImageView preview;
+        TextView iconLabel;
+        TextView photoLabel;
+
+        CourseIconEditState(String iconType, String iconUri) {
+            this.iconType = iconType;
+            this.iconUri = iconUri == null ? "" : iconUri;
+        }
+    }
     private int mCurrentPage = PAGE_TODAY;
     private Calendar mSelectedDate;
     private final Handler mUiHandler = new Handler(Looper.getMainLooper());
@@ -485,7 +503,27 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
             return;
         }
 
+        if (requestCode == REQUEST_CAPTURE_COURSE_ICON_IMAGE) {
+            if (data.getExtras() != null) {
+                Object bitmap = data.getExtras().get("data");
+                if (bitmap instanceof Bitmap) {
+                    cropCourseIcon((Bitmap) bitmap);
+                }
+            }
+            return;
+        }
+
         Uri uri = data.getData();
+        if (requestCode == REQUEST_PICK_COURSE_ICON_IMAGE) {
+            if (uri != null) {
+                try {
+                    getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                } catch (SecurityException ignored) {
+                }
+                cropCourseIcon(uri);
+            }
+            return;
+        }
         if (uri == null) {
             return;
         }
@@ -494,6 +532,32 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         } else if (requestCode == REQUEST_EXPORT_ARCHIVE) {
             exportArchive(uri);
         }
+    }
+
+    private void cropCourseIcon(Uri uri) {
+        MedicineIconFactory.showCropDialog(this, uri, courseIconCropListener());
+    }
+
+    private void cropCourseIcon(Bitmap bitmap) {
+        MedicineIconFactory.showCropDialog(this, bitmap, courseIconCropListener());
+    }
+
+    private MedicineIconFactory.CroppedIconListener courseIconCropListener() {
+        return new MedicineIconFactory.CroppedIconListener() {
+            @Override
+            public void onCropped(String iconUri) {
+                if (mCourseIconEditState == null) {
+                    return;
+                }
+                mCourseIconEditState.iconUri = iconUri;
+                updateCourseIconEditorPreview(mCourseIconEditState);
+            }
+
+            @Override
+            public void onCropFailed() {
+                Toast.makeText(getApplicationContext(), R.string.could_not_save_photo, Toast.LENGTH_SHORT).show();
+            }
+        };
     }
 
     private void exportArchive(Uri uri) {
@@ -2046,8 +2110,9 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         form.addView(stockAlertThreshold, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
-        String[] selectedIconType = new String[]{displayReminder.getIconType()};
-        String[] selectedIconUri = new String[]{displayReminder.getIconUri()};
+        CourseIconEditState iconState = new CourseIconEditState(displayReminder.getIconType(), displayReminder.getIconUri());
+        mCourseIconEditState = iconState;
+
         LinearLayout iconRow = new LinearLayout(this);
         iconRow.setOrientation(LinearLayout.HORIZONTAL);
         iconRow.setGravity(Gravity.CENTER_VERTICAL);
@@ -2055,11 +2120,11 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         iconRow.setPadding(0, dp(12), 0, dp(4));
 
         ImageView preview = new ImageView(this);
-        MedicineIconFactory.apply(preview, selectedIconType[0], selectedIconUri[0]);
+        iconState.preview = preview;
         iconRow.addView(preview, new LinearLayout.LayoutParams(dp(48), dp(48)));
 
         TextView iconLabel = new TextView(this);
-        iconLabel.setText(MedicineIconFactory.label(this, selectedIconType[0]));
+        iconState.iconLabel = iconLabel;
         iconLabel.setTextColor(getResources().getColor(R.color.text_primary));
         iconLabel.setTextSize(16);
         LinearLayout.LayoutParams iconLabelParams = new LinearLayout.LayoutParams(
@@ -2067,13 +2132,65 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         iconLabelParams.leftMargin = dp(12);
         iconRow.addView(iconLabel, iconLabelParams);
         iconRow.setOnClickListener(v -> MedicineIconFactory.showPicker(this, iconType -> {
-            selectedIconType[0] = iconType;
-            selectedIconUri[0] = "";
-            MedicineIconFactory.apply(preview, selectedIconType[0], selectedIconUri[0]);
-            iconLabel.setText(MedicineIconFactory.label(this, selectedIconType[0]));
+            iconState.iconType = iconType;
+            iconState.iconUri = "";
+            updateCourseIconEditorPreview(iconState);
         }));
         form.addView(iconRow, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        LinearLayout photoRow = new LinearLayout(this);
+        photoRow.setOrientation(LinearLayout.HORIZONTAL);
+        photoRow.setGravity(Gravity.CENTER_VERTICAL);
+        photoRow.setClickable(true);
+        photoRow.setPadding(0, dp(8), 0, dp(4));
+
+        ImageView photoIcon = new ImageView(this);
+        photoIcon.setImageResource(R.drawable.baseline_add_24);
+        photoRow.addView(photoIcon, new LinearLayout.LayoutParams(dp(48), dp(48)));
+
+        LinearLayout photoTextGroup = new LinearLayout(this);
+        photoTextGroup.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams photoTextParams = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
+        photoTextParams.leftMargin = dp(12);
+        photoRow.addView(photoTextGroup, photoTextParams);
+
+        TextView photoTitle = new TextView(this);
+        photoTitle.setText(R.string.photo);
+        photoTitle.setTextColor(getResources().getColor(R.color.text_primary));
+        photoTitle.setTextSize(16);
+        photoTextGroup.addView(photoTitle);
+
+        TextView photoLabel = new TextView(this);
+        iconState.photoLabel = photoLabel;
+        photoLabel.setTextColor(getResources().getColor(R.color.text_secondary));
+        photoLabel.setTextSize(13);
+        photoTextGroup.addView(photoLabel);
+        photoRow.setOnClickListener(v -> {
+            mCourseIconEditState = iconState;
+            MedicineIconFactory.showImageSourcePicker(this, iconState.iconType, iconState.iconUri,
+                    new MedicineIconFactory.ImageSourceListener() {
+                        @Override
+                        public void onGallerySelected() {
+                            openCourseIconGallery(iconState);
+                        }
+
+                        @Override
+                        public void onCameraSelected() {
+                            openCourseIconCamera(iconState);
+                        }
+
+                        @Override
+                        public void onUseIconSelected() {
+                            iconState.iconUri = "";
+                            updateCourseIconEditorPreview(iconState);
+                        }
+                    });
+        });
+        form.addView(photoRow, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        updateCourseIconEditorPreview(iconState);
 
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle(R.string.edit_medicine_info)
@@ -2081,6 +2198,11 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 .setPositiveButton(R.string.saved, null)
                 .setNegativeButton(R.string.cancel, null)
                 .create();
+        dialog.setOnDismissListener(d -> {
+            if (mCourseIconEditState == iconState) {
+                mCourseIconEditState = null;
+            }
+        });
         dialog.setOnShowListener(d -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
             String newTitle = name.getText().toString().trim();
             String newSpec = spec.getText().toString().trim();
@@ -2097,12 +2219,48 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 return;
             }
             saveCourseMedicineInfo(groupIds, title, newTitle, newSpec, threshold,
-                    selectedIconType[0], selectedIconUri[0]);
+                    iconState.iconType, iconState.iconUri);
             Toast.makeText(getApplicationContext(), R.string.saved, Toast.LENGTH_SHORT).show();
             dialog.dismiss();
             refreshCourseDetail(groupIds, currentDialog);
         }));
         dialog.show();
+    }
+
+    private void updateCourseIconEditorPreview(CourseIconEditState state) {
+        if (state == null) {
+            return;
+        }
+        if (state.preview != null) {
+            MedicineIconFactory.apply(state.preview, state.iconType, state.iconUri);
+        }
+        if (state.iconLabel != null) {
+            state.iconLabel.setText(MedicineIconFactory.label(this, state.iconType));
+        }
+        if (state.photoLabel != null) {
+            state.photoLabel.setText(state.iconUri.length() > 0
+                    ? R.string.photo_selected
+                    : R.string.photo_source);
+        }
+    }
+
+    private void openCourseIconGallery(CourseIconEditState state) {
+        mCourseIconEditState = state;
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("image/*");
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+        startActivityForResult(intent, REQUEST_PICK_COURSE_ICON_IMAGE);
+    }
+
+    private void openCourseIconCamera(CourseIconEditState state) {
+        mCourseIconEditState = state;
+        Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+        if (intent.resolveActivity(getPackageManager()) == null) {
+            Toast.makeText(getApplicationContext(), R.string.camera_not_available, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        startActivityForResult(intent, REQUEST_CAPTURE_COURSE_ICON_IMAGE);
     }
 
     private void showCoursePlanEditor(Reminder reminder, String title, Reminder template, List<Integer> groupIds,
