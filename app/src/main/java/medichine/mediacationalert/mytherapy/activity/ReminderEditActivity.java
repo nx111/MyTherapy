@@ -125,6 +125,11 @@ public class ReminderEditActivity extends AppCompatActivity implements
         // Get reminder using reminder id
         rb = new ReminderDatabase(this);
         mReceivedReminder = rb.getReminder(mReceivedID);
+        if (mReceivedReminder == null) {
+            Toast.makeText(getApplicationContext(), "Reminder not found", Toast.LENGTH_SHORT).show();
+            finish();
+            return;
+        }
         new Fun(this);
         FrameLayout adContainerView = findViewById(R.id.ad_view_container);
         showBanner(this, adContainerView);

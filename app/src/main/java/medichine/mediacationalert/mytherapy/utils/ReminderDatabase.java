@@ -102,13 +102,18 @@ public class ReminderDatabase extends SQLiteOpenHelper {
 
                 new String[] {String.valueOf(id)}, null, null, null, null);
 
-        if (cursor != null)
-            cursor.moveToFirst();
+        if (cursor == null || !cursor.moveToFirst()) {
+            if (cursor != null) {
+                cursor.close();
+            }
+            return null;
+        }
 
         Reminder reminder = new Reminder(Integer.parseInt(cursor.getString(0)), cursor.getString(1),
                 cursor.getString(2), cursor.getString(3), cursor.getString(4),
                 cursor.getString(5), cursor.getString(6), cursor.getString(7));
 
+        cursor.close();
         return reminder;
     }
 
@@ -119,7 +124,7 @@ public class ReminderDatabase extends SQLiteOpenHelper {
         // Select all Query
         String selectQuery = "SELECT * FROM " + TABLE_REMINDERS;
 
-        SQLiteDatabase db = this.getWritableDatabase();
+        SQLiteDatabase db = this.getReadableDatabase();
         Cursor cursor = db.rawQuery(selectQuery, null);
 
         // Looping through all rows and adding to list
@@ -139,6 +144,7 @@ public class ReminderDatabase extends SQLiteOpenHelper {
                 reminderList.add(reminder);
             } while (cursor.moveToNext());
         }
+        cursor.close();
         return reminderList;
     }
 
@@ -147,9 +153,10 @@ public class ReminderDatabase extends SQLiteOpenHelper {
         String countQuery = "SELECT * FROM " + TABLE_REMINDERS;
         SQLiteDatabase db = this.getReadableDatabase();
         Cursor cursor = db.rawQuery(countQuery,null);
+        int count = cursor.getCount();
         cursor.close();
 
-        return cursor.getCount();
+        return count;
     }
 
     // Updating single Reminder

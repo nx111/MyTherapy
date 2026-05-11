@@ -42,6 +42,9 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
         // Get notification title from Reminder Database
         ReminderDatabase rb = new ReminderDatabase(context);
         Reminder reminder = rb.getReminder(mReceivedID);
+        if (reminder == null) {
+            return;
+        }
         String mTitle = reminder.getTitle();
 
         String CHANNEL_ID = "Channel_id";
