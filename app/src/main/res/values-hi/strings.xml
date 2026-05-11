@@ -27,7 +27,8 @@
     <string name="liquid">तरल</string>
     <string name="taken">ले लिया</string>
     <string name="paused">रोका गया</string>
-    <string name="stock_ready">इस समय समूह की सभी दवाएं लेने के बाद ले लिया पर टैप करें</string>
+    <string name="confirm_all">सभी पुष्टि करें</string>
+    <string name="stock_ready">इस समय समूह की सभी दवाएं लेने के बाद सभी की पुष्टि करें</string>
     <string name="medicine_count_one">%1$d दवा</string>
     <string name="medicine_count_many">%1$d दवाएं</string>
     <string name="medicine_detail_line">%1$s x%2$s • स्टॉक %3$s</string>
@@ -87,7 +88,7 @@
     <string name="nav_today">आज</string>
     <string name="nav_history">इतिहास</string>
     <string name="nav_course">कोर्स</string>
-    <string name="no_today_reminders">आज के लिए कोई लंबित दवा नहीं है</string>
+    <string name="no_today_reminders">चुनी गई तारीख के लिए कोई लंबित दवा नहीं है</string>
     <string name="no_history_records">अभी कोई दवा इतिहास नहीं है</string>
     <string name="no_course_records">अभी कोई दवा नहीं है</string>
     <string name="not_taken">नहीं ली</string>

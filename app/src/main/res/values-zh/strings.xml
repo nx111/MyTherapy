@@ -27,7 +27,8 @@
     <string name="liquid">液体</string>
     <string name="taken">已服药</string>
     <string name="paused">已停用</string>
-    <string name="stock_ready">服用该时间组内所有药品后点击已服药</string>
+    <string name="confirm_all">确认所有</string>
+    <string name="stock_ready">服用该时间组内所有药品后点击确认所有</string>
     <string name="medicine_count_one">%1$d 种药品</string>
     <string name="medicine_count_many">%1$d 种药品</string>
     <string name="medicine_detail_line">%1$s x%2$s • 库存 %3$s</string>
@@ -87,7 +88,7 @@
     <string name="nav_today">今日</string>
     <string name="nav_history">历史</string>
     <string name="nav_course">疗程</string>
-    <string name="no_today_reminders">今日没有待服药品</string>
+    <string name="no_today_reminders">所选日期没有待确认药品</string>
     <string name="no_history_records">暂无服药历史</string>
     <string name="no_course_records">暂无药品</string>
     <string name="not_taken">未服药</string>

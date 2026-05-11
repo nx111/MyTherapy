@@ -27,7 +27,8 @@
     <string name="liquid">액상</string>
     <string name="taken">복용 완료</string>
     <string name="paused">중지됨</string>
-    <string name="stock_ready">이 시간대의 모든 약을 복용한 후 복용 완료를 누르세요</string>
+    <string name="confirm_all">모두 확인</string>
+    <string name="stock_ready">이 시간대의 모든 약을 복용한 후 모두 확인하세요</string>
     <string name="medicine_count_one">약 %1$d개</string>
     <string name="medicine_count_many">약 %1$d개</string>
     <string name="medicine_detail_line">%1$s x%2$s • 재고 %3$s</string>
@@ -87,7 +88,7 @@
     <string name="nav_today">오늘</string>
     <string name="nav_history">기록</string>
     <string name="nav_course">치료</string>
-    <string name="no_today_reminders">오늘 복용할 약이 없습니다</string>
+    <string name="no_today_reminders">선택한 날짜에 확인할 약이 없습니다</string>
     <string name="no_history_records">아직 복약 기록이 없습니다</string>
     <string name="no_course_records">아직 약이 없습니다</string>
     <string name="not_taken">미복용</string>

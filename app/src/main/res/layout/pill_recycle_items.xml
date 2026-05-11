@@ -21,58 +21,56 @@
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
-            <FrameLayout
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:layout_marginRight="12dp">
-
-                <ImageView
-                    android:id="@+id/thumbnail_image"
-                    android:layout_width="48dp"
-                    android:layout_height="48dp"
-                    android:scaleType="centerCrop"
-                    android:src="@drawable/medicine_pill" />
-
-                <TextView
-                    android:id="@+id/text123"
-                    android:layout_width="48dp"
-                    android:layout_height="48dp"
-                    android:gravity="center"
-                    android:textColor="@color/white"
-                    android:visibility="gone" />
-            </FrameLayout>
-
-            <LinearLayout
+            <TextView
+                android:id="@+id/recycle_title"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:orientation="vertical">
-
-                <TextView
-                    android:id="@+id/recycle_title"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:textColor="@color/black"
-                    android:textSize="18sp"
-                    android:textStyle="bold"
-                    tools:text="08:00" />
-
-                <TextView
-                    android:id="@+id/recycle_date_time"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:textColor="@color/grey_calendar"
-                    android:textSize="13sp"
-                    tools:text="11/5/2026 • 2 medicines" />
-            </LinearLayout>
+                android:textColor="@color/black"
+                android:textSize="20sp"
+                android:textStyle="bold"
+                tools:text="08:00" />
 
             <ImageView
                 android:id="@+id/active_image"
                 android:layout_width="28dp"
                 android:layout_height="28dp"
                 android:layout_marginLeft="8dp"
+                android:visibility="gone"
                 android:src="@drawable/notification_icon" />
+
+            <Button
+                android:id="@+id/taken_button"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:backgroundTint="@color/taken_button_bg"
+                android:minWidth="96dp"
+                android:text="@string/confirm_all"
+                android:textAllCaps="false"
+                android:textColor="@color/taken_button_text" />
         </LinearLayout>
+
+        <TextView
+            android:id="@+id/recycle_date_time"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
+            android:textColor="@color/text_secondary"
+            android:textSize="13sp"
+            tools:text="11/5/2026 • 2 medicines" />
+
+        <ImageView
+            android:id="@+id/thumbnail_image"
+            android:layout_width="1dp"
+            android:layout_height="1dp"
+            android:visibility="gone" />
+
+        <LinearLayout
+            android:id="@+id/medicine_line_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:orientation="vertical" />
 
         <TextView
             android:id="@+id/recycle_repeat_info"
@@ -82,33 +80,16 @@
             android:lineSpacingExtra="2dp"
             android:textColor="@color/black"
             android:textSize="14sp"
+            android:visibility="gone"
             tools:text="Medicine A x1 • stock 20&#10;Medicine B x0.5 • stock 8" />
 
-        <LinearLayout
+        <TextView
+            android:id="@+id/recycle_stock_info"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="10dp"
-            android:gravity="center_vertical"
-            android:orientation="horizontal">
-
-            <TextView
-                android:id="@+id/recycle_stock_info"
-                android:layout_width="0dp"
-                android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:textColor="@color/grey_calendar"
-                android:textSize="13sp"
-                tools:text="Stock ready" />
-
-            <Button
-                android:id="@+id/taken_button"
-                android:layout_width="wrap_content"
-                android:layout_height="40dp"
-                android:backgroundTint="@color/taken_button_bg"
-                android:minWidth="96dp"
-                android:text="@string/taken"
-                android:textAllCaps="false"
-                android:textColor="@color/taken_button_text" />
-        </LinearLayout>
+            android:textColor="@color/text_secondary"
+            android:textSize="13sp"
+            tools:text="Stock ready" />
     </LinearLayout>
 </androidx.cardview.widget.CardView>

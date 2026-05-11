@@ -27,7 +27,8 @@
     <string name="liquid">Flüssigkeit</string>
     <string name="taken">Eingenommen</string>
     <string name="paused">Pausiert</string>
-    <string name="stock_ready">Tippen Sie auf Eingenommen, nachdem alle Medikamente dieser Zeitgruppe genommen wurden</string>
+    <string name="confirm_all">Alle bestätigen</string>
+    <string name="stock_ready">Bestätigen Sie alles, nachdem alle Medikamente dieser Zeitgruppe genommen wurden</string>
     <string name="medicine_count_one">%1$d Medikament</string>
     <string name="medicine_count_many">%1$d Medikamente</string>
     <string name="medicine_detail_line">%1$s x%2$s • Bestand %3$s</string>
@@ -87,7 +88,7 @@
     <string name="nav_today">Heute</string>
     <string name="nav_history">Verlauf</string>
     <string name="nav_course">Therapie</string>
-    <string name="no_today_reminders">Heute keine ausstehenden Medikamente</string>
+    <string name="no_today_reminders">Keine ausstehenden Medikamente für das ausgewählte Datum</string>
     <string name="no_history_records">Noch kein Medikamentenverlauf</string>
     <string name="no_course_records">Noch keine Medikamente</string>
     <string name="not_taken">Nicht eingenommen</string>

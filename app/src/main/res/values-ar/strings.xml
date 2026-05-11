@@ -27,7 +27,8 @@
     <string name="liquid">سائل</string>
     <string name="taken">تم التناول</string>
     <string name="paused">متوقف</string>
-    <string name="stock_ready">اضغط تم التناول بعد تناول كل أدوية هذه المجموعة الزمنية</string>
+    <string name="confirm_all">تأكيد الكل</string>
+    <string name="stock_ready">أكد الكل بعد تناول كل أدوية هذه المجموعة الزمنية</string>
     <string name="medicine_count_one">%1$d دواء</string>
     <string name="medicine_count_many">%1$d أدوية</string>
     <string name="medicine_detail_line">%1$s x%2$s • المخزون %3$s</string>
@@ -87,7 +88,7 @@
     <string name="nav_today">اليوم</string>
     <string name="nav_history">السجل</string>
     <string name="nav_course">العلاج</string>
-    <string name="no_today_reminders">لا توجد أدوية معلقة لهذا اليوم</string>
+    <string name="no_today_reminders">لا توجد أدوية معلقة للتاريخ المحدد</string>
     <string name="no_history_records">لا يوجد سجل دواء بعد</string>
     <string name="no_course_records">لا توجد أدوية بعد</string>
     <string name="not_taken">لم يتم التناول</string>

@@ -27,7 +27,8 @@
     <string name="liquid">Líquido</string>
     <string name="taken">Tomado</string>
     <string name="paused">Pausado</string>
-    <string name="stock_ready">Toque em Tomado depois de tomar todos os medicamentos deste horário</string>
+    <string name="confirm_all">Confirmar tudo</string>
+    <string name="stock_ready">Confirme tudo depois de tomar todos os medicamentos deste horário</string>
     <string name="medicine_count_one">%1$d medicamento</string>
     <string name="medicine_count_many">%1$d medicamentos</string>
     <string name="medicine_detail_line">%1$s x%2$s • estoque %3$s</string>
@@ -87,7 +88,7 @@
     <string name="nav_today">Hoje</string>
     <string name="nav_history">Histórico</string>
     <string name="nav_course">Tratamento</string>
-    <string name="no_today_reminders">Nenhum medicamento pendente para hoje</string>
+    <string name="no_today_reminders">Nenhum medicamento pendente para a data selecionada</string>
     <string name="no_history_records">Ainda não há histórico de medicação</string>
     <string name="no_course_records">Ainda não há medicamentos</string>
     <string name="not_taken">Não tomado</string>

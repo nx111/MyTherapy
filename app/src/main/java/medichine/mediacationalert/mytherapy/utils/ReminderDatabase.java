@@ -283,10 +283,14 @@ public class ReminderDatabase extends SQLiteOpenHelper {
         try {
             List<Reminder> remindersToConfirm = new ArrayList<>();
             Map<String, Double> requiredByTitle = new LinkedHashMap<>();
+            long scheduledMillis = ReminderSchedule.parseScheduledAt(scheduledAt).getTimeInMillis();
+            long nowMillis = System.currentTimeMillis();
 
             for (Integer reminderId : reminderIds) {
                 Reminder reminder = getReminder(reminderId);
-                if (reminder == null || !"true".equals(reminder.getActive())
+                if (reminder == null
+                        || !ReminderSchedule.hasOccurrenceAt(reminder, scheduledAt)
+                        || (!"true".equals(reminder.getActive()) && scheduledMillis > nowMillis)
                         || isReminderTaken(reminder.getID(), scheduledAt)) {
                     continue;
                 }

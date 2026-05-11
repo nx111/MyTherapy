@@ -27,7 +27,8 @@
     <string name="liquid">液体</string>
     <string name="taken">服用済み</string>
     <string name="paused">停止中</string>
-    <string name="stock_ready">この時間帯のすべての薬を服用した後に服用済みをタップしてください</string>
+    <string name="confirm_all">すべて確認</string>
+    <string name="stock_ready">この時間帯のすべての薬を服用した後にすべて確認してください</string>
     <string name="medicine_count_one">%1$d 件の薬</string>
     <string name="medicine_count_many">%1$d 件の薬</string>
     <string name="medicine_detail_line">%1$s x%2$s • 在庫 %3$s</string>
@@ -87,7 +88,7 @@
     <string name="nav_today">今日</string>
     <string name="nav_history">履歴</string>
     <string name="nav_course">治療</string>
-    <string name="no_today_reminders">今日の未服用の薬はありません</string>
+    <string name="no_today_reminders">選択した日の未確認の薬はありません</string>
     <string name="no_history_records">服薬履歴はまだありません</string>
     <string name="no_course_records">薬はまだありません</string>
     <string name="not_taken">未服用</string>

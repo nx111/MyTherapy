@@ -27,7 +27,8 @@
     <string name="liquid">Жидкость</string>
     <string name="taken">Принято</string>
     <string name="paused">Приостановлено</string>
-    <string name="stock_ready">Нажмите Принято после приема всех лекарств в этой группе времени</string>
+    <string name="confirm_all">Подтвердить все</string>
+    <string name="stock_ready">Подтвердите все после приема всех лекарств в этой группе времени</string>
     <string name="medicine_count_one">%1$d лекарство</string>
     <string name="medicine_count_many">%1$d лекарств</string>
     <string name="medicine_detail_line">%1$s x%2$s • запас %3$s</string>
@@ -87,7 +88,7 @@
     <string name="nav_today">Сегодня</string>
     <string name="nav_history">История</string>
     <string name="nav_course">Курс</string>
-    <string name="no_today_reminders">На сегодня нет ожидающих лекарств</string>
+    <string name="no_today_reminders">Нет ожидающих лекарств на выбранную дату</string>
     <string name="no_history_records">Истории приема пока нет</string>
     <string name="no_course_records">Лекарств пока нет</string>
     <string name="not_taken">Не принято</string>

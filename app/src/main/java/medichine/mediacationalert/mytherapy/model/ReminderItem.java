@@ -16,6 +16,25 @@ public class ReminderItem {
     public String mIconUri;
     public boolean mTaken;
     public ArrayList<Integer> mReminderIds;
+    public ArrayList<MedicineLine> mMedicineLines;
+
+    public static class MedicineLine {
+        public int reminderId;
+        public String title;
+        public String doseText;
+        public String stockText;
+        public String iconType;
+        public String iconUri;
+
+        public MedicineLine(int ReminderId, String Title, String DoseText, String StockText, String IconType, String IconUri) {
+            this.reminderId = ReminderId;
+            this.title = Title;
+            this.doseText = DoseText;
+            this.stockText = StockText;
+            this.iconType = IconType == null || IconType.length() == 0 ? "pill" : IconType;
+            this.iconUri = IconUri == null ? "" : IconUri;
+        }
+    }
 
     public ReminderItem(String Title, String DateTime, String Repeat, String RepeatNo, String RepeatType, String Active) {
         this(Title, DateTime, Repeat, RepeatNo, RepeatType, Active, "", "", DateTime, "pill", "", false, new ArrayList<Integer>());
@@ -37,6 +56,14 @@ public class ReminderItem {
         this.mIconUri = IconUri == null ? "" : IconUri;
         this.mTaken = Taken;
         this.mReminderIds = ReminderIds == null ? new ArrayList<Integer>() : ReminderIds;
+        this.mMedicineLines = new ArrayList<>();
+    }
+
+    public ReminderItem(String Title, String DateTime, String Repeat, String RepeatNo, String RepeatType, String Active,
+                        String MedicineDetails, String StockSummary, String ScheduledAt, String IconType, String IconUri,
+                        boolean Taken, ArrayList<Integer> ReminderIds, ArrayList<MedicineLine> MedicineLines) {
+        this(Title, DateTime, Repeat, RepeatNo, RepeatType, Active, MedicineDetails, StockSummary, ScheduledAt, IconType, IconUri, Taken, ReminderIds);
+        this.mMedicineLines = MedicineLines == null ? new ArrayList<MedicineLine>() : MedicineLines;
     }
 
     public String getmTitle() {

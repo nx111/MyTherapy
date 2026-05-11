@@ -41,7 +41,8 @@
     <string name="liquid">Liquid</string>
     <string name="taken">Taken</string>
     <string name="paused">Paused</string>
-    <string name="stock_ready">Tap Taken after taking all medicines in this time group</string>
+    <string name="confirm_all">Confirm all</string>
+    <string name="stock_ready">Confirm all after taking every medicine in this time group</string>
     <string name="medicine_count_one">%1$d medicine</string>
     <string name="medicine_count_many">%1$d medicines</string>
     <string name="medicine_detail_line">%1$s x%2$s • stock %3$s</string>
@@ -103,7 +104,7 @@
     <string name="nav_today">Today</string>
     <string name="nav_history">History</string>
     <string name="nav_course">Course</string>
-    <string name="no_today_reminders">No pending medicine for today</string>
+    <string name="no_today_reminders">No pending medicine for the selected date</string>
     <string name="no_history_records">No medication history yet</string>
     <string name="no_course_records">No medicines yet</string>
     <string name="not_taken">Not taken</string>

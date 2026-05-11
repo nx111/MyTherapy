@@ -2,11 +2,14 @@ package medichine.mediacationalert.mytherapy.adapter;
 
 import android.app.Activity;
 import android.net.Uri;
+import android.graphics.Typeface;
+import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -46,6 +49,7 @@ public class MedListAdapter extends RecyclerView.Adapter<MedListAdapter.SimpleHo
         holder.setStockInfo(item.mStockSummary);
         holder.setActiveImage(item.mActive);
         holder.setIcon(item.mIconType, item.mIconUri);
+        holder.setMedicineLines(item.mMedicineLines);
         holder.setTakenState(item.mTaken, "true".equals(item.mActive));
 
         holder.itemView.setOnClickListener(v -> listener.clickListener(position));
@@ -60,6 +64,7 @@ public class MedListAdapter extends RecyclerView.Adapter<MedListAdapter.SimpleHo
     class SimpleHolder extends RecyclerView.ViewHolder {
         private TextView mTitleText, mDateAndTimeText, mRepeatInfoText, mStockInfoText;
         private ImageView mActiveImage, mThumbnailImage;
+        private LinearLayout mMedicineContainer;
         private Button takenButton;
 
         public SimpleHolder(@NonNull View itemView) {
@@ -70,6 +75,7 @@ public class MedListAdapter extends RecyclerView.Adapter<MedListAdapter.SimpleHo
             mStockInfoText = itemView.findViewById(R.id.recycle_stock_info);
             mActiveImage = itemView.findViewById(R.id.active_image);
             mThumbnailImage = itemView.findViewById(R.id.thumbnail_image);
+            mMedicineContainer = itemView.findViewById(R.id.medicine_line_container);
             takenButton = itemView.findViewById(R.id.taken_button);
         }
 
@@ -99,19 +105,80 @@ public class MedListAdapter extends RecyclerView.Adapter<MedListAdapter.SimpleHo
 
         public void setTakenState(boolean taken, boolean active) {
             takenButton.setEnabled(active && !taken);
-            takenButton.setText(activity.getString(R.string.taken));
+            takenButton.setText(activity.getString(R.string.confirm_all));
         }
 
         public void setIcon(String iconType, String iconUri) {
-            if (iconUri != null && iconUri.length() > 0) {
-                mThumbnailImage.setImageURI(Uri.parse(iconUri));
-            } else if ("capsule".equals(iconType)) {
-                mThumbnailImage.setImageResource(R.drawable.medicine_capsule);
-            } else if ("liquid".equals(iconType)) {
-                mThumbnailImage.setImageResource(R.drawable.medicine_liquid);
-            } else {
-                mThumbnailImage.setImageResource(R.drawable.medicine_pill);
+            setMedicineIcon(mThumbnailImage, iconType, iconUri);
+        }
+
+        public void setMedicineLines(List<ReminderItem.MedicineLine> lines) {
+            mMedicineContainer.removeAllViews();
+            if (lines == null || lines.isEmpty()) {
+                mMedicineContainer.setVisibility(View.GONE);
+                mRepeatInfoText.setVisibility(mRepeatInfoText.getText().length() > 0 ? View.VISIBLE : View.GONE);
+                return;
             }
+            mMedicineContainer.setVisibility(View.VISIBLE);
+            mRepeatInfoText.setVisibility(View.GONE);
+
+            for (ReminderItem.MedicineLine line : lines) {
+                LinearLayout row = new LinearLayout(activity);
+                row.setOrientation(LinearLayout.HORIZONTAL);
+                row.setGravity(Gravity.CENTER_VERTICAL);
+                row.setPadding(0, dp(6), 0, dp(6));
+
+                ImageView icon = new ImageView(activity);
+                icon.setScaleType(ImageView.ScaleType.CENTER_CROP);
+                setMedicineIcon(icon, line.iconType, line.iconUri);
+                LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(dp(44), dp(44));
+                row.addView(icon, iconParams);
+
+                LinearLayout textGroup = new LinearLayout(activity);
+                textGroup.setOrientation(LinearLayout.VERTICAL);
+                LinearLayout.LayoutParams textParams = new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
+                textParams.leftMargin = dp(12);
+
+                TextView title = new TextView(activity);
+                title.setText(line.title);
+                title.setTextColor(activity.getResources().getColor(R.color.black));
+                title.setTextSize(16);
+                title.setTypeface(Typeface.DEFAULT_BOLD);
+
+                TextView detail = new TextView(activity);
+                detail.setText(line.doseText + " • " + line.stockText);
+                detail.setTextColor(activity.getResources().getColor(R.color.text_secondary));
+                detail.setTextSize(13);
+
+                textGroup.addView(title, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+                textGroup.addView(detail, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+                row.addView(textGroup, textParams);
+
+                TextView check = new TextView(activity);
+                check.setGravity(Gravity.CENTER);
+                check.setText("\u25CB");
+                check.setTextColor(activity.getResources().getColor(R.color.nav_selected));
+                check.setTextSize(28);
+                row.addView(check, new LinearLayout.LayoutParams(dp(40), dp(40)));
+
+                mMedicineContainer.addView(row, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+            }
+        }
+
+        private void setMedicineIcon(ImageView imageView, String iconType, String iconUri) {
+            if (iconUri != null && iconUri.length() > 0) {
+                imageView.setImageURI(Uri.parse(iconUri));
+            } else if ("capsule".equals(iconType)) {
+                imageView.setImageResource(R.drawable.medicine_capsule);
+            } else if ("liquid".equals(iconType)) {
+                imageView.setImageResource(R.drawable.medicine_liquid);
+            } else {
+                imageView.setImageResource(R.drawable.medicine_pill);
+            }
+        }
+
+        private int dp(int value) {
+            return (int) (value * activity.getResources().getDisplayMetrics().density + 0.5f);
         }
     }
 }

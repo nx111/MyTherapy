@@ -265,12 +265,11 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         long start = startOfTodayMillis();
         long end = endOfTodayMillis();
 
+        long now = System.currentTimeMillis();
         for (Reminder reminder : rb.getAllReminders()) {
-            if (!"true".equals(reminder.getActive())) {
-                continue;
-            }
             for (ScheduledReminder scheduled : collectOccurrences(reminder, start, end)) {
-                if (!rb.isReminderTaken(reminder.getID(), scheduled.scheduledAt)) {
+                if (!rb.isReminderTaken(reminder.getID(), scheduled.scheduledAt)
+                        && shouldShowPendingOccurrence(reminder, scheduled.timeMillis, now)) {
                     scheduledReminders.add(scheduled);
                 }
             }
@@ -303,12 +302,22 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
 
             StringBuilder details = new StringBuilder();
             ArrayList<Integer> reminderIds = new ArrayList<>();
+            ArrayList<ReminderItem.MedicineLine> medicineLines = new ArrayList<>();
             Reminder firstReminder = group.get(0).reminder;
 
             for (ScheduledReminder scheduled : group) {
                 Reminder reminder = scheduled.reminder;
                 reminderIds.add(reminder.getID());
                 double stock = rb.getTotalStock(reminder.getTitle());
+                String doseText = getString(R.string.dose) + " " + formatQuantity(reminder.getDose());
+                String stockText = getString(R.string.stock_amount, formatQuantity(stock));
+                medicineLines.add(new ReminderItem.MedicineLine(
+                        reminder.getID(),
+                        reminder.getTitle(),
+                        doseText,
+                        stockText,
+                        reminder.getIconType(),
+                        reminder.getIconUri()));
                 if (details.length() > 0) {
                     details.append("\n");
                 }
@@ -331,11 +340,16 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                     firstReminder.getIconType(),
                     firstReminder.getIconUri(),
                     false,
-                    reminderIds));
+                    reminderIds,
+                    medicineLines));
             IDmap.put(position, firstReminder.getID());
             position++;
         }
         return items;
+    }
+
+    private boolean shouldShowPendingOccurrence(Reminder reminder, long occurrenceMillis, long nowMillis) {
+        return "true".equals(reminder.getActive()) || occurrenceMillis <= nowMillis;
     }
 
     private List<SummaryItem> generateHistoryData() {
