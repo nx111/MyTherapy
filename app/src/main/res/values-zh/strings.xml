@@ -229,7 +229,7 @@
     <string name="report_stock">补药提醒</string>
     <string name="report_refill_watch">低库存阈值：7</string>
     <string name="report_stock_ok">没有低库存药品</string>
-    <string name="report_low_stock_count">%1$d 个低库存</string>
+    <string name="report_low_stock_count">%1$d个\n低库存</string>
     <string name="report_health_diary">健康日记</string>
     <string name="report_health_diary_detail">%1$d 条健康记录，%2$d 次服药确认</string>
     <string name="report_entries">%1$d 条记录</string>
