@@ -14,6 +14,7 @@ import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.view.Gravity;
+import android.view.MotionEvent;
 import android.view.View;
 import android.widget.GridLayout;
 import android.widget.ImageView;
@@ -41,6 +42,12 @@ public class MedicineIconFactory {
         void onCameraSelected();
 
         void onUseIconSelected();
+    }
+
+    public interface CroppedIconListener {
+        void onCropped(String iconUri);
+
+        void onCropFailed();
     }
 
     private static class IconShape {
@@ -188,6 +195,57 @@ public class MedicineIconFactory {
             throw new IOException("Cannot decode image");
         }
         return saveScaledIcon(context, source);
+    }
+
+    public static void showCropDialog(Context context, Uri uri, CroppedIconListener listener) {
+        try {
+            InputStream inputStream = context.getContentResolver().openInputStream(uri);
+            if (inputStream == null) {
+                listener.onCropFailed();
+                return;
+            }
+            Bitmap source = BitmapFactory.decodeStream(inputStream);
+            inputStream.close();
+            if (source == null) {
+                listener.onCropFailed();
+                return;
+            }
+            showCropDialog(context, source, listener);
+        } catch (IOException e) {
+            listener.onCropFailed();
+        }
+    }
+
+    public static void showCropDialog(Context context, Bitmap source, CroppedIconListener listener) {
+        if (source == null) {
+            listener.onCropFailed();
+            return;
+        }
+        CropView cropView = new CropView(context, source);
+        cropView.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(context, 320)));
+
+        AlertDialog dialog = new AlertDialog.Builder(context)
+                .setTitle(R.string.medicine_photo)
+                .setView(cropView)
+                .setPositiveButton(R.string.saved, null)
+                .setNegativeButton(R.string.cancel, null)
+                .create();
+        dialog.setOnShowListener(d -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            Bitmap cropped = cropView.createCroppedBitmap(ICON_SIZE);
+            try {
+                String savedUri = saveScaledIcon(context, cropped);
+                cropped.recycle();
+                listener.onCropped(savedUri);
+                dialog.dismiss();
+            } catch (IOException e) {
+                cropped.recycle();
+                listener.onCropFailed();
+            }
+        }));
+        dialog.setOnDismissListener(d -> source.recycle());
+        dialog.show();
     }
 
     public static String saveScaledIcon(Context context, Bitmap source) throws IOException {
@@ -570,6 +628,162 @@ public class MedicineIconFactory {
                     Math.max(0, (int) (Color.red(color) * 0.72f)),
                     Math.max(0, (int) (Color.green(color) * 0.72f)),
                     Math.max(0, (int) (Color.blue(color) * 0.72f)));
+        }
+    }
+
+    private static class CropView extends View {
+        private final Bitmap bitmap;
+        private final Paint bitmapPaint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+        private final Paint overlayPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint borderPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final RectF cropRect = new RectF();
+        private float scale;
+        private float minScale;
+        private float offsetX;
+        private float offsetY;
+        private float lastX;
+        private float lastY;
+        private float lastDistance;
+        private boolean initialized;
+
+        CropView(Context context, Bitmap bitmap) {
+            super(context);
+            this.bitmap = bitmap;
+            overlayPaint.setColor(Color.argb(150, 0, 0, 0));
+            borderPaint.setStyle(Paint.Style.STROKE);
+            borderPaint.setStrokeWidth(dp(context, 2));
+            borderPaint.setColor(Color.WHITE);
+            setBackgroundColor(Color.BLACK);
+        }
+
+        @Override
+        protected void onSizeChanged(int w, int h, int oldw, int oldh) {
+            int padding = dp(getContext(), 24);
+            float size = Math.max(1, Math.min(w, h) - padding * 2f);
+            cropRect.set((w - size) / 2f, (h - size) / 2f, (w + size) / 2f, (h + size) / 2f);
+            if (!initialized) {
+                minScale = Math.max(cropRect.width() / bitmap.getWidth(),
+                        cropRect.height() / bitmap.getHeight());
+                scale = minScale;
+                offsetX = cropRect.centerX() - bitmap.getWidth() * scale / 2f;
+                offsetY = cropRect.centerY() - bitmap.getHeight() * scale / 2f;
+                initialized = true;
+            } else {
+                minScale = Math.max(cropRect.width() / bitmap.getWidth(),
+                        cropRect.height() / bitmap.getHeight());
+                scale = Math.max(scale, minScale);
+            }
+            clampImage();
+        }
+
+        @Override
+        protected void onDraw(Canvas canvas) {
+            canvas.drawBitmap(bitmap, null, imageRect(), bitmapPaint);
+            canvas.drawRect(0, 0, getWidth(), cropRect.top, overlayPaint);
+            canvas.drawRect(0, cropRect.bottom, getWidth(), getHeight(), overlayPaint);
+            canvas.drawRect(0, cropRect.top, cropRect.left, cropRect.bottom, overlayPaint);
+            canvas.drawRect(cropRect.right, cropRect.top, getWidth(), cropRect.bottom, overlayPaint);
+            canvas.drawRect(cropRect, borderPaint);
+        }
+
+        @Override
+        public boolean onTouchEvent(MotionEvent event) {
+            if (event.getPointerCount() >= 2) {
+                handlePinch(event);
+                return true;
+            }
+            switch (event.getActionMasked()) {
+                case MotionEvent.ACTION_DOWN:
+                    lastX = event.getX();
+                    lastY = event.getY();
+                    return true;
+                case MotionEvent.ACTION_MOVE:
+                    offsetX += event.getX() - lastX;
+                    offsetY += event.getY() - lastY;
+                    lastX = event.getX();
+                    lastY = event.getY();
+                    clampImage();
+                    invalidate();
+                    return true;
+                case MotionEvent.ACTION_UP:
+                case MotionEvent.ACTION_CANCEL:
+                    lastDistance = 0;
+                    return true;
+                default:
+                    return true;
+            }
+        }
+
+        Bitmap createCroppedBitmap(int size) {
+            if (scale <= 0 || cropRect.width() <= 0 || cropRect.height() <= 0) {
+                return scaleCenterCrop(bitmap, size, size);
+            }
+            Bitmap output = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888);
+            Canvas canvas = new Canvas(output);
+            RectF source = new RectF(
+                    (cropRect.left - offsetX) / scale,
+                    (cropRect.top - offsetY) / scale,
+                    (cropRect.right - offsetX) / scale,
+                    (cropRect.bottom - offsetY) / scale);
+            if (!source.intersect(0, 0, bitmap.getWidth(), bitmap.getHeight())) {
+                output.recycle();
+                return scaleCenterCrop(bitmap, size, size);
+            }
+            android.graphics.Rect sourceRect = new android.graphics.Rect(
+                    Math.max(0, (int) Math.floor(source.left)),
+                    Math.max(0, (int) Math.floor(source.top)),
+                    Math.min(bitmap.getWidth(), (int) Math.ceil(source.right)),
+                    Math.min(bitmap.getHeight(), (int) Math.ceil(source.bottom)));
+            if (sourceRect.width() <= 0 || sourceRect.height() <= 0) {
+                output.recycle();
+                return scaleCenterCrop(bitmap, size, size);
+            }
+            canvas.drawBitmap(bitmap, sourceRect, new RectF(0, 0, size, size), bitmapPaint);
+            return output;
+        }
+
+        private void handlePinch(MotionEvent event) {
+            float distance = pointerDistance(event);
+            float focusX = (event.getX(0) + event.getX(1)) / 2f;
+            float focusY = (event.getY(0) + event.getY(1)) / 2f;
+            if (lastDistance > 0 && distance > 0) {
+                float oldScale = scale;
+                scale = Math.max(minScale, Math.min(scale * distance / lastDistance, minScale * 4f));
+                offsetX = focusX - (focusX - offsetX) * scale / oldScale;
+                offsetY = focusY - (focusY - offsetY) * scale / oldScale;
+                clampImage();
+                invalidate();
+            }
+            lastDistance = distance;
+        }
+
+        private float pointerDistance(MotionEvent event) {
+            float dx = event.getX(0) - event.getX(1);
+            float dy = event.getY(0) - event.getY(1);
+            return (float) Math.sqrt(dx * dx + dy * dy);
+        }
+
+        private RectF imageRect() {
+            return new RectF(offsetX, offsetY,
+                    offsetX + bitmap.getWidth() * scale,
+                    offsetY + bitmap.getHeight() * scale);
+        }
+
+        private void clampImage() {
+            float width = bitmap.getWidth() * scale;
+            float height = bitmap.getHeight() * scale;
+            offsetX = clampOffset(offsetX, width, cropRect.left, cropRect.right);
+            offsetY = clampOffset(offsetY, height, cropRect.top, cropRect.bottom);
+        }
+
+        private float clampOffset(float offset, float imageSize, float cropStart, float cropEnd) {
+            float cropSize = cropEnd - cropStart;
+            if (imageSize <= cropSize) {
+                return cropStart + (cropSize - imageSize) / 2f;
+            }
+            float min = cropEnd - imageSize;
+            float max = cropStart;
+            return Math.max(min, Math.min(offset, max));
         }
     }
 }

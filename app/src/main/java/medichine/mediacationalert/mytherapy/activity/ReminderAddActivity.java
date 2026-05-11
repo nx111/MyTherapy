@@ -30,9 +30,6 @@ import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.wdullaer.materialdatetimepicker.date.DatePickerDialog;
 import com.wdullaer.materialdatetimepicker.time.TimePickerDialog;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
 import java.text.DateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -661,28 +658,36 @@ public class ReminderAddActivity extends AppCompatActivity implements
                 getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
             } catch (SecurityException ignored) {
             }
-            try {
-                mIconUri = MedicineIconFactory.saveScaledIcon(this, uri);
-                updateIconPreview();
-            } catch (IOException e) {
-                Toast.makeText(getApplicationContext(), R.string.could_not_save_photo, Toast.LENGTH_SHORT).show();
-            }
+            cropIcon(uri);
         } else if (requestCode == REQUEST_CAPTURE_IMAGE && data.getExtras() != null) {
             Object bitmap = data.getExtras().get("data");
             if (bitmap instanceof Bitmap) {
-                mIconUri = saveCameraBitmap((Bitmap) bitmap);
-                updateIconPreview();
+                cropIcon((Bitmap) bitmap);
             }
         }
     }
 
-    private String saveCameraBitmap(Bitmap bitmap) {
-        try {
-            return MedicineIconFactory.saveScaledIcon(this, bitmap);
-        } catch (IOException e) {
-            Toast.makeText(getApplicationContext(), R.string.could_not_save_photo, Toast.LENGTH_SHORT).show();
-            return "";
-        }
+    private void cropIcon(Uri uri) {
+        MedicineIconFactory.showCropDialog(this, uri, cropListener());
+    }
+
+    private void cropIcon(Bitmap bitmap) {
+        MedicineIconFactory.showCropDialog(this, bitmap, cropListener());
+    }
+
+    private MedicineIconFactory.CroppedIconListener cropListener() {
+        return new MedicineIconFactory.CroppedIconListener() {
+            @Override
+            public void onCropped(String iconUri) {
+                mIconUri = iconUri;
+                updateIconPreview();
+            }
+
+            @Override
+            public void onCropFailed() {
+                Toast.makeText(getApplicationContext(), R.string.could_not_save_photo, Toast.LENGTH_SHORT).show();
+            }
+        };
     }
 
     // On clicking the save button
