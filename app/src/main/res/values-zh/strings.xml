@@ -26,6 +26,7 @@
     <string name="capsule">胶囊</string>
     <string name="liquid">液体</string>
     <string name="dose_quantity_piece">%1$s粒</string>
+    <string name="dose_unit_piece">粒</string>
     <string name="icon_label_format">%1$s · %2$s</string>
     <string name="icon_color_white">白色</string>
     <string name="icon_color_yellow">黄色</string>

@@ -89,6 +89,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     private static final int PAGE_HISTORY = 5;
     private static final int REQUEST_IMPORT_ARCHIVE = 3001;
     private static final int REQUEST_EXPORT_ARCHIVE = 3002;
+    private static final String COURSE_PLAN_SEPARATOR = "    ";
 
     private BillingClient billingClient;
     private Prefs prefs;
@@ -664,9 +665,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 if (details.length() > 0) {
                     details.append("\n");
                 }
-                details.append(getString(R.string.course_plan_line,
-                        reminder.getDoseTimes().replace(",", ", "),
-                        formatDoseQuantity(reminder)));
+                details.append(formatCoursePlanLine(reminder));
             }
             if (shownCount == 0 || displayReminder == null) {
                 continue;
@@ -732,6 +731,19 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     private String formatDoseQuantity(Reminder reminder, double value) {
         String quantity = formatQuantity(value);
         return usesPieceUnit(reminder) ? getString(R.string.dose_quantity_piece, quantity) : quantity;
+    }
+
+    private String formatCoursePlanLine(Reminder reminder) {
+        String doseText = formatQuantity(reminder.getDose());
+        String unit = doseUnit(reminder);
+        if (unit.length() > 0) {
+            doseText = doseText + " " + unit;
+        }
+        return reminder.getDoseTimes().replace(",", ", ") + COURSE_PLAN_SEPARATOR + doseText;
+    }
+
+    private String doseUnit(Reminder reminder) {
+        return usesPieceUnit(reminder) ? getString(R.string.dose_unit_piece) : "";
     }
 
     private boolean usesPieceUnit(Reminder reminder) {
@@ -1654,9 +1666,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         textGroup.setOrientation(LinearLayout.VERTICAL);
 
         TextView plan = new TextView(this);
-        plan.setText(getString(R.string.course_plan_line,
-                reminder.getDoseTimes().replace(",", ", "),
-                formatDoseQuantity(reminder)));
+        plan.setText(formatCoursePlanLine(reminder));
         plan.setTextColor(getResources().getColor(R.color.text_primary));
         plan.setTextSize(16);
         textGroup.addView(plan, new LinearLayout.LayoutParams(

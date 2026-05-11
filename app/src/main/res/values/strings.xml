@@ -40,6 +40,7 @@
     <string name="capsule">Capsule</string>
     <string name="liquid">Liquid</string>
     <string name="dose_quantity_piece">%1$s pcs</string>
+    <string name="dose_unit_piece">pcs</string>
     <string name="icon_label_format">%1$s · %2$s</string>
     <string name="icon_color_white">White</string>
     <string name="icon_color_yellow">Yellow</string>
