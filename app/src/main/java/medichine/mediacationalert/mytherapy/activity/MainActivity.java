@@ -103,6 +103,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     private SummaryListAdapter mSummaryAdapter;
     private TextView mNoReminderView;
     private TextView mSelectedDateText;
+    private TextView mAccountNameText;
     private ImageButton mCalendarButton;
     private ImageButton mAccountButton;
     private CheckBox mCourseShowAll;
@@ -151,6 +152,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         mList = findViewById(R.id.reminder_list);
         mNoReminderView = findViewById(R.id.no_reminder_text);
         mSelectedDateText = findViewById(R.id.selected_date_text);
+        mAccountNameText = findViewById(R.id.account_name_text);
         mCalendarButton = findViewById(R.id.calendar_button);
         mAccountButton = findViewById(R.id.account_button);
         mCourseShowAll = findViewById(R.id.course_show_all);
@@ -908,9 +910,11 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
 
     private void updateActionButtons() {
         if (mAddReminderButton == null || mCalendarButton == null || mAccountButton == null
-                || mCourseShowAll == null) {
+                || mAccountNameText == null || mCourseShowAll == null) {
             return;
         }
+        mAccountNameText.setText(rb.getCurrentAccountName());
+        mAccountNameText.setVisibility(View.VISIBLE);
         mAccountButton.setVisibility(View.VISIBLE);
         mAccountButton.setContentDescription(getString(R.string.account_info)
                 + ": " + rb.getCurrentAccountName());
@@ -1532,7 +1536,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         Calendar today = Calendar.getInstance();
         normalizeDate(today);
         if (mCurrentPage != PAGE_TODAY) {
-            mSelectedDateText.setText(headerWithAccount(currentPageTitle()));
+            mSelectedDateText.setText(currentPageTitle());
             mWeekCalendarRow.setVisibility(View.GONE);
             return;
         }
@@ -1541,7 +1545,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         String title = sameDate(mSelectedDate, today)
                 ? getString(R.string.nav_today) + " " + dateText
                 : dateText;
-        mSelectedDateText.setText(headerWithAccount(title));
+        mSelectedDateText.setText(title);
 
         mWeekCalendarRow.removeAllViews();
         Calendar cursor = (Calendar) mSelectedDate.clone();
@@ -1551,10 +1555,6 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
             mWeekCalendarRow.addView(createCalendarDayView(day, sameDate(day, mSelectedDate)));
             cursor.add(Calendar.DAY_OF_MONTH, 1);
         }
-    }
-
-    private String headerWithAccount(String title) {
-        return getString(R.string.header_account_format, title, rb.getCurrentAccountName());
     }
 
     private String currentPageTitle() {
