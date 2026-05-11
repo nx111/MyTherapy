@@ -2758,7 +2758,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         String start = formatCourseDate(reminder.getDate());
         String end = formatCourseDate(reminder.getEndDate());
         if (end.length() == 0) {
-            return start;
+            return start + " -";
         }
         return start + " - " + end;
     }
