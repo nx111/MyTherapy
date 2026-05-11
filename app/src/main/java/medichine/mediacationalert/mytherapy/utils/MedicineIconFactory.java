@@ -547,6 +547,8 @@ public class MedicineIconFactory {
         private void drawCapsule(Canvas canvas) {
             canvas.save();
             canvas.rotate(-18, 125, 125);
+            float capsuleScale = "thick".equals(shape) ? 1.2f : 0.85f;
+            canvas.scale(capsuleScale, capsuleScale, 125, 125);
             RectF rect = "thick".equals(shape)
                     ? new RectF(32, 82.25f, 218, 167.75f)
                     : new RectF(18, 88, 232, 162);
