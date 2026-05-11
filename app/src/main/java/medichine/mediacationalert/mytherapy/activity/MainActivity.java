@@ -84,6 +84,7 @@ import medichine.mediacationalert.mytherapy.utils.Reminder;
 import medichine.mediacationalert.mytherapy.utils.ReminderDatabase;
 import medichine.mediacationalert.mytherapy.utils.ReminderSchedule;
 import medichine.mediacationalert.mytherapy.utils.StockAlertNotifier;
+import medichine.mediacationalert.mytherapy.view.LabTrendChartView;
 
 public class MainActivity extends AppCompatActivity implements ItemClickListener {
     private static final int REQUEST_POST_NOTIFICATIONS = 1001;
@@ -113,6 +114,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     private BottomNavigationView mBottomNavigation;
     private final LinkedHashMap<Integer, Integer> IDmap = new LinkedHashMap<>();
     private final LinkedHashMap<Integer, Integer> summaryIDmap = new LinkedHashMap<>();
+    private final LinkedHashMap<Integer, Integer> labItemMap = new LinkedHashMap<>();
     private final LinkedHashMap<Integer, List<Reminder>> courseReminderMap = new LinkedHashMap<>();
     private ReminderDatabase rb;
     private AlarmReceiver mAlarmReceiver;
@@ -886,7 +888,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
             updateEmptyState(summaryList.isEmpty(), R.string.no_history_records);
         } else if (mCurrentPage == PAGE_LAB) {
             summaryList = generateLabData();
-            mSummaryAdapter = new SummaryListAdapter(summaryList, this, this, false);
+            mSummaryAdapter = new SummaryListAdapter(summaryList, this, this, false, true);
             mList.setAdapter(mSummaryAdapter);
             updateEmptyState(summaryList.isEmpty(), R.string.no_lab_records);
         } else if (mCurrentPage == PAGE_COURSE) {
@@ -982,6 +984,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
 
     private List<SummaryItem> generateLabData() {
         ArrayList<SummaryItem> items = new ArrayList<>();
+        labItemMap.clear();
         for (LabTestItem item : rb.getLabTestItems()) {
             LabResult latest = rb.getLatestLabResult(item.mId);
             boolean hasResult = latest != null;
@@ -1007,6 +1010,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 status = getString(R.string.lab_normal);
             }
 
+            labItemMap.put(items.size(), item.mId);
             items.add(new SummaryItem(
                     item.mName,
                     getString(R.string.lab_reference_range,
@@ -1021,6 +1025,54 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                     inRange));
         }
         return items;
+    }
+
+    private void showLabTrendDialog(int itemId) {
+        LabTestItem item = rb.getLabTestItem(itemId);
+        if (item == null) {
+            return;
+        }
+        List<LabResult> results = rb.getLabResultsForItem(itemId);
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        int padding = dp(18);
+        content.setPadding(padding, dp(8), padding, 0);
+
+        TextView reference = new TextView(this);
+        reference.setText(getString(R.string.lab_reference_range,
+                formatQuantity(item.mReferenceMin),
+                formatQuantity(item.mReferenceMax),
+                item.mUnit));
+        reference.setTextColor(getResources().getColor(R.color.text_secondary));
+        reference.setTextSize(13);
+        content.addView(reference, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        LabTrendChartView chart = new LabTrendChartView(this);
+        chart.setData(item, results);
+        LinearLayout.LayoutParams chartParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(260));
+        chartParams.topMargin = dp(8);
+        content.addView(chart, chartParams);
+
+        TextView count = new TextView(this);
+        count.setText(results.isEmpty()
+                ? getString(R.string.lab_no_result)
+                : getString(R.string.lab_history_count, results.size()));
+        count.setTextColor(getResources().getColor(R.color.text_secondary));
+        count.setTextSize(13);
+        content.addView(count, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        new AlertDialog.Builder(this)
+                .setTitle(getString(R.string.lab_trend_title, item.mName))
+                .setView(content)
+                .setPositiveButton(R.string.add_lab_result, (dialog, which) -> showLabResultForm(item))
+                .setNegativeButton(R.string.cancel, null)
+                .show();
     }
 
     private List<SummaryItem> generateReportData() {
@@ -1637,6 +1689,8 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     public void clickListener(int pos) {
         if (mCurrentPage == PAGE_TODAY && IDmap.containsKey(pos)) {
             selectReminder(IDmap.get(pos));
+        } else if (mCurrentPage == PAGE_LAB && labItemMap.containsKey(pos)) {
+            showLabTrendDialog(labItemMap.get(pos));
         } else if (mCurrentPage == PAGE_COURSE && summaryIDmap.containsKey(pos)) {
             selectCourseReminder(pos);
         }

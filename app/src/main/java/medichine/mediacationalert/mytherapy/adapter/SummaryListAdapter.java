@@ -26,14 +26,21 @@ public class SummaryListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHo
     private final List<SummaryItem> mItems;
     private final Activity mActivity;
     private final ItemClickListener mListener;
-    private final boolean mClickable;
+    private final boolean mCardMode;
+    private final boolean mClickEnabled;
 
     public SummaryListAdapter(List<SummaryItem> items, Activity activity,
                               ItemClickListener listener, boolean clickable) {
+        this(items, activity, listener, clickable, clickable);
+    }
+
+    public SummaryListAdapter(List<SummaryItem> items, Activity activity,
+                              ItemClickListener listener, boolean cardMode, boolean clickEnabled) {
         mItems = items;
         mActivity = activity;
         mListener = listener;
-        mClickable = clickable;
+        mCardMode = cardMode;
+        mClickEnabled = clickEnabled;
     }
 
     @NonNull
@@ -68,9 +75,9 @@ public class SummaryListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHo
                 ? R.drawable.notification_icon
                 : R.drawable.baseline_notifications_off_24);
         holder.setIcon(item.mIconType, item.mIconUri);
-        holder.bindMode(item, mClickable);
-        holder.itemView.setOnClickListener(mClickable ? v -> mListener.clickListener(position) : null);
-        holder.itemView.setClickable(mClickable);
+        holder.bindMode(item, mCardMode);
+        holder.itemView.setOnClickListener(mClickEnabled ? v -> mListener.clickListener(position) : null);
+        holder.itemView.setClickable(mClickEnabled);
         holder.itemView.setOnLongClickListener(v -> mListener.longClickListener(position));
     }
 
@@ -80,7 +87,7 @@ public class SummaryListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHo
         if (item.mHeader) {
             return TYPE_HEADER;
         }
-        return mClickable ? TYPE_SUMMARY : TYPE_HISTORY;
+        return mCardMode ? TYPE_SUMMARY : TYPE_HISTORY;
     }
 
     @Override

@@ -847,6 +847,22 @@ public class ReminderDatabase extends SQLiteOpenHelper {
         return results;
     }
 
+    public List<LabResult> getLabResultsForItem(int itemId) {
+        List<LabResult> results = new ArrayList<>();
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = db.rawQuery(labResultSelectSql()
+                        + " WHERE r." + LAB_RESULT_ITEM_ID + "=?"
+                        + " ORDER BY r." + LAB_RESULT_CREATED_AT + " ASC, r." + LAB_RESULT_ID + " ASC",
+                new String[]{String.valueOf(itemId)});
+        if (cursor.moveToFirst()) {
+            do {
+                results.add(readLabResult(cursor));
+            } while (cursor.moveToNext());
+        }
+        cursor.close();
+        return results;
+    }
+
     public LabResult getLatestLabResult(int itemId) {
         SQLiteDatabase db = this.getReadableDatabase();
         Cursor cursor = db.rawQuery(labResultSelectSql()
