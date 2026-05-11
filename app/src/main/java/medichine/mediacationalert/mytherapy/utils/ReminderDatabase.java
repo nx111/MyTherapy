@@ -1,6 +1,3 @@
-
-
-
 package medichine.mediacationalert.mytherapy.utils;
 
 import android.content.ContentValues;
@@ -9,21 +6,18 @@ import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
-
+import java.util.Locale;
+import java.util.Map;
 
 public class ReminderDatabase extends SQLiteOpenHelper {
-    // Database Version
-    private static final int DATABASE_VERSION = 1;
-
-    // Database Name
+    private static final int DATABASE_VERSION = 2;
     private static final String DATABASE_NAME = "MedicationDbTab";
 
-    // Table name
     private static final String TABLE_REMINDERS = "TableMedRe";
-
-    // Table Columns names
     private static final String KEY_ID = "id";
     private static final String KEY_TITLE = "title";
     private static final String KEY_DATE = "date";
@@ -32,75 +26,111 @@ public class ReminderDatabase extends SQLiteOpenHelper {
     private static final String KEY_REPEAT_NO = "repeat_no";
     private static final String KEY_REPEAT_TYPE = "repeat_type";
     private static final String KEY_ACTIVE = "active";
+    private static final String KEY_DOSE = "dose";
+    private static final String KEY_ICON_TYPE = "icon_type";
+    private static final String KEY_ICON_URI = "icon_uri";
+
+    private static final String TABLE_STOCK_BATCHES = "StockBatches";
+    private static final String STOCK_ID = "id";
+    private static final String STOCK_TITLE = "title";
+    private static final String STOCK_ORIGINAL_QUANTITY = "original_quantity";
+    private static final String STOCK_REMAINING_QUANTITY = "remaining_quantity";
+    private static final String STOCK_CREATED_AT = "created_at";
+
+    private static final String TABLE_INTAKE_LOGS = "IntakeLogs";
+    private static final String LOG_ID = "id";
+    private static final String LOG_REMINDER_ID = "reminder_id";
+    private static final String LOG_TITLE = "title";
+    private static final String LOG_DOSE = "dose";
+    private static final String LOG_SCHEDULED_AT = "scheduled_at";
+    private static final String LOG_TAKEN_AT = "taken_at";
+
+    public static class ConfirmResult {
+        public final boolean success;
+        public final String message;
+        public final int confirmedCount;
+
+        ConfirmResult(boolean success, String message, int confirmedCount) {
+            this.success = success;
+            this.message = message;
+            this.confirmedCount = confirmedCount;
+        }
+    }
 
     public ReminderDatabase(Context context) {
         super(context, DATABASE_NAME, null, DATABASE_VERSION);
     }
 
-    // Creating Tables
     @Override
     public void onCreate(SQLiteDatabase db) {
-        String CREATE_REMINDERS_TABLE = "CREATE TABLE " + TABLE_REMINDERS +
-                "("
+        createReminderTable(db);
+        createStockTable(db);
+        createIntakeLogTable(db);
+    }
+
+    @Override
+    public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
+        if (oldVersion < 2) {
+            db.execSQL("ALTER TABLE " + TABLE_REMINDERS + " ADD COLUMN " + KEY_DOSE + " REAL DEFAULT 1.0");
+            db.execSQL("ALTER TABLE " + TABLE_REMINDERS + " ADD COLUMN " + KEY_ICON_TYPE + " TEXT DEFAULT 'pill'");
+            db.execSQL("ALTER TABLE " + TABLE_REMINDERS + " ADD COLUMN " + KEY_ICON_URI + " TEXT DEFAULT ''");
+            createStockTable(db);
+            createIntakeLogTable(db);
+        }
+    }
+
+    private void createReminderTable(SQLiteDatabase db) {
+        String sql = "CREATE TABLE " + TABLE_REMINDERS + "("
                 + KEY_ID + " INTEGER PRIMARY KEY,"
                 + KEY_TITLE + " TEXT,"
                 + KEY_DATE + " TEXT,"
-                + KEY_TIME + " INTEGER,"
-                + KEY_REPEAT + " BOOLEAN,"
-                + KEY_REPEAT_NO + " INTEGER,"
+                + KEY_TIME + " TEXT,"
+                + KEY_REPEAT + " TEXT,"
+                + KEY_REPEAT_NO + " TEXT,"
                 + KEY_REPEAT_TYPE + " TEXT,"
-                + KEY_ACTIVE + " BOOLEAN" + ")";
-        db.execSQL(CREATE_REMINDERS_TABLE);
+                + KEY_ACTIVE + " TEXT,"
+                + KEY_DOSE + " REAL DEFAULT 1.0,"
+                + KEY_ICON_TYPE + " TEXT DEFAULT 'pill',"
+                + KEY_ICON_URI + " TEXT DEFAULT ''"
+                + ")";
+        db.execSQL(sql);
     }
 
-    // Upgrading database
-    @Override
-    public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-        // Drop older table if existed
-        if (oldVersion >= newVersion)
-            return;
-        db.execSQL("DROP TABLE IF EXISTS " + TABLE_REMINDERS);
-
-        // Create tables again
-        onCreate(db);
+    private void createStockTable(SQLiteDatabase db) {
+        String sql = "CREATE TABLE IF NOT EXISTS " + TABLE_STOCK_BATCHES + "("
+                + STOCK_ID + " INTEGER PRIMARY KEY AUTOINCREMENT,"
+                + STOCK_TITLE + " TEXT NOT NULL,"
+                + STOCK_ORIGINAL_QUANTITY + " REAL NOT NULL,"
+                + STOCK_REMAINING_QUANTITY + " REAL NOT NULL,"
+                + STOCK_CREATED_AT + " TEXT NOT NULL"
+                + ")";
+        db.execSQL(sql);
     }
 
-    // Adding new Reminder
-    public int addReminder(Reminder reminder){
+    private void createIntakeLogTable(SQLiteDatabase db) {
+        String sql = "CREATE TABLE IF NOT EXISTS " + TABLE_INTAKE_LOGS + "("
+                + LOG_ID + " INTEGER PRIMARY KEY AUTOINCREMENT,"
+                + LOG_REMINDER_ID + " INTEGER NOT NULL,"
+                + LOG_TITLE + " TEXT NOT NULL,"
+                + LOG_DOSE + " REAL NOT NULL,"
+                + LOG_SCHEDULED_AT + " TEXT NOT NULL,"
+                + LOG_TAKEN_AT + " TEXT NOT NULL,"
+                + "UNIQUE(" + LOG_REMINDER_ID + "," + LOG_SCHEDULED_AT + ")"
+                + ")";
+        db.execSQL(sql);
+    }
+
+    public int addReminder(Reminder reminder) {
         SQLiteDatabase db = this.getWritableDatabase();
-        ContentValues values = new ContentValues();
-
-        values.put(KEY_TITLE , reminder.getTitle());
-        values.put(KEY_DATE , reminder.getDate());
-        values.put(KEY_TIME , reminder.getTime());
-        values.put(KEY_REPEAT , reminder.getRepeat());
-        values.put(KEY_REPEAT_NO , reminder.getRepeatNo());
-        values.put(KEY_REPEAT_TYPE, reminder.getRepeatType());
-        values.put(KEY_ACTIVE, reminder.getActive());
-
-        // Inserting Row
-        long ID = db.insert(TABLE_REMINDERS, null, values);
+        long ID = db.insert(TABLE_REMINDERS, null, toReminderValues(reminder));
         db.close();
         return (int) ID;
     }
 
-    // Getting single Reminder
-    public Reminder getReminder(int id){
+    public Reminder getReminder(int id) {
         SQLiteDatabase db = this.getReadableDatabase();
-
-        Cursor cursor = db.query(TABLE_REMINDERS, new String[]
-                        {
-                                KEY_ID,
-                                KEY_TITLE,
-                                KEY_DATE,
-                                KEY_TIME,
-                                KEY_REPEAT,
-                                KEY_REPEAT_NO,
-                                KEY_REPEAT_TYPE,
-                                KEY_ACTIVE
-                        }, KEY_ID + "=?",
-
-                new String[] {String.valueOf(id)}, null, null, null, null);
+        Cursor cursor = db.query(TABLE_REMINDERS, reminderColumns(), KEY_ID + "=?",
+                new String[]{String.valueOf(id)}, null, null, null, null);
 
         if (cursor == null || !cursor.moveToFirst()) {
             if (cursor != null) {
@@ -109,78 +139,247 @@ public class ReminderDatabase extends SQLiteOpenHelper {
             return null;
         }
 
-        Reminder reminder = new Reminder(Integer.parseInt(cursor.getString(0)), cursor.getString(1),
-                cursor.getString(2), cursor.getString(3), cursor.getString(4),
-                cursor.getString(5), cursor.getString(6), cursor.getString(7));
-
+        Reminder reminder = readReminder(cursor);
         cursor.close();
         return reminder;
     }
 
-    // Getting all Reminders
-    public List<Reminder> getAllReminders(){
+    public List<Reminder> getAllReminders() {
         List<Reminder> reminderList = new ArrayList<>();
-
-        // Select all Query
-        String selectQuery = "SELECT * FROM " + TABLE_REMINDERS;
-
         SQLiteDatabase db = this.getReadableDatabase();
-        Cursor cursor = db.rawQuery(selectQuery, null);
+        Cursor cursor = db.query(TABLE_REMINDERS, reminderColumns(), null, null, null, null, KEY_ID + " ASC");
 
-        // Looping through all rows and adding to list
-        if(cursor.moveToFirst()){
-            do{
-                Reminder reminder = new Reminder();
-                reminder.setID(Integer.parseInt(cursor.getString(0)));
-                reminder.setTitle(cursor.getString(1));
-                reminder.setDate(cursor.getString(2));
-                reminder.setTime(cursor.getString(3));
-                reminder.setRepeat(cursor.getString(4));
-                reminder.setRepeatNo(cursor.getString(5));
-                reminder.setRepeatType(cursor.getString(6));
-                reminder.setActive(cursor.getString(7));
-
-                // Adding Reminders to list
-                reminderList.add(reminder);
+        if (cursor.moveToFirst()) {
+            do {
+                reminderList.add(readReminder(cursor));
             } while (cursor.moveToNext());
         }
         cursor.close();
         return reminderList;
     }
 
-    // Getting Reminders Count
-    public int getRemindersCount(){
-        String countQuery = "SELECT * FROM " + TABLE_REMINDERS;
+    public List<Reminder> getActiveRemindersAt(String date, String time) {
+        List<Reminder> reminderList = new ArrayList<>();
         SQLiteDatabase db = this.getReadableDatabase();
-        Cursor cursor = db.rawQuery(countQuery,null);
-        int count = cursor.getCount();
-        cursor.close();
+        Cursor cursor = db.query(TABLE_REMINDERS, reminderColumns(),
+                KEY_DATE + "=? AND " + KEY_TIME + "=? AND " + KEY_ACTIVE + "=?",
+                new String[]{date, time, "true"}, null, null, KEY_ID + " ASC");
 
+        if (cursor.moveToFirst()) {
+            do {
+                reminderList.add(readReminder(cursor));
+            } while (cursor.moveToNext());
+        }
+        cursor.close();
+        return reminderList;
+    }
+
+    public int getRemindersCount() {
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = db.rawQuery("SELECT COUNT(*) FROM " + TABLE_REMINDERS, null);
+        int count = 0;
+        if (cursor.moveToFirst()) {
+            count = cursor.getInt(0);
+        }
+        cursor.close();
         return count;
     }
 
-    // Updating single Reminder
-    public int updateReminder(Reminder reminder){
+    public int updateReminder(Reminder reminder) {
         SQLiteDatabase db = this.getWritableDatabase();
-        ContentValues values = new ContentValues();
-        values.put(KEY_TITLE , reminder.getTitle());
-        values.put(KEY_DATE , reminder.getDate());
-        values.put(KEY_TIME , reminder.getTime());
-        values.put(KEY_REPEAT , reminder.getRepeat());
-        values.put(KEY_REPEAT_NO , reminder.getRepeatNo());
-        values.put(KEY_REPEAT_TYPE, reminder.getRepeatType());
-        values.put(KEY_ACTIVE, reminder.getActive());
-
-        // Updating row
-        return db.update(TABLE_REMINDERS, values, KEY_ID + "=?",
+        return db.update(TABLE_REMINDERS, toReminderValues(reminder), KEY_ID + "=?",
                 new String[]{String.valueOf(reminder.getID())});
     }
 
-    // Deleting single Reminder
-    public void deleteReminder(Reminder reminder){
+    public void deleteReminder(Reminder reminder) {
         SQLiteDatabase db = this.getWritableDatabase();
         db.delete(TABLE_REMINDERS, KEY_ID + "=?",
                 new String[]{String.valueOf(reminder.getID())});
         db.close();
+    }
+
+    public int setActiveForTitle(String title, boolean active) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        ContentValues values = new ContentValues();
+        values.put(KEY_ACTIVE, active ? "true" : "false");
+        return db.update(TABLE_REMINDERS, values, KEY_TITLE + "=?",
+                new String[]{normalizeTitle(title)});
+    }
+
+    public void addStockBatch(String title, double quantity) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        ContentValues values = new ContentValues();
+        values.put(STOCK_TITLE, normalizeTitle(title));
+        values.put(STOCK_ORIGINAL_QUANTITY, quantity);
+        values.put(STOCK_REMAINING_QUANTITY, quantity);
+        values.put(STOCK_CREATED_AT, nowText());
+        db.insert(TABLE_STOCK_BATCHES, null, values);
+        db.close();
+    }
+
+    public double getTotalStock(String title) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = db.rawQuery(
+                "SELECT SUM(" + STOCK_REMAINING_QUANTITY + ") FROM " + TABLE_STOCK_BATCHES + " WHERE " + STOCK_TITLE + "=?",
+                new String[]{normalizeTitle(title)});
+        double total = 0;
+        if (cursor.moveToFirst()) {
+            total = cursor.isNull(0) ? 0 : cursor.getDouble(0);
+        }
+        cursor.close();
+        return total;
+    }
+
+    public boolean isReminderTaken(int reminderId, String scheduledAt) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = db.query(TABLE_INTAKE_LOGS, new String[]{LOG_ID},
+                LOG_REMINDER_ID + "=? AND " + LOG_SCHEDULED_AT + "=?",
+                new String[]{String.valueOf(reminderId), scheduledAt}, null, null, null, "1");
+        boolean exists = cursor.moveToFirst();
+        cursor.close();
+        return exists;
+    }
+
+    public ConfirmResult confirmReminderGroup(List<Integer> reminderIds, String scheduledAt) {
+        if (reminderIds == null || reminderIds.isEmpty()) {
+            return new ConfirmResult(false, "No reminders selected", 0);
+        }
+
+        SQLiteDatabase db = this.getWritableDatabase();
+        db.beginTransaction();
+        try {
+            List<Reminder> remindersToConfirm = new ArrayList<>();
+            Map<String, Double> requiredByTitle = new LinkedHashMap<>();
+
+            for (Integer reminderId : reminderIds) {
+                Reminder reminder = getReminder(reminderId);
+                if (reminder == null || !"true".equals(reminder.getActive())
+                        || isReminderTaken(reminder.getID(), scheduledAt)) {
+                    continue;
+                }
+
+                remindersToConfirm.add(reminder);
+                String title = normalizeTitle(reminder.getTitle());
+                double current = requiredByTitle.containsKey(title) ? requiredByTitle.get(title) : 0;
+                requiredByTitle.put(title, current + reminder.getDose());
+            }
+
+            if (remindersToConfirm.isEmpty()) {
+                db.setTransactionSuccessful();
+                return new ConfirmResult(true, "Already confirmed", 0);
+            }
+
+            for (Map.Entry<String, Double> entry : requiredByTitle.entrySet()) {
+                double stock = getTotalStock(entry.getKey());
+                if (stock + 0.000001 < entry.getValue()) {
+                    return new ConfirmResult(false,
+                            "Insufficient stock for " + entry.getKey() + ". Need " + formatQuantity(entry.getValue())
+                                    + ", have " + formatQuantity(stock), 0);
+                }
+            }
+
+            for (Map.Entry<String, Double> entry : requiredByTitle.entrySet()) {
+                consumeStock(db, entry.getKey(), entry.getValue());
+            }
+
+            String takenAt = nowText();
+            for (Reminder reminder : remindersToConfirm) {
+                ContentValues values = new ContentValues();
+                values.put(LOG_REMINDER_ID, reminder.getID());
+                values.put(LOG_TITLE, normalizeTitle(reminder.getTitle()));
+                values.put(LOG_DOSE, reminder.getDose());
+                values.put(LOG_SCHEDULED_AT, scheduledAt);
+                values.put(LOG_TAKEN_AT, takenAt);
+                db.insertWithOnConflict(TABLE_INTAKE_LOGS, null, values, SQLiteDatabase.CONFLICT_IGNORE);
+            }
+
+            db.setTransactionSuccessful();
+            return new ConfirmResult(true, "Confirmed " + remindersToConfirm.size() + " dose(s)", remindersToConfirm.size());
+        } finally {
+            db.endTransaction();
+        }
+    }
+
+    private void consumeStock(SQLiteDatabase db, String title, double amount) {
+        double remaining = amount;
+        Cursor cursor = db.query(TABLE_STOCK_BATCHES,
+                new String[]{STOCK_ID, STOCK_REMAINING_QUANTITY},
+                STOCK_TITLE + "=? AND " + STOCK_REMAINING_QUANTITY + ">0",
+                new String[]{normalizeTitle(title)}, null, null, STOCK_ID + " ASC");
+
+        if (cursor.moveToFirst()) {
+            do {
+                int id = cursor.getInt(0);
+                double batchRemaining = cursor.getDouble(1);
+                double used = Math.min(batchRemaining, remaining);
+                ContentValues values = new ContentValues();
+                values.put(STOCK_REMAINING_QUANTITY, batchRemaining - used);
+                db.update(TABLE_STOCK_BATCHES, values, STOCK_ID + "=?", new String[]{String.valueOf(id)});
+                remaining -= used;
+            } while (remaining > 0.000001 && cursor.moveToNext());
+        }
+        cursor.close();
+    }
+
+    private ContentValues toReminderValues(Reminder reminder) {
+        ContentValues values = new ContentValues();
+        values.put(KEY_TITLE, normalizeTitle(reminder.getTitle()));
+        values.put(KEY_DATE, reminder.getDate());
+        values.put(KEY_TIME, reminder.getTime());
+        values.put(KEY_REPEAT, reminder.getRepeat());
+        values.put(KEY_REPEAT_NO, reminder.getRepeatNo());
+        values.put(KEY_REPEAT_TYPE, reminder.getRepeatType());
+        values.put(KEY_ACTIVE, reminder.getActive());
+        values.put(KEY_DOSE, reminder.getDose());
+        values.put(KEY_ICON_TYPE, reminder.getIconType());
+        values.put(KEY_ICON_URI, reminder.getIconUri());
+        return values;
+    }
+
+    private Reminder readReminder(Cursor cursor) {
+        Reminder reminder = new Reminder();
+        reminder.setID(cursor.getInt(cursor.getColumnIndexOrThrow(KEY_ID)));
+        reminder.setTitle(cursor.getString(cursor.getColumnIndexOrThrow(KEY_TITLE)));
+        reminder.setDate(cursor.getString(cursor.getColumnIndexOrThrow(KEY_DATE)));
+        reminder.setTime(cursor.getString(cursor.getColumnIndexOrThrow(KEY_TIME)));
+        reminder.setRepeat(cursor.getString(cursor.getColumnIndexOrThrow(KEY_REPEAT)));
+        reminder.setRepeatNo(cursor.getString(cursor.getColumnIndexOrThrow(KEY_REPEAT_NO)));
+        reminder.setRepeatType(cursor.getString(cursor.getColumnIndexOrThrow(KEY_REPEAT_TYPE)));
+        reminder.setActive(cursor.getString(cursor.getColumnIndexOrThrow(KEY_ACTIVE)));
+        reminder.setDose(cursor.getDouble(cursor.getColumnIndexOrThrow(KEY_DOSE)));
+        reminder.setIconType(cursor.getString(cursor.getColumnIndexOrThrow(KEY_ICON_TYPE)));
+        reminder.setIconUri(cursor.getString(cursor.getColumnIndexOrThrow(KEY_ICON_URI)));
+        return reminder;
+    }
+
+    private String[] reminderColumns() {
+        return new String[]{
+                KEY_ID,
+                KEY_TITLE,
+                KEY_DATE,
+                KEY_TIME,
+                KEY_REPEAT,
+                KEY_REPEAT_NO,
+                KEY_REPEAT_TYPE,
+                KEY_ACTIVE,
+                KEY_DOSE,
+                KEY_ICON_TYPE,
+                KEY_ICON_URI
+        };
+    }
+
+    private String normalizeTitle(String title) {
+        return title == null ? "" : title.trim();
+    }
+
+    private String nowText() {
+        return new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(new java.util.Date());
+    }
+
+    private String formatQuantity(double value) {
+        if (Math.abs(value - Math.round(value)) < 0.000001) {
+            return String.valueOf((long) Math.round(value));
+        }
+        return String.format(Locale.US, "%.2f", value);
     }
 }

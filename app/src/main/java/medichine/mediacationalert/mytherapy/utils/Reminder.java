@@ -1,6 +1,3 @@
-
-
-
 package medichine.mediacationalert.mytherapy.utils;
 
 // Reminder class
@@ -13,9 +10,16 @@ public class Reminder {
     private String mRepeatNo;
     private String mRepeatType;
     private String mActive;
+    private double mDose;
+    private String mIconType;
+    private String mIconUri;
 
+    public Reminder(int ID, String Title, String Date, String Time, String Repeat, String RepeatNo, String RepeatType, String Active) {
+        this(ID, Title, Date, Time, Repeat, RepeatNo, RepeatType, Active, 1.0, "pill", "");
+    }
 
-    public Reminder(int ID, String Title, String Date, String Time, String Repeat, String RepeatNo, String RepeatType, String Active){
+    public Reminder(int ID, String Title, String Date, String Time, String Repeat, String RepeatNo, String RepeatType, String Active,
+                    double Dose, String IconType, String IconUri) {
         mID = ID;
         mTitle = Title;
         mDate = Date;
@@ -24,9 +28,17 @@ public class Reminder {
         mRepeatNo = RepeatNo;
         mRepeatType = RepeatType;
         mActive = Active;
+        mDose = Dose;
+        mIconType = IconType == null || IconType.length() == 0 ? "pill" : IconType;
+        mIconUri = IconUri == null ? "" : IconUri;
     }
 
-    public Reminder(String Title, String Date, String Time, String Repeat, String RepeatNo, String RepeatType, String Active){
+    public Reminder(String Title, String Date, String Time, String Repeat, String RepeatNo, String RepeatType, String Active) {
+        this(Title, Date, Time, Repeat, RepeatNo, RepeatType, Active, 1.0, "pill", "");
+    }
+
+    public Reminder(String Title, String Date, String Time, String Repeat, String RepeatNo, String RepeatType, String Active,
+                    double Dose, String IconType, String IconUri) {
         mTitle = Title;
         mDate = Date;
         mTime = Time;
@@ -34,9 +46,16 @@ public class Reminder {
         mRepeatNo = RepeatNo;
         mRepeatType = RepeatType;
         mActive = Active;
+        mDose = Dose;
+        mIconType = IconType == null || IconType.length() == 0 ? "pill" : IconType;
+        mIconUri = IconUri == null ? "" : IconUri;
     }
 
-    public Reminder(){}
+    public Reminder() {
+        mDose = 1.0;
+        mIconType = "pill";
+        mIconUri = "";
+    }
 
     public int getID() {
         return mID;
@@ -100,5 +119,29 @@ public class Reminder {
 
     public void setActive(String active) {
         mActive = active;
+    }
+
+    public double getDose() {
+        return mDose;
+    }
+
+    public void setDose(double dose) {
+        mDose = dose;
+    }
+
+    public String getIconType() {
+        return mIconType;
+    }
+
+    public void setIconType(String iconType) {
+        mIconType = iconType == null || iconType.length() == 0 ? "pill" : iconType;
+    }
+
+    public String getIconUri() {
+        return mIconUri;
+    }
+
+    public void setIconUri(String iconUri) {
+        mIconUri = iconUri == null ? "" : iconUri;
     }
 }
