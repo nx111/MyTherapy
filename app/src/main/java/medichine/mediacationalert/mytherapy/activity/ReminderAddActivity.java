@@ -135,6 +135,7 @@ public class ReminderAddActivity extends AppCompatActivity implements
         mRepeatNoText.setText(mRepeatNo);
         mRepeatTypeText.setText(mRepeatType);
         updateRepeatText();
+        updateActiveButtons();
 
         // To save state on device rotation
         if (savedInstanceState != null) {
@@ -162,6 +163,7 @@ public class ReminderAddActivity extends AppCompatActivity implements
             mRepeatType = savedRepeatType;
 
             mActive = savedInstanceState.getString(KEY_ACTIVE);
+            updateActiveButtons();
         }
     }
 
@@ -210,20 +212,14 @@ public class ReminderAddActivity extends AppCompatActivity implements
 
     // On clicking the active button
     public void selectFab1(View v) {
-        mFAB1 = (FloatingActionButton) findViewById(R.id.starred1);
-        mFAB1.setVisibility(View.GONE);
-        mFAB2 = (FloatingActionButton) findViewById(R.id.starred2);
-        mFAB2.setVisibility(View.VISIBLE);
         mActive = "true";
+        updateActiveButtons();
     }
 
     // On clicking the inactive button
     public void selectFab2(View v) {
-        mFAB2 = (FloatingActionButton) findViewById(R.id.starred2);
-        mFAB2.setVisibility(View.GONE);
-        mFAB1 = (FloatingActionButton) findViewById(R.id.starred1);
-        mFAB1.setVisibility(View.VISIBLE);
         mActive = "false";
+        updateActiveButtons();
     }
 
     // On clicking the repeat switch
@@ -306,6 +302,16 @@ public class ReminderAddActivity extends AppCompatActivity implements
             mRepeatText.setText("Every " + mRepeatNo + " " + mRepeatType + "(s)");
         } else {
             mRepeatText.setText(R.string.repeat_off);
+        }
+    }
+
+    private void updateActiveButtons() {
+        if ("true".equals(mActive)) {
+            mFAB1.setVisibility(View.GONE);
+            mFAB2.setVisibility(View.VISIBLE);
+        } else {
+            mFAB1.setVisibility(View.VISIBLE);
+            mFAB2.setVisibility(View.GONE);
         }
     }
 

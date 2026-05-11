@@ -83,7 +83,8 @@
                         android:layout_marginTop="10dp"
                         android:background="@drawable/a1_grad"
                         android:clickable="true"
-                        android:onClick="selectFab1" />
+                        android:onClick="selectFab1"
+                        android:src="@drawable/baseline_notifications_off_24" />
 
 
                     <com.google.android.material.floatingactionbutton.FloatingActionButton

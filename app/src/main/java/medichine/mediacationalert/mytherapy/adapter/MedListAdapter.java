@@ -112,10 +112,10 @@ public class MedListAdapter extends RecyclerView.Adapter<MedListAdapter.simpleHo
 
         // Set active image as on or off
         public void setActiveImage(String active) {
-            if (active.equals("true")) {
-//                    mActiveImage.setImageResource(R.drawable.ic_notifications_on_white_24dp);
-            } else if (active.equals("false")) {
-//                    mActiveImage.setImageResource(R.drawable.ic_notifications_off_grey600_24dp);
+            if ("true".equals(active)) {
+                mActiveImage.setBackgroundResource(R.drawable.notification_icon);
+            } else {
+                mActiveImage.setBackgroundResource(R.drawable.baseline_notifications_off_24);
             }
         }
     }

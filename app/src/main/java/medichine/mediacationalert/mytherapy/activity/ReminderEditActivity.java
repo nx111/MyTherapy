@@ -178,14 +178,7 @@ public class ReminderEditActivity extends AppCompatActivity implements
         }
 
         // Setup up active buttons
-        if (mActive.equals("false")) {
-            mFAB1.setVisibility(View.VISIBLE);
-            mFAB2.setVisibility(View.GONE);
-
-        } else if (mActive.equals("true")) {
-            mFAB1.setVisibility(View.GONE);
-            mFAB2.setVisibility(View.VISIBLE);
-        }
+        updateActiveButtons();
 
         // Setup repeat switch
         if (mRepeat.equals("false")) {
@@ -264,20 +257,14 @@ public class ReminderEditActivity extends AppCompatActivity implements
 
     // On clicking the active button
     public void selectFab1(View v) {
-        mFAB1 = (FloatingActionButton) findViewById(R.id.starred1);
-        mFAB1.setVisibility(View.GONE);
-        mFAB2 = (FloatingActionButton) findViewById(R.id.starred2);
-        mFAB2.setVisibility(View.VISIBLE);
         mActive = "true";
+        updateActiveButtons();
     }
 
     // On clicking the inactive button
     public void selectFab2(View v) {
-        mFAB2 = (FloatingActionButton) findViewById(R.id.starred2);
-        mFAB2.setVisibility(View.GONE);
-        mFAB1 = (FloatingActionButton) findViewById(R.id.starred1);
-        mFAB1.setVisibility(View.VISIBLE);
         mActive = "false";
+        updateActiveButtons();
     }
 
     // On clicking the repeat switch
@@ -360,6 +347,16 @@ public class ReminderEditActivity extends AppCompatActivity implements
             mRepeatText.setText("Every " + mRepeatNo + " " + mRepeatType + "(s)");
         } else {
             mRepeatText.setText(R.string.repeat_off);
+        }
+    }
+
+    private void updateActiveButtons() {
+        if ("true".equals(mActive)) {
+            mFAB1.setVisibility(View.GONE);
+            mFAB2.setVisibility(View.VISIBLE);
+        } else {
+            mFAB1.setVisibility(View.VISIBLE);
+            mFAB2.setVisibility(View.GONE);
         }
     }
 
