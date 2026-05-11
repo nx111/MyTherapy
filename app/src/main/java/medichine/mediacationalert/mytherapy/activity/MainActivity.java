@@ -638,17 +638,10 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         summaryIDmap.clear();
         courseReminderMap.clear();
 
-        LinkedHashMap<String, CourseGroup> groups = new LinkedHashMap<>();
-        for (Reminder reminder : rb.getAllReminders()) {
-            String title = normalizeTitle(reminder.getTitle());
-            if (!groups.containsKey(title)) {
-                groups.put(title, new CourseGroup(title, reminder));
-            }
-            groups.get(title).reminders.add(reminder);
-        }
+        List<CourseGroup> groups = buildCourseGroups(rb.getAllReminders());
 
         int position = 0;
-        for (CourseGroup group : groups.values()) {
+        for (CourseGroup group : groups) {
             Collections.sort(group.reminders, Comparator.comparingLong(item -> ReminderSchedule.parse(item).getTimeInMillis()));
             double stock = rb.getTotalStock(group.title);
             StringBuilder details = new StringBuilder();
@@ -672,7 +665,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
             }
 
             items.add(new SummaryItem(
-                    group.title,
+                    courseDisplayTitle(group, groups),
                     getString(R.string.stock_amount, formatQuantity(stock)),
                     details.toString(),
                     getString(R.string.reminder_count, shownCount),
@@ -694,6 +687,50 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     private boolean hasActiveReminder(List<Reminder> reminders) {
         for (Reminder reminder : reminders) {
             if ("true".equals(reminder.getActive())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private List<CourseGroup> buildCourseGroups(List<Reminder> reminders) {
+        ArrayList<CourseGroup> groups = new ArrayList<>();
+        for (Reminder reminder : reminders) {
+            String title = normalizeTitle(reminder.getTitle());
+            CourseGroup group = findCompatibleCourseGroup(groups, title, reminder.getSpec());
+            if (group == null) {
+                groups.add(new CourseGroup(title, reminder));
+            } else {
+                group.add(reminder);
+            }
+        }
+        return groups;
+    }
+
+    private CourseGroup findCompatibleCourseGroup(List<CourseGroup> groups, String title, String spec) {
+        for (CourseGroup group : groups) {
+            if (group.title.equals(title) && specsCompatible(group.spec, spec)) {
+                return group;
+            }
+        }
+        return null;
+    }
+
+    private String courseDisplayTitle(CourseGroup group, List<CourseGroup> groups) {
+        if (group.spec.length() == 0 || !hasSpecVariants(group.title, groups)) {
+            return group.title;
+        }
+        return group.title + "(" + group.spec + ")";
+    }
+
+    private boolean hasSpecVariants(String title, List<CourseGroup> groups) {
+        ArrayList<String> specs = new ArrayList<>();
+        for (CourseGroup group : groups) {
+            if (!group.title.equals(title) || group.spec.length() == 0 || specs.contains(group.spec)) {
+                continue;
+            }
+            specs.add(group.spec);
+            if (specs.size() > 1) {
                 return true;
             }
         }
@@ -1553,18 +1590,24 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         if (reminders == null || reminders.isEmpty()) {
             return;
         }
-        showCourseMedicationDetails(reminders.get(0).getTitle());
+        showCourseMedicationDetails(reminders);
     }
 
-    private void showCourseMedicationDetails(String title) {
-        String normalizedTitle = normalizeTitle(title);
-        List<Reminder> reminders = courseRemindersForTitle(normalizedTitle);
+    private void showCourseMedicationDetails(List<Reminder> sourceReminders) {
+        List<Integer> groupIds = courseReminderIds(sourceReminders);
+        List<Reminder> reminders = courseRemindersForIds(groupIds);
         if (reminders.isEmpty()) {
             loadCurrentPage();
             return;
         }
 
         Collections.sort(reminders, Comparator.comparingLong(item -> ReminderSchedule.parse(item).getTimeInMillis()));
+        String normalizedTitle = normalizeTitle(reminders.get(0).getTitle());
+        CourseGroup displayGroup = new CourseGroup(normalizedTitle, reminders.get(0));
+        for (int i = 1; i < reminders.size(); i++) {
+            displayGroup.add(reminders.get(i));
+        }
+        String displayTitle = courseDisplayTitle(displayGroup, buildCourseGroups(rb.getAllReminders()));
 
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
@@ -1572,7 +1615,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         content.setPadding(padding, dp(8), padding, 0);
 
         final AlertDialog[] dialogHolder = new AlertDialog[1];
-        content.addView(createMedicineHeaderRow(normalizedTitle, reminders.get(0), dialogHolder));
+        content.addView(createMedicineHeaderRow(displayTitle, normalizedTitle, reminders.get(0), groupIds, dialogHolder));
 
         TextView summary = new TextView(this);
         String summaryText = getString(R.string.stock_amount, formatQuantity(rb.getTotalStock(normalizedTitle)));
@@ -1586,10 +1629,10 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         content.addView(summary, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
-        content.addView(createPlanHeaderRow(normalizedTitle, reminders.get(0), reminders.size(), dialogHolder));
+        content.addView(createPlanHeaderRow(normalizedTitle, reminders.get(0), reminders.size(), groupIds, dialogHolder));
 
         for (Reminder reminder : reminders) {
-            content.addView(createCoursePlanRow(reminder, normalizedTitle, dialogHolder));
+            content.addView(createCoursePlanRow(reminder, normalizedTitle, groupIds, dialogHolder));
         }
 
         ScrollView scrollView = new ScrollView(this);
@@ -1602,14 +1645,15 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         dialog.show();
     }
 
-    private View createMedicineHeaderRow(String title, Reminder displayReminder, AlertDialog[] dialogHolder) {
+    private View createMedicineHeaderRow(String displayTitle, String title, Reminder displayReminder,
+                                         List<Integer> groupIds, AlertDialog[] dialogHolder) {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setPadding(0, dp(4), 0, dp(8));
 
         TextView titleView = new TextView(this);
-        titleView.setText(title);
+        titleView.setText(displayTitle);
         titleView.setTextColor(getResources().getColor(R.color.text_primary));
         titleView.setTypeface(Typeface.DEFAULT_BOLD);
         titleView.setTextSize(22);
@@ -1621,12 +1665,13 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         edit.setColorFilter(getResources().getColor(R.color.text_primary));
         edit.setBackgroundResource(android.R.drawable.list_selector_background);
         edit.setContentDescription(getString(R.string.edit_medicine_info));
-        edit.setOnClickListener(v -> showMedicineInfoEditor(title, displayReminder, dialogHolder[0]));
+        edit.setOnClickListener(v -> showMedicineInfoEditor(title, displayReminder, groupIds, dialogHolder[0]));
         row.addView(edit, new LinearLayout.LayoutParams(dp(44), dp(44)));
         return row;
     }
 
-    private View createPlanHeaderRow(String title, Reminder displayReminder, int reminderCount, AlertDialog[] dialogHolder) {
+    private View createPlanHeaderRow(String title, Reminder displayReminder, int reminderCount,
+                                     List<Integer> groupIds, AlertDialog[] dialogHolder) {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
@@ -1649,12 +1694,12 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         add.setColorFilter(getResources().getColor(R.color.text_primary));
         add.setBackgroundResource(android.R.drawable.list_selector_background);
         add.setContentDescription(getString(R.string.add_plan));
-        add.setOnClickListener(v -> showCoursePlanEditor(null, title, displayReminder, dialogHolder[0]));
+        add.setOnClickListener(v -> showCoursePlanEditor(null, title, displayReminder, groupIds, dialogHolder[0]));
         row.addView(add, new LinearLayout.LayoutParams(dp(44), dp(44)));
         return row;
     }
 
-    private View createCoursePlanRow(Reminder reminder, String title, AlertDialog[] dialogHolder) {
+    private View createCoursePlanRow(Reminder reminder, String title, List<Integer> groupIds, AlertDialog[] dialogHolder) {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
@@ -1697,7 +1742,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         row.addView(status, new LinearLayout.LayoutParams(dp(24), dp(24)));
 
         row.setOnLongClickListener(v -> {
-            showCoursePlanOptions(reminder, title, dialogHolder[0]);
+            showCoursePlanOptions(reminder, title, groupIds, dialogHolder[0]);
             return true;
         });
 
@@ -1748,7 +1793,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         return row;
     }
 
-    private void showCoursePlanOptions(Reminder reminder, String title, AlertDialog currentDialog) {
+    private void showCoursePlanOptions(Reminder reminder, String title, List<Integer> groupIds, AlertDialog currentDialog) {
         LinearLayout content = new LinearLayout(this);
         content.setOrientation(LinearLayout.VERTICAL);
         int padding = dp(12);
@@ -1764,26 +1809,27 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 getString(R.string.edit_plan),
                 v -> {
                     optionDialog.dismiss();
-                    showCoursePlanEditor(reminder, title, null, currentDialog);
+                    showCoursePlanEditor(reminder, title, null, groupIds, currentDialog);
                 }));
         content.addView(createCourseActionRow(
                 "true".equals(reminder.getActive()) ? R.drawable.baseline_notifications_off_24 : R.drawable.baseline_done_24,
                 getString("true".equals(reminder.getActive()) ? R.string.disable_plan : R.string.enable_plan),
                 v -> {
                     optionDialog.dismiss();
-                    toggleCoursePlan(reminder, title, currentDialog);
+                    toggleCoursePlan(reminder, groupIds, currentDialog);
                 }));
         content.addView(createCourseActionRow(
                 R.drawable.baseline_delete_24,
                 getString(R.string.delete_plan),
                 v -> {
                     optionDialog.dismiss();
-                    confirmDeleteCoursePlan(reminder, title, currentDialog);
+                    confirmDeleteCoursePlan(reminder, groupIds, currentDialog);
                 }));
         optionDialog.show();
     }
 
-    private void showMedicineInfoEditor(String title, Reminder displayReminder, AlertDialog currentDialog) {
+    private void showMedicineInfoEditor(String title, Reminder displayReminder, List<Integer> groupIds,
+                                        AlertDialog currentDialog) {
         LinearLayout form = new LinearLayout(this);
         form.setOrientation(LinearLayout.VERTICAL);
         int padding = dp(20);
@@ -1840,24 +1886,25 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 .create();
         dialog.setOnShowListener(d -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
             String newTitle = name.getText().toString().trim();
+            String newSpec = spec.getText().toString().trim();
             if (newTitle.length() == 0) {
                 name.setError(getString(R.string.reminder_title_blank));
                 return;
             }
-            if (wouldCreateDuplicateMedicinePlans(title, newTitle)) {
+            if (wouldCreateDuplicateMedicinePlans(groupIds, newTitle, newSpec)) {
                 name.setError(getString(R.string.duplicate_reminder_plan));
                 return;
             }
-            rb.updateMedicineInfo(title, newTitle, spec.getText().toString().trim(),
-                    selectedIconType[0], selectedIconUri[0]);
+            saveCourseMedicineInfo(groupIds, title, newTitle, newSpec, selectedIconType[0], selectedIconUri[0]);
             Toast.makeText(getApplicationContext(), R.string.saved, Toast.LENGTH_SHORT).show();
             dialog.dismiss();
-            refreshCourseDetail(newTitle, currentDialog);
+            refreshCourseDetail(groupIds, currentDialog);
         }));
         dialog.show();
     }
 
-    private void showCoursePlanEditor(Reminder reminder, String title, Reminder template, AlertDialog currentDialog) {
+    private void showCoursePlanEditor(Reminder reminder, String title, Reminder template, List<Integer> groupIds,
+                                      AlertDialog currentDialog) {
         Reminder fresh = reminder == null ? newCourseReminder(title, template) : rb.getReminder(reminder.getID());
         if (fresh == null) {
             return;
@@ -1931,8 +1978,11 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 .create();
         dialog.setOnShowListener(d -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
             if (saveSimpleCoursePlan(fresh, dose, doseTimes, startDate[0], endDate[0], active.isChecked())) {
+                if (fresh.getID() > 0 && !groupIds.contains(fresh.getID())) {
+                    groupIds.add(fresh.getID());
+                }
                 dialog.dismiss();
-                refreshCourseDetail(title, currentDialog);
+                refreshCourseDetail(groupIds, currentDialog);
             }
         }));
         dialog.show();
@@ -2025,6 +2075,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 Toast.makeText(getApplicationContext(), R.string.could_not_save_reminder, Toast.LENGTH_SHORT).show();
                 return false;
             }
+            reminder.setID(id);
             reminder = rb.getReminder(id);
             if (reminder == null) {
                 return false;
@@ -2110,22 +2161,18 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         }
     }
 
-    private boolean wouldCreateDuplicateMedicinePlans(String oldTitle, String newTitle) {
-        String oldName = normalizeTitle(oldTitle);
+    private boolean wouldCreateDuplicateMedicinePlans(List<Integer> groupIds, String newTitle, String newSpec) {
         String newName = normalizeTitle(newTitle);
-        if (oldName.equals(newName)) {
-            return false;
-        }
         List<Reminder> reminders = rb.getAllReminders();
         for (Reminder changed : reminders) {
-            if (!oldName.equals(normalizeTitle(changed.getTitle()))) {
+            if (!groupIds.contains(changed.getID())) {
                 continue;
             }
             for (Reminder other : reminders) {
-                if (changed.getID() == other.getID()) {
+                if (groupIds.contains(other.getID())) {
                     continue;
                 }
-                if (newName.equals(normalizeTitle(other.getTitle()))
+                if (sameCourseMedicine(newName, newSpec, normalizeTitle(other.getTitle()), other.getSpec())
                         && Math.abs(changed.getDose() - other.getDose()) < 0.000001
                         && hasOverlappingDoseTime(changed, other)) {
                     return true;
@@ -2133,6 +2180,27 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
             }
         }
         return false;
+    }
+
+    private void saveCourseMedicineInfo(List<Integer> groupIds, String oldTitle, String newTitle, String newSpec,
+                                        String iconType, String iconUri) {
+        String oldName = normalizeTitle(oldTitle);
+        String normalizedNewTitle = normalizeTitle(newTitle);
+        if (courseRemindersForTitle(oldName).size() == groupIds.size()) {
+            rb.updateMedicineInfo(oldName, normalizedNewTitle, newSpec, iconType, iconUri);
+            return;
+        }
+        for (Integer id : groupIds) {
+            Reminder reminder = rb.getReminder(id);
+            if (reminder == null) {
+                continue;
+            }
+            reminder.setTitle(normalizedNewTitle);
+            reminder.setSpec(newSpec);
+            reminder.setIconType(iconType);
+            reminder.setIconUri(iconUri);
+            rb.updateReminder(reminder);
+        }
     }
 
     private boolean hasOverlappingDoseTime(Reminder left, Reminder right) {
@@ -2157,7 +2225,28 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         return reminders;
     }
 
-    private void toggleCoursePlan(Reminder reminder, String title, AlertDialog currentDialog) {
+    private List<Integer> courseReminderIds(List<Reminder> reminders) {
+        ArrayList<Integer> ids = new ArrayList<>();
+        for (Reminder reminder : reminders) {
+            if (!ids.contains(reminder.getID())) {
+                ids.add(reminder.getID());
+            }
+        }
+        return ids;
+    }
+
+    private List<Reminder> courseRemindersForIds(List<Integer> ids) {
+        ArrayList<Reminder> reminders = new ArrayList<>();
+        for (Integer id : ids) {
+            Reminder reminder = rb.getReminder(id);
+            if (reminder != null) {
+                reminders.add(reminder);
+            }
+        }
+        return reminders;
+    }
+
+    private void toggleCoursePlan(Reminder reminder, List<Integer> groupIds, AlertDialog currentDialog) {
         Reminder fresh = rb.getReminder(reminder.getID());
         if (fresh == null) {
             return;
@@ -2176,37 +2265,38 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
             mAlarmReceiver.scheduleReminder(getApplicationContext(), fresh);
         }
         Toast.makeText(getApplicationContext(), R.string.edited, Toast.LENGTH_SHORT).show();
-        refreshCourseDetail(title, currentDialog);
+        refreshCourseDetail(groupIds, currentDialog);
     }
 
-    private void confirmDeleteCoursePlan(Reminder reminder, String title, AlertDialog currentDialog) {
+    private void confirmDeleteCoursePlan(Reminder reminder, List<Integer> groupIds, AlertDialog currentDialog) {
         new AlertDialog.Builder(this)
                 .setTitle(R.string.delete_plan)
                 .setMessage(R.string.delete_plan_message)
-                .setPositiveButton(R.string.delete_plan, (dialog, which) -> deleteCoursePlan(reminder, title, currentDialog))
+                .setPositiveButton(R.string.delete_plan, (dialog, which) -> deleteCoursePlan(reminder, groupIds, currentDialog))
                 .setNegativeButton(R.string.cancel, null)
                 .show();
     }
 
-    private void deleteCoursePlan(Reminder reminder, String title, AlertDialog currentDialog) {
+    private void deleteCoursePlan(Reminder reminder, List<Integer> groupIds, AlertDialog currentDialog) {
         Reminder fresh = rb.getReminder(reminder.getID());
         if (fresh == null) {
-            refreshCourseDetail(title, currentDialog);
+            refreshCourseDetail(groupIds, currentDialog);
             return;
         }
         rb.deleteReminder(fresh);
+        groupIds.remove(Integer.valueOf(fresh.getID()));
         mAlarmReceiver.cancelAlarm(getApplicationContext(), fresh.getID());
         Toast.makeText(getApplicationContext(), R.string.deleted, Toast.LENGTH_SHORT).show();
-        refreshCourseDetail(title, currentDialog);
+        refreshCourseDetail(groupIds, currentDialog);
     }
 
-    private void refreshCourseDetail(String title, AlertDialog currentDialog) {
+    private void refreshCourseDetail(List<Integer> groupIds, AlertDialog currentDialog) {
         if (currentDialog != null && currentDialog.isShowing()) {
             currentDialog.dismiss();
         }
         loadCurrentPage();
-        if (!courseRemindersForTitle(title).isEmpty()) {
-            showCourseMedicationDetails(title);
+        if (!courseRemindersForIds(groupIds).isEmpty()) {
+            showCourseMedicationDetails(courseRemindersForIds(groupIds));
         }
     }
 
@@ -2316,6 +2406,20 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         return title == null ? "" : title.trim();
     }
 
+    private String normalizeSpec(String spec) {
+        return spec == null ? "" : spec.trim();
+    }
+
+    private boolean specsCompatible(String left, String right) {
+        String leftSpec = normalizeSpec(left);
+        String rightSpec = normalizeSpec(right);
+        return leftSpec.length() == 0 || rightSpec.length() == 0 || leftSpec.equals(rightSpec);
+    }
+
+    private boolean sameCourseMedicine(String leftTitle, String leftSpec, String rightTitle, String rightSpec) {
+        return normalizeTitle(leftTitle).equals(normalizeTitle(rightTitle)) && specsCompatible(leftSpec, rightSpec);
+    }
+
     private void normalizeDate(Calendar calendar) {
         calendar.set(Calendar.HOUR_OF_DAY, 0);
         calendar.set(Calendar.MINUTE, 0);
@@ -2355,6 +2459,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         final int firstReminderId;
         final String iconType;
         final String iconUri;
+        String spec;
         final List<Reminder> reminders = new ArrayList<>();
 
         CourseGroup(String title, Reminder firstReminder) {
@@ -2362,6 +2467,15 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
             this.firstReminderId = firstReminder.getID();
             this.iconType = firstReminder.getIconType();
             this.iconUri = firstReminder.getIconUri();
+            this.spec = firstReminder.getSpec();
+            reminders.add(firstReminder);
+        }
+
+        void add(Reminder reminder) {
+            if (spec.length() == 0 && reminder.getSpec().length() > 0) {
+                spec = reminder.getSpec();
+            }
+            reminders.add(reminder);
         }
     }
 

@@ -464,6 +464,7 @@ public class ReminderDatabase extends SQLiteOpenHelper {
                 continue;
             }
             if (title.equals(normalizeTitle(reminder.getTitle()))
+                    && specsCompatible(candidate.getSpec(), reminder.getSpec())
                     && Math.abs(candidate.getDose() - reminder.getDose()) < 0.000001
                     && hasMatchingDoseTime(candidate, reminder)) {
                 return reminder;
@@ -1135,6 +1136,16 @@ public class ReminderDatabase extends SQLiteOpenHelper {
 
     private String normalizeTitle(String title) {
         return title == null ? "" : title.trim();
+    }
+
+    private String normalizeSpec(String spec) {
+        return spec == null ? "" : spec.trim();
+    }
+
+    private boolean specsCompatible(String left, String right) {
+        String leftSpec = normalizeSpec(left);
+        String rightSpec = normalizeSpec(right);
+        return leftSpec.length() == 0 || rightSpec.length() == 0 || leftSpec.equals(rightSpec);
     }
 
     private String logExportKey(int reminderId, String scheduledAt) {
