@@ -25,14 +25,16 @@ public class ReminderItem {
         public String stockText;
         public String iconType;
         public String iconUri;
+        public boolean taken;
 
-        public MedicineLine(int ReminderId, String Title, String DoseText, String StockText, String IconType, String IconUri) {
+        public MedicineLine(int ReminderId, String Title, String DoseText, String StockText, String IconType, String IconUri, boolean Taken) {
             this.reminderId = ReminderId;
             this.title = Title;
             this.doseText = DoseText;
             this.stockText = StockText;
             this.iconType = IconType == null || IconType.length() == 0 ? "pill" : IconType;
             this.iconUri = IconUri == null ? "" : IconUri;
+            this.taken = Taken;
         }
     }
 

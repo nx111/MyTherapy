@@ -156,9 +156,9 @@ public class MedListAdapter extends RecyclerView.Adapter<MedListAdapter.SimpleHo
 
                 TextView check = new TextView(activity);
                 check.setGravity(Gravity.CENTER);
-                check.setText("\u25CB");
-                check.setTextColor(activity.getResources().getColor(R.color.nav_selected));
-                check.setTextSize(28);
+                check.setText(line.taken ? "\u2713" : "\u25CB");
+                check.setTextColor(activity.getResources().getColor(line.taken ? R.color.nav_selected : R.color.text_secondary));
+                check.setTextSize(line.taken ? 24 : 28);
                 row.addView(check, new LinearLayout.LayoutParams(dp(40), dp(40)));
 
                 mMedicineContainer.addView(row, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));

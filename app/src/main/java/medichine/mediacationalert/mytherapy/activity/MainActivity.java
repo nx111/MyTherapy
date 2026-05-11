@@ -268,9 +268,9 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         long now = System.currentTimeMillis();
         for (Reminder reminder : rb.getAllReminders()) {
             for (ScheduledReminder scheduled : collectOccurrences(reminder, start, end)) {
-                if (!rb.isReminderTaken(reminder.getID(), scheduled.scheduledAt)
-                        && shouldShowPendingOccurrence(reminder, scheduled.timeMillis, now)) {
-                    scheduledReminders.add(scheduled);
+                boolean taken = rb.isReminderTaken(reminder.getID(), scheduled.scheduledAt);
+                if (shouldShowScheduledOccurrence(reminder, scheduled.timeMillis, now)) {
+                    scheduledReminders.add(new ScheduledReminder(reminder, scheduled.scheduledAt, scheduled.timeMillis, taken));
                 }
             }
         }
@@ -307,9 +307,11 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
 
             for (ScheduledReminder scheduled : group) {
                 Reminder reminder = scheduled.reminder;
-                reminderIds.add(reminder.getID());
+                if (!scheduled.taken) {
+                    reminderIds.add(reminder.getID());
+                }
                 double stock = rb.getTotalStock(reminder.getTitle());
-                String doseText = getString(R.string.dose) + " " + formatQuantity(reminder.getDose());
+                String doseText = formatQuantity(reminder.getDose()) + " " + getString(R.string.pill);
                 String stockText = getString(R.string.stock_amount, formatQuantity(stock));
                 medicineLines.add(new ReminderItem.MedicineLine(
                         reminder.getID(),
@@ -317,7 +319,8 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                         doseText,
                         stockText,
                         reminder.getIconType(),
-                        reminder.getIconUri()));
+                        reminder.getIconUri(),
+                        scheduled.taken));
                 if (details.length() > 0) {
                     details.append("\n");
                 }
@@ -333,13 +336,13 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                     "",
                     "",
                     "",
-                    "true",
+                    reminderIds.isEmpty() ? "false" : "true",
                     details.toString(),
-                    getString(R.string.stock_ready),
+                    reminderIds.isEmpty() ? getString(R.string.already_confirmed) : getString(R.string.stock_ready),
                     scheduledAt,
                     firstReminder.getIconType(),
                     firstReminder.getIconUri(),
-                    false,
+                    reminderIds.isEmpty(),
                     reminderIds,
                     medicineLines));
             IDmap.put(position, firstReminder.getID());
@@ -348,7 +351,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         return items;
     }
 
-    private boolean shouldShowPendingOccurrence(Reminder reminder, long occurrenceMillis, long nowMillis) {
+    private boolean shouldShowScheduledOccurrence(Reminder reminder, long occurrenceMillis, long nowMillis) {
         return "true".equals(reminder.getActive()) || occurrenceMillis <= nowMillis;
     }
 
@@ -659,11 +662,17 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         final Reminder reminder;
         final String scheduledAt;
         final long timeMillis;
+        final boolean taken;
 
         ScheduledReminder(Reminder reminder, String scheduledAt, long timeMillis) {
+            this(reminder, scheduledAt, timeMillis, false);
+        }
+
+        ScheduledReminder(Reminder reminder, String scheduledAt, long timeMillis, boolean taken) {
             this.reminder = reminder;
             this.scheduledAt = scheduledAt;
             this.timeMillis = timeMillis;
+            this.taken = taken;
         }
     }
 
