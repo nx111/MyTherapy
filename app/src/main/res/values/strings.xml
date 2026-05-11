@@ -220,7 +220,6 @@
     <string name="lab_unit_hint">Unit</string>
     <string name="lab_result_value_hint">Result value</string>
     <string name="lab_result_date">Test Date</string>
-    <string name="lab_result_date_required">Select a test date</string>
     <string name="lab_reference_range">Reference %1$s-%2$s %3$s</string>
     <string name="lab_latest_result">Latest %1$s %2$s · %3$s</string>
     <string name="lab_no_result">No result</string>

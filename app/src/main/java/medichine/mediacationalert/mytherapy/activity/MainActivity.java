@@ -1383,11 +1383,9 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         value.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL | InputType.TYPE_NUMBER_FLAG_SIGNED);
         form.addView(value, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
-        String[] resultDate = new String[]{""};
+        String[] resultDate = new String[]{ReminderSchedule.formatDate(Calendar.getInstance())};
         TextView resultDateText = dateSelectorText(R.string.lab_result_date, resultDate[0]);
-        resultDateText.setOnClickListener(v -> showCourseDatePicker(
-                resultDate[0].length() == 0 ? ReminderSchedule.formatDate(Calendar.getInstance()) : resultDate[0],
-                date -> {
+        resultDateText.setOnClickListener(v -> showCourseDatePicker(resultDate[0], date -> {
                     resultDate[0] = date;
                     resultDateText.setText(dateSelectorLabel(R.string.lab_result_date, resultDate[0]));
                 }));
@@ -1411,10 +1409,6 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
             Double resultValue = parseNumber(value);
             if (resultValue == null) {
                 value.setError(getString(R.string.lab_result_required));
-                return;
-            }
-            if (resultDate[0].length() == 0) {
-                Toast.makeText(this, R.string.lab_result_date_required, Toast.LENGTH_SHORT).show();
                 return;
             }
             long id = rb.addLabResult(new LabResult(item.mId, resultValue, labResultCreatedAt(resultDate[0])));
