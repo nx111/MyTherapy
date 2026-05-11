@@ -552,9 +552,19 @@ public class MedicineIconFactory {
             RectF rect = "thick".equals(shape)
                     ? new RectF(32, 82.25f, 218, 167.75f)
                     : new RectF(18, 88, 232, 162);
+            float split = rect.centerX();
+            Paint whiteFill = new Paint(fill);
+            whiteFill.setColor(Color.WHITE);
+            canvas.save();
+            canvas.clipRect(rect.left, rect.top, split, rect.bottom);
             canvas.drawRoundRect(rect, rect.height() / 2f, rect.height() / 2f, fill);
+            canvas.restore();
+            canvas.save();
+            canvas.clipRect(split, rect.top, rect.right, rect.bottom);
+            canvas.drawRoundRect(rect, rect.height() / 2f, rect.height() / 2f, whiteFill);
+            canvas.restore();
             canvas.drawRoundRect(rect, rect.height() / 2f, rect.height() / 2f, stroke);
-            canvas.drawLine(125, rect.top + 12, 125, rect.bottom - 12, line);
+            canvas.drawLine(split, rect.top + 6, split, rect.bottom - 6, stroke);
             canvas.restore();
         }
 
