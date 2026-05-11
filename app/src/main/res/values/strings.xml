@@ -100,4 +100,15 @@
     <string name="download_permission_needed">Storage permission is needed for download</string>
     <string name="download_complete_soon">Download will complete shortly</string>
     <string name="kodi_not_found">Kodi player not found</string>
+    <string name="nav_today">Today</string>
+    <string name="nav_history">History</string>
+    <string name="nav_course">Course</string>
+    <string name="no_today_reminders">No pending medicine for today</string>
+    <string name="no_history_records">No medication history yet</string>
+    <string name="no_course_records">No medicines yet</string>
+    <string name="not_taken">Not taken</string>
+    <string name="active">Active</string>
+    <string name="stock_amount">Stock: %1$s</string>
+    <string name="reminder_count">%1$d reminder(s)</string>
+    <string name="course_schedule_line">%1$s x%2$s • %3$s</string>
 </resources>

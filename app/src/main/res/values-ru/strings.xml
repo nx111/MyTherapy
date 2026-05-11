@@ -84,4 +84,15 @@
     <string name="download_permission_needed">Для загрузки требуется разрешение на хранилище</string>
     <string name="download_complete_soon">Загрузка скоро завершится</string>
     <string name="kodi_not_found">Плеер Kodi не найден</string>
+    <string name="nav_today">Сегодня</string>
+    <string name="nav_history">История</string>
+    <string name="nav_course">Курс</string>
+    <string name="no_today_reminders">На сегодня нет ожидающих лекарств</string>
+    <string name="no_history_records">Истории приема пока нет</string>
+    <string name="no_course_records">Лекарств пока нет</string>
+    <string name="not_taken">Не принято</string>
+    <string name="active">Активно</string>
+    <string name="stock_amount">Запас: %1$s</string>
+    <string name="reminder_count">%1$d напоминание(я)</string>
+    <string name="course_schedule_line">%1$s x%2$s • %3$s</string>
 </resources>

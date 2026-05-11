@@ -84,4 +84,15 @@
     <string name="download_permission_needed">يلزم إذن التخزين للتنزيل</string>
     <string name="download_complete_soon">سيكتمل التنزيل قريبا</string>
     <string name="kodi_not_found">لم يتم العثور على مشغل Kodi</string>
+    <string name="nav_today">اليوم</string>
+    <string name="nav_history">السجل</string>
+    <string name="nav_course">العلاج</string>
+    <string name="no_today_reminders">لا توجد أدوية معلقة لهذا اليوم</string>
+    <string name="no_history_records">لا يوجد سجل دواء بعد</string>
+    <string name="no_course_records">لا توجد أدوية بعد</string>
+    <string name="not_taken">لم يتم التناول</string>
+    <string name="active">نشط</string>
+    <string name="stock_amount">المخزون: %1$s</string>
+    <string name="reminder_count">%1$d تذكير</string>
+    <string name="course_schedule_line">%1$s x%2$s • %3$s</string>
 </resources>

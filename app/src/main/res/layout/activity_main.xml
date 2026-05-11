@@ -1,62 +1,72 @@
-<RelativeLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools"
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:fab="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#EEEEEE"
+    android:background="#F2F4F6"
     tools:context=".activity.MainActivity">
 
     <RelativeLayout
         android:id="@+id/baner"
         android:layout_width="match_parent"
         android:layout_height="300dp"
-        android:layout_marginTop="-20dp"
         android:layout_marginStart="-5dp"
+        android:layout_marginTop="-20dp"
         android:layout_marginEnd="-5dp"
-        android:background="@drawable/medication_banner"/>
+        android:background="@drawable/medication_banner" />
+
+    <com.google.android.material.bottomnavigation.BottomNavigationView
+        android:id="@+id/bottom_nav"
+        android:layout_width="match_parent"
+        android:layout_height="64dp"
+        android:layout_alignParentBottom="true"
+        android:background="@color/white"
+        app:itemIconTint="@color/bottom_nav_item"
+        app:itemTextColor="@color/bottom_nav_item"
+        app:labelVisibilityMode="labeled"
+        app:menu="@menu/main_bottom_nav" />
 
     <FrameLayout
-        android:layout_above="@id/reminder_list"
         android:id="@+id/ad_view_container"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        />
+        android:layout_above="@id/bottom_nav" />
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/reminder_list"
-        android:layout_marginTop="150dp"
-        android:layout_marginStart="15dp"
-        android:layout_marginEnd="15dp"
         android:layout_width="match_parent"
-        android:layout_marginBottom="5dp"
-        android:layout_height="match_parent" />
+        android:layout_height="match_parent"
+        android:layout_above="@id/ad_view_container"
+        android:layout_marginStart="15dp"
+        android:layout_marginTop="150dp"
+        android:layout_marginEnd="15dp"
+        android:layout_marginBottom="8dp" />
 
     <TextView
         android:id="@+id/no_reminder_text"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_centerInParent="true"
-        android:padding="16dp"
+        android:layout_above="@id/bottom_nav"
+        android:layout_centerHorizontal="true"
+        android:layout_centerVertical="true"
         android:gravity="center"
-        android:visibility="gone"
-        android:text="@string/no_reminders"/>
-
-
-
+        android:padding="16dp"
+        android:text="@string/no_reminders"
+        android:textColor="@color/black"
+        android:textSize="16sp"
+        android:visibility="gone" />
 
     <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/add_reminder"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_alignParentBottom="true"
-        android:clickable="true"
-        android:src="@drawable/baseline_add_24"
-        android:background="@drawable/a3_grad"
+        android:layout_above="@id/bottom_nav"
         android:layout_alignParentRight="true"
-        android:layout_marginBottom="8dp"
-        android:layout_marginRight="8dp"
-        android:contentDescription="button" />
+        android:layout_marginRight="16dp"
+        android:layout_marginBottom="16dp"
+        android:background="@drawable/a3_grad"
+        android:clickable="true"
+        android:contentDescription="@string/title_activity_add_reminder"
+        android:src="@drawable/baseline_add_24" />
 
 </RelativeLayout>

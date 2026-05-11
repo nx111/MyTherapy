@@ -84,4 +84,15 @@
     <string name="download_permission_needed">다운로드에는 저장소 권한이 필요합니다</string>
     <string name="download_complete_soon">다운로드가 곧 완료됩니다</string>
     <string name="kodi_not_found">Kodi 플레이어를 찾을 수 없습니다</string>
+    <string name="nav_today">오늘</string>
+    <string name="nav_history">기록</string>
+    <string name="nav_course">치료</string>
+    <string name="no_today_reminders">오늘 복용할 약이 없습니다</string>
+    <string name="no_history_records">아직 복약 기록이 없습니다</string>
+    <string name="no_course_records">아직 약이 없습니다</string>
+    <string name="not_taken">미복용</string>
+    <string name="active">사용 중</string>
+    <string name="stock_amount">재고: %1$s</string>
+    <string name="reminder_count">알림 %1$d개</string>
+    <string name="course_schedule_line">%1$s x%2$s • %3$s</string>
 </resources>

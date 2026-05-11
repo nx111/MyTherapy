@@ -84,4 +84,15 @@
     <string name="download_permission_needed">ダウンロードにはストレージ権限が必要です</string>
     <string name="download_complete_soon">ダウンロードはまもなく完了します</string>
     <string name="kodi_not_found">Kodi プレーヤーが見つかりません</string>
+    <string name="nav_today">今日</string>
+    <string name="nav_history">履歴</string>
+    <string name="nav_course">治療</string>
+    <string name="no_today_reminders">今日の未服用の薬はありません</string>
+    <string name="no_history_records">服薬履歴はまだありません</string>
+    <string name="no_course_records">薬はまだありません</string>
+    <string name="not_taken">未服用</string>
+    <string name="active">有効</string>
+    <string name="stock_amount">在庫: %1$s</string>
+    <string name="reminder_count">%1$d 件のリマインダー</string>
+    <string name="course_schedule_line">%1$s x%2$s • %3$s</string>
 </resources>

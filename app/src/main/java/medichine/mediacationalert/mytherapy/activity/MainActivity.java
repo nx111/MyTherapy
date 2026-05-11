@@ -3,12 +3,7 @@ package medichine.mediacationalert.mytherapy.activity;
 import static medichine.mediacationalert.mytherapy.utils.Fun.showBanner;
 
 import android.Manifest;
-import androidx.annotation.NonNull;
-import androidx.appcompat.app.ActionBar;
-import androidx.appcompat.app.AppCompatActivity;
-import androidx.recyclerview.widget.LinearLayoutManager;
-import androidx.recyclerview.widget.RecyclerView;
-
+import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.Build;
@@ -19,29 +14,37 @@ import android.widget.FrameLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
+import androidx.appcompat.app.ActionBar;
+import androidx.appcompat.app.AppCompatActivity;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 import com.android.billingclient.api.BillingClient;
 import com.android.billingclient.api.BillingClientStateListener;
 import com.android.billingclient.api.BillingResult;
 import com.android.billingclient.api.Purchase;
 import com.android.billingclient.api.QueryPurchasesParams;
+import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 import medichine.mediacationalert.mytherapy.BuildConfig;
-import medichine.mediacationalert.mytherapy.utils.DateTimeComparator;
-import medichine.mediacationalert.mytherapy.utils.ItemClickListener;
 import medichine.mediacationalert.mytherapy.R;
 import medichine.mediacationalert.mytherapy.adapter.MedListAdapter;
+import medichine.mediacationalert.mytherapy.adapter.SummaryListAdapter;
 import medichine.mediacationalert.mytherapy.model.ReminderItem;
+import medichine.mediacationalert.mytherapy.model.SummaryItem;
 import medichine.mediacationalert.mytherapy.utils.AlarmReceiver;
-import medichine.mediacationalert.mytherapy.utils.DateTimeSorter;
 import medichine.mediacationalert.mytherapy.utils.Fun;
+import medichine.mediacationalert.mytherapy.utils.ItemClickListener;
 import medichine.mediacationalert.mytherapy.utils.Prefs;
 import medichine.mediacationalert.mytherapy.utils.Reminder;
 import medichine.mediacationalert.mytherapy.utils.ReminderDatabase;
@@ -49,25 +52,31 @@ import medichine.mediacationalert.mytherapy.utils.ReminderSchedule;
 
 public class MainActivity extends AppCompatActivity implements ItemClickListener {
     private static final int REQUEST_POST_NOTIFICATIONS = 1001;
-    private BillingClient billingClient;
-    Prefs prefs;
+    private static final int PAGE_TODAY = 0;
+    private static final int PAGE_HISTORY = 1;
+    private static final int PAGE_COURSE = 2;
 
+    private BillingClient billingClient;
+    private Prefs prefs;
     private RecyclerView mList;
     private MedListAdapter mAdapter;
-    //    private Toolbar mToolbar;
+    private SummaryListAdapter mSummaryAdapter;
     private TextView mNoReminderView;
     private FloatingActionButton mAddReminderButton;
-    private int mTempPost;
-    private LinkedHashMap<Integer, Integer> IDmap = new LinkedHashMap<>();
+    private BottomNavigationView mBottomNavigation;
+    private final LinkedHashMap<Integer, Integer> IDmap = new LinkedHashMap<>();
+    private final LinkedHashMap<Integer, Integer> summaryIDmap = new LinkedHashMap<>();
+    private final LinkedHashMap<Integer, List<Reminder>> courseReminderMap = new LinkedHashMap<>();
     private ReminderDatabase rb;
     private AlarmReceiver mAlarmReceiver;
+    private int mCurrentPage = PAGE_TODAY;
 
-    List<ReminderItem> medicineList;
+    private List<ReminderItem> medicineList = new ArrayList<>();
+    private List<SummaryItem> summaryList = new ArrayList<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
 
         setContentView(R.layout.activity_main);
         requestNotificationPermission();
@@ -76,36 +85,38 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         if (actionBar != null) {
             actionBar.hide();
         }
-        // Initialize reminder database
+
         rb = new ReminderDatabase(getApplicationContext());
         prefs = new Prefs(this);
         new Fun(this);
 
         if (BuildConfig.ADS_ENABLED && Fun.checkInternet()) {
             checkSubscription();
-
         } else if (BuildConfig.ADS_ENABLED) {
             Toast.makeText(this, R.string.check_internet, Toast.LENGTH_SHORT).show();
         }
+
         FrameLayout adContainerView = findViewById(R.id.ad_view_container);
         showBanner(this, adContainerView);
-        mAddReminderButton = (FloatingActionButton) findViewById(R.id.add_reminder);
-        mList = (RecyclerView) findViewById(R.id.reminder_list);
-        mNoReminderView = (TextView) findViewById(R.id.no_reminder_text);
+        mAddReminderButton = findViewById(R.id.add_reminder);
+        mList = findViewById(R.id.reminder_list);
+        mNoReminderView = findViewById(R.id.no_reminder_text);
+        mBottomNavigation = findViewById(R.id.bottom_nav);
 
-        // To check is there are saved reminders
-        // If there are no reminders display a message asking the user to create reminders
-        List<Reminder> mTest = rb.getAllReminders();
-
-        if (mTest.isEmpty()) {
-            mNoReminderView.setVisibility(View.VISIBLE);
-        }
-        // Create recycler view
         mList.setLayoutManager(new LinearLayoutManager(this));
         registerForContextMenu(mList);
-        loadReminderList();
+        mBottomNavigation.setOnItemSelectedListener(item -> {
+            if (item.getItemId() == R.id.nav_history) {
+                mCurrentPage = PAGE_HISTORY;
+            } else if (item.getItemId() == R.id.nav_course) {
+                mCurrentPage = PAGE_COURSE;
+            } else {
+                mCurrentPage = PAGE_TODAY;
+            }
+            loadCurrentPage();
+            return true;
+        });
 
-        // On clicking the floating action button
         mAddReminderButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -114,8 +125,8 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
             }
         });
 
-        // Initialize alarm
         mAlarmReceiver = new AlarmReceiver();
+        loadCurrentPage();
     }
 
     private void requestNotificationPermission() {
@@ -126,7 +137,6 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     }
 
     void checkSubscription() {
-
         billingClient = BillingClient.newBuilder(this).enablePendingPurchases().setListener((billingResult, list) -> {
         }).build();
         final BillingClient finalBillingClient = billingClient;
@@ -135,6 +145,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
             public void onBillingServiceDisconnected() {
 
             }
+
             @Override
             public void onBillingSetupFinished(@NonNull BillingResult billingResult) {
 
@@ -146,25 +157,17 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                                     if (list.size() > 0) {
                                         prefs.setPremium(1);
                                         prefs.setIsRemoveAd(true);
-                                        // set 1 to activate premium feature
-// set 1 to activate premium feature
                                         int i = 0;
                                         for (Purchase purchase : list) {
-                                            //Here you can manage each product, if you have multiple subscription
-                                            //     Log.d("testOffer", purchase.getOriginalJson()); // Get to see the order information
-                                            //   Log.d("testOffer", " index" + i);
                                             i++;
                                         }
                                     } else {
                                         prefs.setPremium(0);
                                         prefs.setIsRemoveAd(false);
-// set 0 to de-activate premium feature
                                     }
                                 }
                             });
-
                 }
-
             }
         });
     }
@@ -173,63 +176,53 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         ArrayList<ReminderItem> items = new ArrayList<>();
         IDmap.clear();
 
-        // Get all reminders from the database
-        List<Reminder> reminders = rb.getAllReminders();
-        List<DateTimeSorter> DateTimeSortList = new ArrayList<>();
-        LinkedHashMap<Integer, String> scheduledById = new LinkedHashMap<>();
+        ArrayList<ScheduledReminder> scheduledReminders = new ArrayList<>();
+        long start = startOfTodayMillis();
+        long end = endOfTodayMillis();
 
-        for (int i = 0; i < reminders.size(); i++) {
-            Reminder reminder = reminders.get(i);
-            String scheduledAt = ReminderSchedule.format(ReminderSchedule.currentOccurrence(reminder, rb));
-            scheduledById.put(reminder.getID(), scheduledAt);
-            DateTimeSortList.add(new DateTimeSorter(i, scheduledAt));
+        for (Reminder reminder : rb.getAllReminders()) {
+            if (!"true".equals(reminder.getActive())) {
+                continue;
+            }
+            for (ScheduledReminder scheduled : collectOccurrences(reminder, start, end)) {
+                if (!rb.isReminderTaken(reminder.getID(), scheduled.scheduledAt)) {
+                    scheduledReminders.add(scheduled);
+                }
+            }
         }
 
-        // Sort items according to date and time in ascending order
-        Collections.sort(DateTimeSortList, new DateTimeComparator());
+        Collections.sort(scheduledReminders, Comparator.comparingLong(item -> item.timeMillis));
 
-        LinkedHashMap<String, List<Reminder>> groups = new LinkedHashMap<>();
-
-        for (DateTimeSorter item : DateTimeSortList) {
-            Reminder reminder = reminders.get(item.getIndex());
-            String scheduledAt = scheduledById.get(reminder.getID());
-            if (!groups.containsKey(scheduledAt)) {
-                groups.put(scheduledAt, new ArrayList<>());
+        LinkedHashMap<String, List<ScheduledReminder>> groups = new LinkedHashMap<>();
+        for (ScheduledReminder scheduled : scheduledReminders) {
+            if (!groups.containsKey(scheduled.scheduledAt)) {
+                groups.put(scheduled.scheduledAt, new ArrayList<>());
             }
-            groups.get(scheduledAt).add(reminder);
+            groups.get(scheduled.scheduledAt).add(scheduled);
         }
 
         int position = 0;
-        for (Map.Entry<String, List<Reminder>> entry : groups.entrySet()) {
+        for (Map.Entry<String, List<ScheduledReminder>> entry : groups.entrySet()) {
             String scheduledAt = entry.getKey();
-            List<Reminder> groupReminders = entry.getValue();
-            if (groupReminders.isEmpty()) {
+            List<ScheduledReminder> group = entry.getValue();
+            if (group.isEmpty()) {
                 continue;
             }
 
             String[] parts = splitScheduledAt(scheduledAt);
             String timeText = parts[1];
-            String countText = groupReminders.size() > 1
-                    ? getString(R.string.medicine_count_many, groupReminders.size())
-                    : getString(R.string.medicine_count_one, groupReminders.size());
+            String countText = group.size() > 1
+                    ? getString(R.string.medicine_count_many, group.size())
+                    : getString(R.string.medicine_count_one, group.size());
             String dateText = parts[0] + " • " + countText;
 
             StringBuilder details = new StringBuilder();
-            boolean anyActive = false;
-            boolean allTaken = true;
             ArrayList<Integer> reminderIds = new ArrayList<>();
-            Reminder firstReminder = groupReminders.get(0);
+            Reminder firstReminder = group.get(0).reminder;
 
-            for (Reminder reminder : groupReminders) {
+            for (ScheduledReminder scheduled : group) {
+                Reminder reminder = scheduled.reminder;
                 reminderIds.add(reminder.getID());
-                boolean active = "true".equals(reminder.getActive());
-                boolean taken = rb.isReminderTaken(reminder.getID(), scheduledAt);
-                if (active) {
-                    anyActive = true;
-                    if (!taken) {
-                        allTaken = false;
-                    }
-                }
                 double stock = rb.getTotalStock(reminder.getTitle());
                 if (details.length() > 0) {
                     details.append("\n");
@@ -238,11 +231,6 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                         reminder.getTitle(),
                         formatQuantity(reminder.getDose()),
                         formatQuantity(stock)));
-                if (!active) {
-                    details.append(getString(R.string.status_paused_suffix));
-                } else if (taken) {
-                    details.append(getString(R.string.status_taken_suffix));
-                }
             }
 
             items.add(new ReminderItem(
@@ -251,18 +239,133 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                     "",
                     "",
                     "",
-                    anyActive ? "true" : "false",
+                    "true",
                     details.toString(),
-                    anyActive ? getString(R.string.stock_ready) : getString(R.string.paused),
+                    getString(R.string.stock_ready),
                     scheduledAt,
                     firstReminder.getIconType(),
                     firstReminder.getIconUri(),
-                    anyActive && allTaken,
+                    false,
                     reminderIds));
             IDmap.put(position, firstReminder.getID());
             position++;
         }
         return items;
+    }
+
+    private List<SummaryItem> generateHistoryData() {
+        ArrayList<SummaryItem> items = new ArrayList<>();
+        ArrayList<ScheduledReminder> scheduledReminders = new ArrayList<>();
+        long now = System.currentTimeMillis();
+
+        for (Reminder reminder : rb.getAllReminders()) {
+            long start = ReminderSchedule.parse(reminder).getTimeInMillis();
+            scheduledReminders.addAll(collectOccurrences(reminder, start, now));
+        }
+
+        Collections.sort(scheduledReminders, (left, right) -> Long.compare(right.timeMillis, left.timeMillis));
+
+        for (ScheduledReminder scheduled : scheduledReminders) {
+            Reminder reminder = scheduled.reminder;
+            boolean taken = rb.isReminderTaken(reminder.getID(), scheduled.scheduledAt);
+            boolean active = "true".equals(reminder.getActive());
+            String status = taken
+                    ? getString(R.string.taken)
+                    : active ? getString(R.string.not_taken) : getString(R.string.paused);
+            String details = getString(R.string.dose) + " " + formatQuantity(reminder.getDose());
+            items.add(new SummaryItem(
+                    reminder.getTitle(),
+                    scheduled.scheduledAt,
+                    details,
+                    status,
+                    reminder.getIconType(),
+                    reminder.getIconUri(),
+                    reminder.getActive()));
+        }
+        return items;
+    }
+
+    private List<SummaryItem> generateCourseData() {
+        ArrayList<SummaryItem> items = new ArrayList<>();
+        summaryIDmap.clear();
+        courseReminderMap.clear();
+
+        LinkedHashMap<String, CourseGroup> groups = new LinkedHashMap<>();
+        for (Reminder reminder : rb.getAllReminders()) {
+            String title = normalizeTitle(reminder.getTitle());
+            if (!groups.containsKey(title)) {
+                groups.put(title, new CourseGroup(title, reminder));
+            }
+            groups.get(title).reminders.add(reminder);
+        }
+
+        int position = 0;
+        for (CourseGroup group : groups.values()) {
+            Collections.sort(group.reminders, Comparator.comparingLong(item -> ReminderSchedule.parse(item).getTimeInMillis()));
+            double stock = rb.getTotalStock(group.title);
+            StringBuilder details = new StringBuilder();
+            boolean anyActive = false;
+            for (Reminder reminder : group.reminders) {
+                if ("true".equals(reminder.getActive())) {
+                    anyActive = true;
+                }
+                if (details.length() > 0) {
+                    details.append("\n");
+                }
+                details.append(getString(R.string.course_schedule_line,
+                        reminder.getTime(),
+                        formatQuantity(reminder.getDose()),
+                        "true".equals(reminder.getActive()) ? getString(R.string.active) : getString(R.string.paused)));
+            }
+
+            items.add(new SummaryItem(
+                    group.title,
+                    getString(R.string.stock_amount, formatQuantity(stock)),
+                    details.toString(),
+                    getString(R.string.reminder_count, group.reminders.size()),
+                    group.iconType,
+                    group.iconUri,
+                    anyActive ? "true" : "false"));
+            summaryIDmap.put(position, group.firstReminderId);
+            courseReminderMap.put(position, new ArrayList<>(group.reminders));
+            position++;
+        }
+        return items;
+    }
+
+    private List<ScheduledReminder> collectOccurrences(Reminder reminder, long startMillis, long endMillis) {
+        ArrayList<ScheduledReminder> occurrences = new ArrayList<>();
+        long timeMillis = ReminderSchedule.parse(reminder).getTimeInMillis();
+
+        if (!"true".equals(reminder.getRepeat())) {
+            if (timeMillis >= startMillis && timeMillis <= endMillis) {
+                occurrences.add(new ScheduledReminder(reminder, formatTime(timeMillis), timeMillis));
+            }
+            return occurrences;
+        }
+
+        long repeatMillis = ReminderSchedule.repeatMillis(reminder);
+        if (repeatMillis <= 0 || timeMillis > endMillis) {
+            return occurrences;
+        }
+
+        if (timeMillis < startMillis) {
+            long steps = (startMillis - timeMillis) / repeatMillis;
+            timeMillis += steps * repeatMillis;
+            while (timeMillis < startMillis) {
+                timeMillis += repeatMillis;
+            }
+        }
+
+        while (timeMillis <= endMillis) {
+            occurrences.add(new ScheduledReminder(reminder, formatTime(timeMillis), timeMillis));
+            long next = timeMillis + repeatMillis;
+            if (next <= timeMillis) {
+                break;
+            }
+            timeMillis = next;
+        }
+        return occurrences;
     }
 
     private String[] splitScheduledAt(String scheduledAt) {
@@ -283,49 +386,84 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     @Override
     public void onResume() {
         super.onResume();
+        loadCurrentPage();
+    }
 
-        // To check is there are saved reminders
-        // If there are no reminders display a message asking the user to create reminders
-        List<Reminder> mTest = rb.getAllReminders();
+    private void loadCurrentPage() {
+        if (mCurrentPage == PAGE_HISTORY) {
+            summaryList = generateHistoryData();
+            mSummaryAdapter = new SummaryListAdapter(summaryList, this, this, false);
+            mList.setAdapter(mSummaryAdapter);
+            updateEmptyState(summaryList.isEmpty(), R.string.no_history_records);
+        } else if (mCurrentPage == PAGE_COURSE) {
+            summaryList = generateCourseData();
+            mSummaryAdapter = new SummaryListAdapter(summaryList, this, this, true);
+            mList.setAdapter(mSummaryAdapter);
+            updateEmptyState(summaryList.isEmpty(), R.string.no_course_records);
+        } else {
+            loadReminderList();
+        }
+    }
 
-        if (mTest.isEmpty()) {
+    private void updateEmptyState(boolean isEmpty, int emptyTextRes) {
+        if (isEmpty) {
+            mNoReminderView.setText(emptyTextRes);
             mNoReminderView.setVisibility(View.VISIBLE);
         } else {
             mNoReminderView.setVisibility(View.GONE);
         }
-
-        loadReminderList();
     }
 
     private void loadReminderList() {
         medicineList = generateData();
         mAdapter = new MedListAdapter(medicineList, this, this);
         mList.setAdapter(mAdapter);
+        updateEmptyState(medicineList.isEmpty(), R.string.no_today_reminders);
     }
 
-
     private void selectReminder(int pos) {
-
         String mStringClickID = Integer.toString(pos);
         Intent i = new Intent(this, ReminderEditActivity.class);
         i.putExtra(ReminderEditActivity.EXTRA_REMINDER_ID, mStringClickID);
         startActivity(i);
-
     }
-
 
     @Override
     public void clickListener(int pos) {
+        if (mCurrentPage == PAGE_TODAY && IDmap.containsKey(pos)) {
+            selectReminder(IDmap.get(pos));
+        } else if (mCurrentPage == PAGE_COURSE && summaryIDmap.containsKey(pos)) {
+            selectCourseReminder(pos);
+        }
+    }
 
-        int mReminderClickID = IDmap.get(pos);
-        selectReminder(mReminderClickID);
-        //  selectReminder(pos);
+    private void selectCourseReminder(int pos) {
+        List<Reminder> reminders = courseReminderMap.get(pos);
+        if (reminders == null || reminders.isEmpty()) {
+            return;
+        }
+        if (reminders.size() == 1) {
+            selectReminder(reminders.get(0).getID());
+            return;
+        }
 
+        String[] labels = new String[reminders.size()];
+        for (int i = 0; i < reminders.size(); i++) {
+            Reminder reminder = reminders.get(i);
+            labels[i] = getString(R.string.course_schedule_line,
+                    reminder.getTime(),
+                    formatQuantity(reminder.getDose()),
+                    "true".equals(reminder.getActive()) ? getString(R.string.active) : getString(R.string.paused));
+        }
+        new AlertDialog.Builder(this)
+                .setTitle(reminders.get(0).getTitle())
+                .setItems(labels, (dialog, which) -> selectReminder(reminders.get(which).getID()))
+                .show();
     }
 
     @Override
     public void confirmListener(int pos) {
-        if (pos < 0 || pos >= medicineList.size()) {
+        if (mCurrentPage != PAGE_TODAY || pos < 0 || pos >= medicineList.size()) {
             return;
         }
         ReminderItem item = medicineList.get(pos);
@@ -334,4 +472,53 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         loadReminderList();
     }
 
+    private long startOfTodayMillis() {
+        Calendar calendar = Calendar.getInstance();
+        calendar.set(Calendar.HOUR_OF_DAY, 0);
+        calendar.set(Calendar.MINUTE, 0);
+        calendar.set(Calendar.SECOND, 0);
+        calendar.set(Calendar.MILLISECOND, 0);
+        return calendar.getTimeInMillis();
+    }
+
+    private long endOfTodayMillis() {
+        return startOfTodayMillis() + 24L * 60L * 60L * 1000L - 1L;
+    }
+
+    private String formatTime(long timeMillis) {
+        Calendar calendar = Calendar.getInstance();
+        calendar.setTimeInMillis(timeMillis);
+        return ReminderSchedule.format(calendar);
+    }
+
+    private String normalizeTitle(String title) {
+        return title == null ? "" : title.trim();
+    }
+
+    private static class ScheduledReminder {
+        final Reminder reminder;
+        final String scheduledAt;
+        final long timeMillis;
+
+        ScheduledReminder(Reminder reminder, String scheduledAt, long timeMillis) {
+            this.reminder = reminder;
+            this.scheduledAt = scheduledAt;
+            this.timeMillis = timeMillis;
+        }
+    }
+
+    private static class CourseGroup {
+        final String title;
+        final int firstReminderId;
+        final String iconType;
+        final String iconUri;
+        final List<Reminder> reminders = new ArrayList<>();
+
+        CourseGroup(String title, Reminder firstReminder) {
+            this.title = title;
+            this.firstReminderId = firstReminder.getID();
+            this.iconType = firstReminder.getIconType();
+            this.iconUri = firstReminder.getIconUri();
+        }
+    }
 }

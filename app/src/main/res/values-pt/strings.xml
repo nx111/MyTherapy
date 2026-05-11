@@ -84,4 +84,15 @@
     <string name="download_permission_needed">Permissão de armazenamento necessária para baixar</string>
     <string name="download_complete_soon">O download será concluído em breve</string>
     <string name="kodi_not_found">Player Kodi não encontrado</string>
+    <string name="nav_today">Hoje</string>
+    <string name="nav_history">Histórico</string>
+    <string name="nav_course">Tratamento</string>
+    <string name="no_today_reminders">Nenhum medicamento pendente para hoje</string>
+    <string name="no_history_records">Ainda não há histórico de medicação</string>
+    <string name="no_course_records">Ainda não há medicamentos</string>
+    <string name="not_taken">Não tomado</string>
+    <string name="active">Ativo</string>
+    <string name="stock_amount">Estoque: %1$s</string>
+    <string name="reminder_count">%1$d lembrete(s)</string>
+    <string name="course_schedule_line">%1$s x%2$s • %3$s</string>
 </resources>

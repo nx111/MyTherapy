@@ -84,4 +84,15 @@
     <string name="download_permission_needed">डाउनलोड के लिए स्टोरेज अनुमति चाहिए</string>
     <string name="download_complete_soon">डाउनलोड जल्द पूरा होगा</string>
     <string name="kodi_not_found">Kodi प्लेयर नहीं मिला</string>
+    <string name="nav_today">आज</string>
+    <string name="nav_history">इतिहास</string>
+    <string name="nav_course">कोर्स</string>
+    <string name="no_today_reminders">आज के लिए कोई लंबित दवा नहीं है</string>
+    <string name="no_history_records">अभी कोई दवा इतिहास नहीं है</string>
+    <string name="no_course_records">अभी कोई दवा नहीं है</string>
+    <string name="not_taken">नहीं ली</string>
+    <string name="active">सक्रिय</string>
+    <string name="stock_amount">स्टॉक: %1$s</string>
+    <string name="reminder_count">%1$d रिमाइंडर</string>
+    <string name="course_schedule_line">%1$s x%2$s • %3$s</string>
 </resources>

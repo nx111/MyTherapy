@@ -84,4 +84,15 @@
     <string name="download_permission_needed">下载需要存储权限</string>
     <string name="download_complete_soon">下载即将完成</string>
     <string name="kodi_not_found">未找到 Kodi 播放器</string>
+    <string name="nav_today">今日</string>
+    <string name="nav_history">历史</string>
+    <string name="nav_course">疗程</string>
+    <string name="no_today_reminders">今日没有待服药品</string>
+    <string name="no_history_records">暂无服药历史</string>
+    <string name="no_course_records">暂无药品</string>
+    <string name="not_taken">未服药</string>
+    <string name="active">启用中</string>
+    <string name="stock_amount">库存：%1$s</string>
+    <string name="reminder_count">%1$d 个提醒</string>
+    <string name="course_schedule_line">%1$s x%2$s • %3$s</string>
 </resources>

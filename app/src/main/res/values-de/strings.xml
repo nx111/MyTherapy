@@ -84,4 +84,15 @@
     <string name="download_permission_needed">Für den Download ist Speicherzugriff erforderlich</string>
     <string name="download_complete_soon">Der Download wird bald abgeschlossen</string>
     <string name="kodi_not_found">Kodi-Player nicht gefunden</string>
+    <string name="nav_today">Heute</string>
+    <string name="nav_history">Verlauf</string>
+    <string name="nav_course">Therapie</string>
+    <string name="no_today_reminders">Heute keine ausstehenden Medikamente</string>
+    <string name="no_history_records">Noch kein Medikamentenverlauf</string>
+    <string name="no_course_records">Noch keine Medikamente</string>
+    <string name="not_taken">Nicht eingenommen</string>
+    <string name="active">Aktiv</string>
+    <string name="stock_amount">Bestand: %1$s</string>
+    <string name="reminder_count">%1$d Erinnerung(en)</string>
+    <string name="course_schedule_line">%1$s x%2$s • %3$s</string>
 </resources>
