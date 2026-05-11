@@ -13,10 +13,14 @@ import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.InputType;
 import android.util.Log;
 import android.view.Gravity;
+import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewConfiguration;
 import android.view.Window;
 import android.widget.EditText;
 import android.widget.FrameLayout;
@@ -111,6 +115,9 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     private AlarmReceiver mAlarmReceiver;
     private int mCurrentPage = PAGE_TODAY;
     private Calendar mSelectedDate;
+    private final Handler mUiHandler = new Handler(Looper.getMainLooper());
+    private Runnable mAccountLongPressRunnable;
+    private boolean mAccountLongPressHandled;
 
     private List<ReminderItem> medicineList = new ArrayList<>();
     private List<SummaryItem> summaryList = new ArrayList<>();
@@ -192,10 +199,40 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         if (mAccountButton == null) {
             return;
         }
-        mAccountButton.setOnClickListener(v -> showAccountInfoDialog());
-        mAccountButton.setLongClickable(true);
-        mAccountButton.setOnLongClickListener(v -> {
+        if (mAccountLongPressRunnable != null) {
+            mUiHandler.removeCallbacks(mAccountLongPressRunnable);
+        }
+        mAccountLongPressRunnable = () -> {
+            if (mAccountButton == null || !mAccountButton.isPressed()) {
+                return;
+            }
+            mAccountLongPressHandled = true;
             showAccountDialog();
+        };
+        mAccountButton.setOnClickListener(null);
+        mAccountButton.setOnLongClickListener(null);
+        mAccountButton.setLongClickable(false);
+        mAccountButton.setOnTouchListener((view, event) -> {
+            if (event.getAction() == MotionEvent.ACTION_DOWN) {
+                mAccountLongPressHandled = false;
+                view.setPressed(true);
+                mUiHandler.postDelayed(mAccountLongPressRunnable, ViewConfiguration.getLongPressTimeout());
+                return true;
+            }
+            if (event.getAction() == MotionEvent.ACTION_UP) {
+                mUiHandler.removeCallbacks(mAccountLongPressRunnable);
+                view.setPressed(false);
+                if (!mAccountLongPressHandled) {
+                    view.performClick();
+                    showAccountInfoDialog();
+                }
+                return true;
+            }
+            if (event.getAction() == MotionEvent.ACTION_CANCEL) {
+                mUiHandler.removeCallbacks(mAccountLongPressRunnable);
+                view.setPressed(false);
+                return true;
+            }
             return true;
         });
     }
