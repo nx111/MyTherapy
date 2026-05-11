@@ -32,10 +32,22 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
+                android:ellipsize="end"
+                android:maxLines="1"
                 android:textColor="@color/text_primary"
                 android:textSize="24sp"
                 android:textStyle="bold"
                 tools:text="今日 2026/5/11" />
+
+            <ImageButton
+                android:id="@+id/account_button"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/switch_account"
+                android:padding="8dp"
+                android:src="@drawable/ic_account_24"
+                app:tint="@color/text_primary" />
 
             <ImageButton
                 android:id="@+id/calendar_button"
@@ -44,7 +56,8 @@
                 android:background="?android:attr/selectableItemBackgroundBorderless"
                 android:contentDescription="@string/date"
                 android:padding="8dp"
-                android:src="@drawable/baseline_calendar_month_24" />
+                android:src="@drawable/baseline_calendar_month_24"
+                app:tint="@color/text_primary" />
         </LinearLayout>
 
         <LinearLayout

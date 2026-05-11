@@ -16,14 +16,23 @@ import java.util.Map;
 import medichine.mediacationalert.mytherapy.model.HealthEntry;
 import medichine.mediacationalert.mytherapy.model.LabResult;
 import medichine.mediacationalert.mytherapy.model.LabTestItem;
+import medichine.mediacationalert.mytherapy.model.Account;
 import medichine.mediacationalert.mytherapy.R;
 
 public class ReminderDatabase extends SQLiteOpenHelper {
-    private static final int DATABASE_VERSION = 5;
+    private static final int DATABASE_VERSION = 6;
     private static final String DATABASE_NAME = "MedicationDbTab";
+    private static final int DEFAULT_ACCOUNT_ID = 1;
+    private static final String PREF_ACTIVE_ACCOUNT_ID = "active_account_id";
+
+    private static final String TABLE_ACCOUNTS = "Accounts";
+    private static final String ACCOUNT_ID = "id";
+    private static final String ACCOUNT_NAME = "name";
+    private static final String ACCOUNT_CREATED_AT = "created_at";
 
     private static final String TABLE_REMINDERS = "TableMedRe";
     private static final String KEY_ID = "id";
+    private static final String KEY_ACCOUNT_ID = "account_id";
     private static final String KEY_TITLE = "title";
     private static final String KEY_DATE = "date";
     private static final String KEY_TIME = "time";
@@ -39,6 +48,7 @@ public class ReminderDatabase extends SQLiteOpenHelper {
 
     private static final String TABLE_STOCK_BATCHES = "StockBatches";
     private static final String STOCK_ID = "id";
+    private static final String STOCK_ACCOUNT_ID = "account_id";
     private static final String STOCK_TITLE = "title";
     private static final String STOCK_ORIGINAL_QUANTITY = "original_quantity";
     private static final String STOCK_REMAINING_QUANTITY = "remaining_quantity";
@@ -46,6 +56,7 @@ public class ReminderDatabase extends SQLiteOpenHelper {
 
     private static final String TABLE_INTAKE_LOGS = "IntakeLogs";
     private static final String LOG_ID = "id";
+    private static final String LOG_ACCOUNT_ID = "account_id";
     private static final String LOG_REMINDER_ID = "reminder_id";
     private static final String LOG_TITLE = "title";
     private static final String LOG_DOSE = "dose";
@@ -75,6 +86,7 @@ public class ReminderDatabase extends SQLiteOpenHelper {
     private static final String LAB_RESULT_VALUE = "value";
     private static final String LAB_RESULT_CREATED_AT = "created_at";
     private final Context mContext;
+    private int mCurrentAccountId;
 
     public static class ConfirmResult {
         public final boolean success;
@@ -91,15 +103,19 @@ public class ReminderDatabase extends SQLiteOpenHelper {
     public ReminderDatabase(Context context) {
         super(context, DATABASE_NAME, null, DATABASE_VERSION);
         mContext = context.getApplicationContext();
+        mCurrentAccountId = new Prefs(mContext).getInt(PREF_ACTIVE_ACCOUNT_ID, DEFAULT_ACCOUNT_ID);
+        ensureActiveAccount();
     }
 
     @Override
     public void onCreate(SQLiteDatabase db) {
+        createAccountTable(db);
         createReminderTable(db);
         createStockTable(db);
         createIntakeLogTable(db);
         createHealthEntryTable(db);
         createLabTestTables(db);
+        ensureDefaultAccount(db);
     }
 
     @Override
@@ -125,11 +141,85 @@ public class ReminderDatabase extends SQLiteOpenHelper {
         if (oldVersion < 5) {
             createLabTestTables(db);
         }
+        if (oldVersion < 6) {
+            createAccountTable(db);
+            ensureDefaultAccount(db);
+            addColumnIfMissing(db, TABLE_REMINDERS, KEY_ACCOUNT_ID,
+                    KEY_ACCOUNT_ID + " INTEGER NOT NULL DEFAULT " + DEFAULT_ACCOUNT_ID);
+            addColumnIfMissing(db, TABLE_STOCK_BATCHES, STOCK_ACCOUNT_ID,
+                    STOCK_ACCOUNT_ID + " INTEGER NOT NULL DEFAULT " + DEFAULT_ACCOUNT_ID);
+            addColumnIfMissing(db, TABLE_INTAKE_LOGS, LOG_ACCOUNT_ID,
+                    LOG_ACCOUNT_ID + " INTEGER NOT NULL DEFAULT " + DEFAULT_ACCOUNT_ID);
+        }
+    }
+
+    private void createAccountTable(SQLiteDatabase db) {
+        String sql = "CREATE TABLE IF NOT EXISTS " + TABLE_ACCOUNTS + "("
+                + ACCOUNT_ID + " INTEGER PRIMARY KEY AUTOINCREMENT,"
+                + ACCOUNT_NAME + " TEXT NOT NULL,"
+                + ACCOUNT_CREATED_AT + " TEXT NOT NULL"
+                + ")";
+        db.execSQL(sql);
+    }
+
+    private void ensureDefaultAccount(SQLiteDatabase db) {
+        Cursor cursor = db.query(TABLE_ACCOUNTS, new String[]{ACCOUNT_ID}, ACCOUNT_ID + "=?",
+                new String[]{String.valueOf(DEFAULT_ACCOUNT_ID)}, null, null, null, "1");
+        boolean exists = cursor.moveToFirst();
+        cursor.close();
+        if (exists) {
+            return;
+        }
+
+        ContentValues values = new ContentValues();
+        values.put(ACCOUNT_ID, DEFAULT_ACCOUNT_ID);
+        values.put(ACCOUNT_NAME, mContext.getString(R.string.default_account));
+        values.put(ACCOUNT_CREATED_AT, nowText());
+        db.insertWithOnConflict(TABLE_ACCOUNTS, null, values, SQLiteDatabase.CONFLICT_IGNORE);
+    }
+
+    private void ensureActiveAccount() {
+        SQLiteDatabase db = getWritableDatabase();
+        ensureDefaultAccount(db);
+        if (!accountExists(db, mCurrentAccountId)) {
+            mCurrentAccountId = DEFAULT_ACCOUNT_ID;
+            new Prefs(mContext).setInt(PREF_ACTIVE_ACCOUNT_ID, DEFAULT_ACCOUNT_ID);
+        }
+    }
+
+    private boolean accountExists(SQLiteDatabase db, int accountId) {
+        Cursor cursor = db.query(TABLE_ACCOUNTS, new String[]{ACCOUNT_ID}, ACCOUNT_ID + "=?",
+                new String[]{String.valueOf(accountId)}, null, null, null, "1");
+        boolean exists = cursor.moveToFirst();
+        cursor.close();
+        return exists;
+    }
+
+    private void addColumnIfMissing(SQLiteDatabase db, String tableName, String columnName, String columnDefinition) {
+        if (hasColumn(db, tableName, columnName)) {
+            return;
+        }
+        db.execSQL("ALTER TABLE " + tableName + " ADD COLUMN " + columnDefinition);
+    }
+
+    private boolean hasColumn(SQLiteDatabase db, String tableName, String columnName) {
+        Cursor cursor = db.rawQuery("PRAGMA table_info(" + tableName + ")", null);
+        try {
+            while (cursor.moveToNext()) {
+                if (columnName.equals(cursor.getString(cursor.getColumnIndexOrThrow("name")))) {
+                    return true;
+                }
+            }
+            return false;
+        } finally {
+            cursor.close();
+        }
     }
 
     private void createReminderTable(SQLiteDatabase db) {
         String sql = "CREATE TABLE " + TABLE_REMINDERS + "("
                 + KEY_ID + " INTEGER PRIMARY KEY,"
+                + KEY_ACCOUNT_ID + " INTEGER NOT NULL DEFAULT " + DEFAULT_ACCOUNT_ID + ","
                 + KEY_TITLE + " TEXT,"
                 + KEY_DATE + " TEXT,"
                 + KEY_TIME + " TEXT,"
@@ -149,6 +239,7 @@ public class ReminderDatabase extends SQLiteOpenHelper {
     private void createStockTable(SQLiteDatabase db) {
         String sql = "CREATE TABLE IF NOT EXISTS " + TABLE_STOCK_BATCHES + "("
                 + STOCK_ID + " INTEGER PRIMARY KEY AUTOINCREMENT,"
+                + STOCK_ACCOUNT_ID + " INTEGER NOT NULL DEFAULT " + DEFAULT_ACCOUNT_ID + ","
                 + STOCK_TITLE + " TEXT NOT NULL,"
                 + STOCK_ORIGINAL_QUANTITY + " REAL NOT NULL,"
                 + STOCK_REMAINING_QUANTITY + " REAL NOT NULL,"
@@ -160,6 +251,7 @@ public class ReminderDatabase extends SQLiteOpenHelper {
     private void createIntakeLogTable(SQLiteDatabase db) {
         String sql = "CREATE TABLE IF NOT EXISTS " + TABLE_INTAKE_LOGS + "("
                 + LOG_ID + " INTEGER PRIMARY KEY AUTOINCREMENT,"
+                + LOG_ACCOUNT_ID + " INTEGER NOT NULL DEFAULT " + DEFAULT_ACCOUNT_ID + ","
                 + LOG_REMINDER_ID + " INTEGER NOT NULL,"
                 + LOG_TITLE + " TEXT NOT NULL,"
                 + LOG_DOSE + " REAL NOT NULL,"
@@ -212,8 +304,9 @@ public class ReminderDatabase extends SQLiteOpenHelper {
 
     public Reminder getReminder(int id) {
         SQLiteDatabase db = this.getReadableDatabase();
-        Cursor cursor = db.query(TABLE_REMINDERS, reminderColumns(), KEY_ID + "=?",
-                new String[]{String.valueOf(id)}, null, null, null, null);
+        Cursor cursor = db.query(TABLE_REMINDERS, reminderColumns(),
+                accountSelection(KEY_ACCOUNT_ID, KEY_ID + "=?"),
+                accountArgs(String.valueOf(id)), null, null, null, null);
 
         if (cursor == null || !cursor.moveToFirst()) {
             if (cursor != null) {
@@ -230,6 +323,21 @@ public class ReminderDatabase extends SQLiteOpenHelper {
     public List<Reminder> getAllReminders() {
         List<Reminder> reminderList = new ArrayList<>();
         SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = db.query(TABLE_REMINDERS, reminderColumns(),
+                accountSelection(KEY_ACCOUNT_ID, null), accountArgs(), null, null, KEY_ID + " ASC");
+
+        if (cursor.moveToFirst()) {
+            do {
+                reminderList.add(readReminder(cursor));
+            } while (cursor.moveToNext());
+        }
+        cursor.close();
+        return reminderList;
+    }
+
+    public List<Reminder> getAllRemindersForAllAccounts() {
+        List<Reminder> reminderList = new ArrayList<>();
+        SQLiteDatabase db = this.getReadableDatabase();
         Cursor cursor = db.query(TABLE_REMINDERS, reminderColumns(), null, null, null, null, KEY_ID + " ASC");
 
         if (cursor.moveToFirst()) {
@@ -239,6 +347,79 @@ public class ReminderDatabase extends SQLiteOpenHelper {
         }
         cursor.close();
         return reminderList;
+    }
+
+    public List<Account> getAccounts() {
+        List<Account> accounts = new ArrayList<>();
+        SQLiteDatabase db = this.getWritableDatabase();
+        ensureDefaultAccount(db);
+        Cursor cursor = db.query(TABLE_ACCOUNTS, accountColumns(), null, null,
+                null, null, ACCOUNT_ID + " ASC");
+        if (cursor.moveToFirst()) {
+            do {
+                accounts.add(readAccount(cursor));
+            } while (cursor.moveToNext());
+        }
+        cursor.close();
+        return accounts;
+    }
+
+    public int addAccount(String name) {
+        String normalizedName = normalizeTitle(name);
+        if (normalizedName.length() == 0) {
+            return -1;
+        }
+        int existingId = findAccountIdByName(normalizedName);
+        if (existingId != -1) {
+            return existingId;
+        }
+
+        SQLiteDatabase db = this.getWritableDatabase();
+        ContentValues values = new ContentValues();
+        values.put(ACCOUNT_NAME, normalizedName);
+        values.put(ACCOUNT_CREATED_AT, nowText());
+        return (int) db.insert(TABLE_ACCOUNTS, null, values);
+    }
+
+    public boolean setCurrentAccountId(int accountId) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        if (!accountExists(db, accountId)) {
+            return false;
+        }
+        mCurrentAccountId = accountId;
+        new Prefs(mContext).setInt(PREF_ACTIVE_ACCOUNT_ID, accountId);
+        return true;
+    }
+
+    public int getCurrentAccountId() {
+        return mCurrentAccountId;
+    }
+
+    public String getCurrentAccountName() {
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = db.query(TABLE_ACCOUNTS, new String[]{ACCOUNT_NAME}, ACCOUNT_ID + "=?",
+                new String[]{String.valueOf(mCurrentAccountId)}, null, null, null, "1");
+        if (!cursor.moveToFirst()) {
+            cursor.close();
+            return mContext.getString(R.string.default_account);
+        }
+        String name = cursor.getString(0);
+        cursor.close();
+        return name;
+    }
+
+    private int findAccountIdByName(String name) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = db.query(TABLE_ACCOUNTS, new String[]{ACCOUNT_ID},
+                ACCOUNT_NAME + "=? COLLATE NOCASE",
+                new String[]{name}, null, null, null, "1");
+        if (!cursor.moveToFirst()) {
+            cursor.close();
+            return -1;
+        }
+        int id = cursor.getInt(0);
+        cursor.close();
+        return id;
     }
 
     public Reminder findDuplicateReminder(Reminder candidate, int excludedId) {
@@ -279,7 +460,9 @@ public class ReminderDatabase extends SQLiteOpenHelper {
 
     public int getRemindersCount() {
         SQLiteDatabase db = this.getReadableDatabase();
-        Cursor cursor = db.rawQuery("SELECT COUNT(*) FROM " + TABLE_REMINDERS, null);
+        Cursor cursor = db.rawQuery("SELECT COUNT(*) FROM " + TABLE_REMINDERS
+                        + " WHERE " + KEY_ACCOUNT_ID + "=?",
+                new String[]{accountIdText()});
         int count = 0;
         if (cursor.moveToFirst()) {
             count = cursor.getInt(0);
@@ -290,14 +473,15 @@ public class ReminderDatabase extends SQLiteOpenHelper {
 
     public int updateReminder(Reminder reminder) {
         SQLiteDatabase db = this.getWritableDatabase();
-        return db.update(TABLE_REMINDERS, toReminderValues(reminder), KEY_ID + "=?",
-                new String[]{String.valueOf(reminder.getID())});
+        return db.update(TABLE_REMINDERS, toReminderValues(reminder),
+                accountSelection(KEY_ACCOUNT_ID, KEY_ID + "=?"),
+                accountArgs(String.valueOf(reminder.getID())));
     }
 
     public void deleteReminder(Reminder reminder) {
         SQLiteDatabase db = this.getWritableDatabase();
-        db.delete(TABLE_REMINDERS, KEY_ID + "=?",
-                new String[]{String.valueOf(reminder.getID())});
+        db.delete(TABLE_REMINDERS, accountSelection(KEY_ACCOUNT_ID, KEY_ID + "=?"),
+                accountArgs(String.valueOf(reminder.getID())));
         db.close();
     }
 
@@ -305,13 +489,14 @@ public class ReminderDatabase extends SQLiteOpenHelper {
         SQLiteDatabase db = this.getWritableDatabase();
         ContentValues values = new ContentValues();
         values.put(KEY_ACTIVE, active ? "true" : "false");
-        return db.update(TABLE_REMINDERS, values, KEY_TITLE + "=?",
-                new String[]{normalizeTitle(title)});
+        return db.update(TABLE_REMINDERS, values, accountSelection(KEY_ACCOUNT_ID, KEY_TITLE + "=?"),
+                accountArgs(normalizeTitle(title)));
     }
 
     public void addStockBatch(String title, double quantity) {
         SQLiteDatabase db = this.getWritableDatabase();
         ContentValues values = new ContentValues();
+        values.put(STOCK_ACCOUNT_ID, mCurrentAccountId);
         values.put(STOCK_TITLE, normalizeTitle(title));
         values.put(STOCK_ORIGINAL_QUANTITY, quantity);
         values.put(STOCK_REMAINING_QUANTITY, quantity);
@@ -323,8 +508,9 @@ public class ReminderDatabase extends SQLiteOpenHelper {
     public double getTotalStock(String title) {
         SQLiteDatabase db = this.getReadableDatabase();
         Cursor cursor = db.rawQuery(
-                "SELECT SUM(" + STOCK_REMAINING_QUANTITY + ") FROM " + TABLE_STOCK_BATCHES + " WHERE " + STOCK_TITLE + "=?",
-                new String[]{normalizeTitle(title)});
+                "SELECT SUM(" + STOCK_REMAINING_QUANTITY + ") FROM " + TABLE_STOCK_BATCHES
+                        + " WHERE " + STOCK_TITLE + "=? AND " + STOCK_ACCOUNT_ID + "=?",
+                new String[]{normalizeTitle(title), accountIdText()});
         double total = 0;
         if (cursor.moveToFirst()) {
             total = cursor.isNull(0) ? 0 : cursor.getDouble(0);
@@ -336,8 +522,8 @@ public class ReminderDatabase extends SQLiteOpenHelper {
     public boolean isReminderTaken(int reminderId, String scheduledAt) {
         SQLiteDatabase db = this.getReadableDatabase();
         Cursor cursor = db.query(TABLE_INTAKE_LOGS, new String[]{LOG_ID},
-                LOG_REMINDER_ID + "=? AND " + LOG_SCHEDULED_AT + "=?",
-                new String[]{String.valueOf(reminderId), scheduledAt}, null, null, null, "1");
+                LOG_REMINDER_ID + "=? AND " + LOG_SCHEDULED_AT + "=? AND " + LOG_ACCOUNT_ID + "=?",
+                new String[]{String.valueOf(reminderId), scheduledAt, accountIdText()}, null, null, null, "1");
         boolean exists = cursor.moveToFirst();
         cursor.close();
         return exists;
@@ -346,6 +532,7 @@ public class ReminderDatabase extends SQLiteOpenHelper {
     public boolean insertIntakeLog(int reminderId, String title, double dose, String scheduledAt, String takenAt) {
         SQLiteDatabase db = this.getWritableDatabase();
         ContentValues values = new ContentValues();
+        values.put(LOG_ACCOUNT_ID, mCurrentAccountId);
         values.put(LOG_REMINDER_ID, reminderId);
         values.put(LOG_TITLE, normalizeTitle(title));
         values.put(LOG_DOSE, dose);
@@ -358,8 +545,9 @@ public class ReminderDatabase extends SQLiteOpenHelper {
     public int getIntakeLogCountSince(String takenAtLowerBound) {
         SQLiteDatabase db = this.getReadableDatabase();
         Cursor cursor = db.rawQuery(
-                "SELECT COUNT(*) FROM " + TABLE_INTAKE_LOGS + " WHERE " + LOG_TAKEN_AT + ">=?",
-                new String[]{takenAtLowerBound});
+                "SELECT COUNT(*) FROM " + TABLE_INTAKE_LOGS
+                        + " WHERE " + LOG_TAKEN_AT + ">=? AND " + LOG_ACCOUNT_ID + "=?",
+                new String[]{takenAtLowerBound, accountIdText()});
         int count = 0;
         if (cursor.moveToFirst()) {
             count = cursor.getInt(0);
@@ -556,6 +744,7 @@ public class ReminderDatabase extends SQLiteOpenHelper {
             String takenAt = nowText();
             for (Reminder reminder : remindersToConfirm) {
                 ContentValues values = new ContentValues();
+                values.put(LOG_ACCOUNT_ID, mCurrentAccountId);
                 values.put(LOG_REMINDER_ID, reminder.getID());
                 values.put(LOG_TITLE, normalizeTitle(reminder.getTitle()));
                 values.put(LOG_DOSE, reminder.getDose());
@@ -577,8 +766,8 @@ public class ReminderDatabase extends SQLiteOpenHelper {
         double remaining = amount;
         Cursor cursor = db.query(TABLE_STOCK_BATCHES,
                 new String[]{STOCK_ID, STOCK_REMAINING_QUANTITY},
-                STOCK_TITLE + "=? AND " + STOCK_REMAINING_QUANTITY + ">0",
-                new String[]{normalizeTitle(title)}, null, null, STOCK_ID + " ASC");
+                STOCK_TITLE + "=? AND " + STOCK_REMAINING_QUANTITY + ">0 AND " + STOCK_ACCOUNT_ID + "=?",
+                new String[]{normalizeTitle(title), accountIdText()}, null, null, STOCK_ID + " ASC");
 
         if (cursor.moveToFirst()) {
             do {
@@ -596,6 +785,7 @@ public class ReminderDatabase extends SQLiteOpenHelper {
 
     private ContentValues toReminderValues(Reminder reminder) {
         ContentValues values = new ContentValues();
+        values.put(KEY_ACCOUNT_ID, mCurrentAccountId);
         values.put(KEY_TITLE, normalizeTitle(reminder.getTitle()));
         values.put(KEY_DATE, reminder.getDate());
         values.put(KEY_TIME, reminder.getTime());
@@ -627,6 +817,13 @@ public class ReminderDatabase extends SQLiteOpenHelper {
         reminder.setEndDate(cursor.getString(cursor.getColumnIndexOrThrow(KEY_END_DATE)));
         reminder.setDoseTimes(cursor.getString(cursor.getColumnIndexOrThrow(KEY_DOSE_TIMES)));
         return reminder;
+    }
+
+    private Account readAccount(Cursor cursor) {
+        return new Account(
+                cursor.getInt(cursor.getColumnIndexOrThrow(ACCOUNT_ID)),
+                cursor.getString(cursor.getColumnIndexOrThrow(ACCOUNT_NAME)),
+                cursor.getString(cursor.getColumnIndexOrThrow(ACCOUNT_CREATED_AT)));
     }
 
     private HealthEntry readHealthEntry(Cursor cursor) {
@@ -672,6 +869,7 @@ public class ReminderDatabase extends SQLiteOpenHelper {
     private String[] reminderColumns() {
         return new String[]{
                 KEY_ID,
+                KEY_ACCOUNT_ID,
                 KEY_TITLE,
                 KEY_DATE,
                 KEY_TIME,
@@ -684,6 +882,14 @@ public class ReminderDatabase extends SQLiteOpenHelper {
                 KEY_ICON_URI,
                 KEY_END_DATE,
                 KEY_DOSE_TIMES
+        };
+    }
+
+    private String[] accountColumns() {
+        return new String[]{
+                ACCOUNT_ID,
+                ACCOUNT_NAME,
+                ACCOUNT_CREATED_AT
         };
     }
 
@@ -715,6 +921,24 @@ public class ReminderDatabase extends SQLiteOpenHelper {
                 + "r." + LAB_RESULT_VALUE + ", i." + LAB_ITEM_UNIT + ", r." + LAB_RESULT_CREATED_AT
                 + " FROM " + TABLE_LAB_RESULTS + " r"
                 + " LEFT JOIN " + TABLE_LAB_ITEMS + " i ON i." + LAB_ITEM_ID + "=r." + LAB_RESULT_ITEM_ID;
+    }
+
+    private String accountSelection(String accountColumn, String selection) {
+        if (selection == null || selection.length() == 0) {
+            return accountColumn + "=?";
+        }
+        return selection + " AND " + accountColumn + "=?";
+    }
+
+    private String[] accountArgs(String... args) {
+        String[] allArgs = new String[args.length + 1];
+        System.arraycopy(args, 0, allArgs, 0, args.length);
+        allArgs[args.length] = accountIdText();
+        return allArgs;
+    }
+
+    private String accountIdText() {
+        return String.valueOf(mCurrentAccountId);
     }
 
     private String normalizeTitle(String title) {

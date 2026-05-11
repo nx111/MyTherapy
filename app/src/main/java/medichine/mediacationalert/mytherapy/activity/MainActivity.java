@@ -58,6 +58,7 @@ import medichine.mediacationalert.mytherapy.BuildConfig;
 import medichine.mediacationalert.mytherapy.R;
 import medichine.mediacationalert.mytherapy.adapter.MedListAdapter;
 import medichine.mediacationalert.mytherapy.adapter.SummaryListAdapter;
+import medichine.mediacationalert.mytherapy.model.Account;
 import medichine.mediacationalert.mytherapy.model.HealthEntry;
 import medichine.mediacationalert.mytherapy.model.LabResult;
 import medichine.mediacationalert.mytherapy.model.LabTestItem;
@@ -90,6 +91,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     private TextView mNoReminderView;
     private TextView mSelectedDateText;
     private ImageButton mCalendarButton;
+    private ImageButton mAccountButton;
     private CheckBox mCourseShowAll;
     private LinearLayout mWeekCalendarRow;
     private FloatingActionButton mAddReminderButton;
@@ -136,6 +138,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         mNoReminderView = findViewById(R.id.no_reminder_text);
         mSelectedDateText = findViewById(R.id.selected_date_text);
         mCalendarButton = findViewById(R.id.calendar_button);
+        mAccountButton = findViewById(R.id.account_button);
         mCourseShowAll = findViewById(R.id.course_show_all);
         mWeekCalendarRow = findViewById(R.id.week_calendar_row);
         mBottomNavigation = findViewById(R.id.bottom_nav);
@@ -168,6 +171,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
 
         mImportArchiveButton.setOnClickListener(v -> openArchiveImport());
         mCalendarButton.setOnClickListener(v -> showSelectedDatePicker());
+        mAccountButton.setOnClickListener(v -> showAccountDialog());
         mCourseShowAll.setOnCheckedChangeListener((buttonView, isChecked) -> {
             if (mCurrentPage == PAGE_COURSE) {
                 loadCurrentPage();
@@ -211,6 +215,82 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     private void showHistoryPage() {
         mCurrentPage = PAGE_HISTORY;
         loadCurrentPage();
+    }
+
+    private void showAccountDialog() {
+        List<Account> accounts = rb.getAccounts();
+        String[] labels = new String[accounts.size()];
+        int currentAccountId = rb.getCurrentAccountId();
+        for (int i = 0; i < accounts.size(); i++) {
+            Account account = accounts.get(i);
+            labels[i] = account.mId == currentAccountId
+                    ? getString(R.string.current_account_format, account.mName)
+                    : account.mName;
+        }
+
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.switch_account)
+                .setItems(labels, (dialog, which) -> switchToAccount(accounts.get(which).mId))
+                .setPositiveButton(R.string.add_account, (dialog, which) -> showAddAccountDialog())
+                .setNegativeButton(R.string.cancel, null)
+                .show();
+    }
+
+    private void showAddAccountDialog() {
+        EditText input = new EditText(this);
+        input.setHint(R.string.account_name_hint);
+        input.setSingleLine(true);
+        input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+        int padding = dp(20);
+        input.setPadding(padding, dp(8), padding, 0);
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(R.string.add_account)
+                .setView(input)
+                .setPositiveButton(R.string.saved, null)
+                .setNegativeButton(R.string.cancel, null)
+                .create();
+        dialog.setOnShowListener(d -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            String name = input.getText().toString().trim();
+            if (name.length() == 0) {
+                input.setError(getString(R.string.account_name_required));
+                return;
+            }
+            int accountId = rb.addAccount(name);
+            if (accountId == -1) {
+                input.setError(getString(R.string.account_name_required));
+                return;
+            }
+            dialog.dismiss();
+            switchToAccount(accountId);
+        }));
+        dialog.show();
+    }
+
+    private void switchToAccount(int accountId) {
+        if (accountId == rb.getCurrentAccountId()) {
+            return;
+        }
+        if (!rb.setCurrentAccountId(accountId)) {
+            Toast.makeText(this, R.string.account_not_found, Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        rescheduleCurrentAccountReminders();
+        Toast.makeText(this, getString(R.string.account_switched, rb.getCurrentAccountName()), Toast.LENGTH_SHORT).show();
+        loadCurrentPage();
+    }
+
+    private void rescheduleCurrentAccountReminders() {
+        AlarmReceiver alarmReceiver = mAlarmReceiver == null ? new AlarmReceiver() : mAlarmReceiver;
+        for (Reminder reminder : rb.getAllRemindersForAllAccounts()) {
+            alarmReceiver.cancelAlarm(getApplicationContext(), reminder.getID());
+        }
+        for (Reminder reminder : rb.getAllReminders()) {
+            if ("true".equals(reminder.getActive())) {
+                alarmReceiver.scheduleReminder(getApplicationContext(), reminder);
+            }
+        }
     }
 
     private void openArchiveImport() {
@@ -592,9 +672,13 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     }
 
     private void updateActionButtons() {
-        if (mAddReminderButton == null || mImportArchiveButton == null || mCalendarButton == null || mCourseShowAll == null) {
+        if (mAddReminderButton == null || mImportArchiveButton == null || mCalendarButton == null
+                || mAccountButton == null || mCourseShowAll == null) {
             return;
         }
+        mAccountButton.setVisibility(View.VISIBLE);
+        mAccountButton.setContentDescription(getString(R.string.switch_account)
+                + ": " + rb.getCurrentAccountName());
         mCourseShowAll.setVisibility(mCurrentPage == PAGE_COURSE ? View.VISIBLE : View.GONE);
         if (mCurrentPage == PAGE_COURSE) {
             mAddReminderButton.setVisibility(View.VISIBLE);
@@ -1214,15 +1298,16 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         Calendar today = Calendar.getInstance();
         normalizeDate(today);
         if (mCurrentPage != PAGE_TODAY) {
-            mSelectedDateText.setText(currentPageTitle());
+            mSelectedDateText.setText(headerWithAccount(currentPageTitle()));
             mWeekCalendarRow.setVisibility(View.GONE);
             return;
         }
         mWeekCalendarRow.setVisibility(View.VISIBLE);
         String dateText = formatDateLocalized(mSelectedDate, DateFormat.MEDIUM);
-        mSelectedDateText.setText(sameDate(mSelectedDate, today)
+        String title = sameDate(mSelectedDate, today)
                 ? getString(R.string.nav_today) + " " + dateText
-                : dateText);
+                : dateText;
+        mSelectedDateText.setText(headerWithAccount(title));
 
         mWeekCalendarRow.removeAllViews();
         Calendar cursor = (Calendar) mSelectedDate.clone();
@@ -1232,6 +1317,10 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
             mWeekCalendarRow.addView(createCalendarDayView(day, sameDate(day, mSelectedDate)));
             cursor.add(Calendar.DAY_OF_MONTH, 1);
         }
+    }
+
+    private String headerWithAccount(String title) {
+        return getString(R.string.header_account_format, title, rb.getCurrentAccountName());
     }
 
     private String currentPageTitle() {
