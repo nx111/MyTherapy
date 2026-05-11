@@ -1682,7 +1682,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         }
 
         TextView range = new TextView(this);
-        range.setText(formatCourseDate(reminder.getDate()) + " - " + formatCourseDate(reminder.getEndDate()));
+        range.setText(formatCourseDateRange(reminder));
         range.setTextColor(getResources().getColor(R.color.text_secondary));
         range.setTextSize(13);
         textGroup.addView(range, new LinearLayout.LayoutParams(
@@ -2206,13 +2206,22 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
 
     private String formatCourseDate(String date) {
         if (Reminder.isNoEndDate(date)) {
-            return getString(R.string.no_expiration);
+            return "";
         }
         Calendar calendar = parseCourseDate(date);
         if (calendar == null) {
             return date == null ? "" : date;
         }
         return formatDateLocalized(calendar, DateFormat.MEDIUM);
+    }
+
+    private String formatCourseDateRange(Reminder reminder) {
+        String start = formatCourseDate(reminder.getDate());
+        String end = formatCourseDate(reminder.getEndDate());
+        if (end.length() == 0) {
+            return start;
+        }
+        return start + " - " + end;
     }
 
     private Calendar parseCourseDate(String date) {
