@@ -159,7 +159,7 @@
     <string name="dose_times_invalid">请输入有效时间，例如 8:00, 20:00</string>
     <string name="start_date">开始日期</string>
     <string name="end_date">结束日期</string>
-    <string name="no_expiration">不过期</string>
+    <string name="no_expiration">无期限</string>
     <string name="dose_times">服药时间</string>
     <string name="dose_time_item">第 %1$d 次：%2$s</string>
     <string name="times_per_repeat">次数</string>

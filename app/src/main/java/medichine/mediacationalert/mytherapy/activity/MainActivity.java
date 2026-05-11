@@ -2359,28 +2359,14 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         form.addView(startDateText);
 
         TextView endDateText = dateSelectorText(R.string.end_date, endDate[0]);
-        CheckBox noEnd = new CheckBox(this);
-        noEnd.setText(R.string.no_expiration);
-        noEnd.setTextColor(getResources().getColor(R.color.text_primary));
-        noEnd.setChecked(Reminder.isNoEndDate(endDate[0]));
-        endDateText.setEnabled(!noEnd.isChecked());
         endDateText.setOnClickListener(v -> showCourseDatePicker(
                 Reminder.isNoEndDate(endDate[0]) ? startDate[0] : endDate[0],
+                true,
                 date -> {
                     endDate[0] = date;
                     endDateText.setText(dateSelectorLabel(R.string.end_date, endDate[0]));
                 }));
-        noEnd.setOnCheckedChangeListener((buttonView, isChecked) -> {
-            endDateText.setEnabled(!isChecked);
-            if (isChecked) {
-                endDate[0] = Reminder.NO_END_DATE;
-            } else if (Reminder.isNoEndDate(endDate[0])) {
-                endDate[0] = startDate[0];
-            }
-            endDateText.setText(dateSelectorLabel(R.string.end_date, endDate[0]));
-        });
         form.addView(endDateText);
-        form.addView(noEnd);
 
         CheckBox active = new CheckBox(this);
         active.setText(R.string.active);
@@ -2539,10 +2525,17 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     }
 
     private String dateSelectorLabel(int labelRes, String date) {
-        return getString(labelRes) + ": " + formatCourseDate(date);
+        String formatted = labelRes == R.string.end_date && Reminder.isNoEndDate(date)
+                ? getString(R.string.no_expiration)
+                : formatCourseDate(date);
+        return getString(labelRes) + ": " + formatted;
     }
 
     private void showCourseDatePicker(String currentDate, CourseDateSelectedListener listener) {
+        showCourseDatePicker(currentDate, false, listener);
+    }
+
+    private void showCourseDatePicker(String currentDate, boolean allowNoEnd, CourseDateSelectedListener listener) {
         Calendar calendar = parseCourseDate(currentDate);
         if (calendar == null) {
             calendar = Calendar.getInstance();
@@ -2560,6 +2553,10 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 calendar.get(Calendar.YEAR),
                 calendar.get(Calendar.MONTH),
                 calendar.get(Calendar.DAY_OF_MONTH));
+        if (allowNoEnd) {
+            dialog.setButton(AlertDialog.BUTTON_NEUTRAL, getString(R.string.no_expiration),
+                    (d, which) -> listener.onDateSelected(Reminder.NO_END_DATE));
+        }
         dialog.show();
         Window window = dialog.getWindow();
         if (window != null) {
