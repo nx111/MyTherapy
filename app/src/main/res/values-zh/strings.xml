@@ -69,7 +69,7 @@
     <string name="camera">相机</string>
     <string name="use_icon">使用图标</string>
     <string name="ok">确定</string>
-    <string name="cancel">取消</string>
+    <string name="cancel">关闭</string>
     <string name="saved">保存</string>
     <string name="edited">已编辑</string>
     <string name="deleted">已删除</string>
