@@ -117,6 +117,7 @@
     <string name="stock_amount">库存：%1$s</string>
     <string name="reminder_count">%1$d 个提醒</string>
     <string name="course_schedule_line">%1$s x%2$s • %3$s</string>
+    <string name="course_plan_line">%1$s x%2$s</string>
     <string name="course_show_all">所有</string>
     <string name="duplicate_reminder_plan">已存在相同药品、时间和剂量的计划</string>
     <string name="default_account">默认账户</string>
@@ -134,8 +135,11 @@
     <string name="delete_plan_message">删除这个计划？</string>
     <string name="edit_medicine_info">编辑药品信息</string>
     <string name="medicine_plans">计划</string>
+    <string name="add_plan">新建计划</string>
     <string name="select_plan_action">计划选项</string>
     <string name="edit_plan">修改计划</string>
+    <string name="medicine_spec">规格</string>
+    <string name="medicine_spec_format">规格：%1$s</string>
     <string name="dose_times_hint">时间，例如 8:00, 20:00</string>
     <string name="dose_times_invalid">请输入有效时间，例如 8:00, 20:00</string>
     <string name="start_date">开始日期</string>

@@ -12,6 +12,7 @@ public class Reminder {
     private String mRepeatType;
     private String mActive;
     private double mDose;
+    private String mSpec;
     private String mIconType;
     private String mIconUri;
     private String mEndDate;
@@ -37,6 +38,7 @@ public class Reminder {
         mRepeatType = RepeatType;
         mActive = Active;
         mDose = Dose;
+        mSpec = "";
         mIconType = IconType == null || IconType.length() == 0 ? "pill" : IconType;
         mIconUri = IconUri == null ? "" : IconUri;
         mEndDate = cleanEndDate(EndDate, Date);
@@ -62,6 +64,7 @@ public class Reminder {
         mRepeatType = RepeatType;
         mActive = Active;
         mDose = Dose;
+        mSpec = "";
         mIconType = IconType == null || IconType.length() == 0 ? "pill" : IconType;
         mIconUri = IconUri == null ? "" : IconUri;
         mEndDate = cleanEndDate(EndDate, Date);
@@ -70,6 +73,7 @@ public class Reminder {
 
     public Reminder() {
         mDose = 1.0;
+        mSpec = "";
         mIconType = "pill";
         mIconUri = "";
         mEndDate = "";
@@ -146,6 +150,14 @@ public class Reminder {
 
     public void setDose(double dose) {
         mDose = dose;
+    }
+
+    public String getSpec() {
+        return mSpec == null ? "" : mSpec;
+    }
+
+    public void setSpec(String spec) {
+        mSpec = spec == null ? "" : spec.trim();
     }
 
     public String getIconType() {

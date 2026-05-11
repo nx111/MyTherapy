@@ -20,7 +20,7 @@ import medichine.mediacationalert.mytherapy.model.Account;
 import medichine.mediacationalert.mytherapy.R;
 
 public class ReminderDatabase extends SQLiteOpenHelper {
-    private static final int DATABASE_VERSION = 6;
+    private static final int DATABASE_VERSION = 7;
     private static final String DATABASE_NAME = "MedicationDbTab";
     private static final int DEFAULT_ACCOUNT_ID = 1;
     private static final String PREF_ACTIVE_ACCOUNT_ID = "active_account_id";
@@ -41,6 +41,7 @@ public class ReminderDatabase extends SQLiteOpenHelper {
     private static final String KEY_REPEAT_TYPE = "repeat_type";
     private static final String KEY_ACTIVE = "active";
     private static final String KEY_DOSE = "dose";
+    private static final String KEY_SPEC = "spec";
     private static final String KEY_ICON_TYPE = "icon_type";
     private static final String KEY_ICON_URI = "icon_uri";
     private static final String KEY_END_DATE = "end_date";
@@ -151,6 +152,9 @@ public class ReminderDatabase extends SQLiteOpenHelper {
             addColumnIfMissing(db, TABLE_INTAKE_LOGS, LOG_ACCOUNT_ID,
                     LOG_ACCOUNT_ID + " INTEGER NOT NULL DEFAULT " + DEFAULT_ACCOUNT_ID);
         }
+        if (oldVersion < 7) {
+            addColumnIfMissing(db, TABLE_REMINDERS, KEY_SPEC, KEY_SPEC + " TEXT DEFAULT ''");
+        }
     }
 
     private void createAccountTable(SQLiteDatabase db) {
@@ -228,6 +232,7 @@ public class ReminderDatabase extends SQLiteOpenHelper {
                 + KEY_REPEAT_TYPE + " TEXT,"
                 + KEY_ACTIVE + " TEXT,"
                 + KEY_DOSE + " REAL DEFAULT 1.0,"
+                + KEY_SPEC + " TEXT DEFAULT '',"
                 + KEY_ICON_TYPE + " TEXT DEFAULT 'pill',"
                 + KEY_ICON_URI + " TEXT DEFAULT '',"
                 + KEY_END_DATE + " TEXT DEFAULT '',"
@@ -493,7 +498,7 @@ public class ReminderDatabase extends SQLiteOpenHelper {
                 accountArgs(normalizeTitle(title)));
     }
 
-    public void updateMedicineInfo(String oldTitle, String newTitle, String iconType, String iconUri) {
+    public void updateMedicineInfo(String oldTitle, String newTitle, String spec, String iconType, String iconUri) {
         String oldName = normalizeTitle(oldTitle);
         String newName = normalizeTitle(newTitle);
         SQLiteDatabase db = this.getWritableDatabase();
@@ -501,6 +506,7 @@ public class ReminderDatabase extends SQLiteOpenHelper {
         try {
             ContentValues reminderValues = new ContentValues();
             reminderValues.put(KEY_TITLE, newName);
+            reminderValues.put(KEY_SPEC, spec == null ? "" : spec.trim());
             reminderValues.put(KEY_ICON_TYPE, iconType);
             reminderValues.put(KEY_ICON_URI, iconUri == null ? "" : iconUri);
             db.update(TABLE_REMINDERS, reminderValues, accountSelection(KEY_ACCOUNT_ID, KEY_TITLE + "=?"),
@@ -823,6 +829,7 @@ public class ReminderDatabase extends SQLiteOpenHelper {
         values.put(KEY_REPEAT_TYPE, reminder.getRepeatType());
         values.put(KEY_ACTIVE, reminder.getActive());
         values.put(KEY_DOSE, reminder.getDose());
+        values.put(KEY_SPEC, reminder.getSpec());
         values.put(KEY_ICON_TYPE, reminder.getIconType());
         values.put(KEY_ICON_URI, reminder.getIconUri());
         values.put(KEY_END_DATE, reminder.getEndDate());
@@ -841,6 +848,7 @@ public class ReminderDatabase extends SQLiteOpenHelper {
         reminder.setRepeatType(cursor.getString(cursor.getColumnIndexOrThrow(KEY_REPEAT_TYPE)));
         reminder.setActive(cursor.getString(cursor.getColumnIndexOrThrow(KEY_ACTIVE)));
         reminder.setDose(cursor.getDouble(cursor.getColumnIndexOrThrow(KEY_DOSE)));
+        reminder.setSpec(cursor.getString(cursor.getColumnIndexOrThrow(KEY_SPEC)));
         reminder.setIconType(cursor.getString(cursor.getColumnIndexOrThrow(KEY_ICON_TYPE)));
         reminder.setIconUri(cursor.getString(cursor.getColumnIndexOrThrow(KEY_ICON_URI)));
         reminder.setEndDate(cursor.getString(cursor.getColumnIndexOrThrow(KEY_END_DATE)));
@@ -907,6 +915,7 @@ public class ReminderDatabase extends SQLiteOpenHelper {
                 KEY_REPEAT_TYPE,
                 KEY_ACTIVE,
                 KEY_DOSE,
+                KEY_SPEC,
                 KEY_ICON_TYPE,
                 KEY_ICON_URI,
                 KEY_END_DATE,
