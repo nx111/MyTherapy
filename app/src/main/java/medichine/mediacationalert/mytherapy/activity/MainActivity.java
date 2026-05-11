@@ -1713,14 +1713,15 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         int padding = dp(20);
         form.setPadding(padding, dp(8), padding, 0);
 
+        form.addView(formLabel(R.string.dose));
         EditText dose = new EditText(this);
-        dose.setHint(R.string.dose);
         dose.setSingleLine(true);
         dose.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
         dose.setText(formatQuantity(fresh.getDose()));
         form.addView(dose, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
+        form.addView(formLabel(R.string.time));
         EditText doseTimes = new EditText(this);
         doseTimes.setHint(R.string.dose_times_hint);
         doseTimes.setSingleLine(true);
@@ -1780,6 +1781,16 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
             }
         }));
         dialog.show();
+    }
+
+    private TextView formLabel(int labelRes) {
+        TextView label = new TextView(this);
+        label.setText(labelRes);
+        label.setTextColor(getResources().getColor(R.color.text_secondary));
+        label.setTextSize(13);
+        label.setTypeface(Typeface.DEFAULT_BOLD);
+        label.setPadding(0, dp(10), 0, 0);
+        return label;
     }
 
     private Reminder newCourseReminder(String title, Reminder template) {
