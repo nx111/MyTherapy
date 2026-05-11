@@ -2,6 +2,7 @@ package medichine.mediacationalert.mytherapy.activity;
 
 import static medichine.mediacationalert.mytherapy.utils.Fun.showBanner;
 
+import android.Manifest;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
@@ -9,6 +10,8 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
@@ -43,6 +46,7 @@ import medichine.mediacationalert.mytherapy.utils.Reminder;
 import medichine.mediacationalert.mytherapy.utils.ReminderDatabase;
 
 public class MainActivity extends AppCompatActivity implements ItemClickListener {
+    private static final int REQUEST_POST_NOTIFICATIONS = 1001;
     private BillingClient billingClient;
     Prefs prefs;
 
@@ -64,6 +68,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
 
 
         setContentView(R.layout.activity_main);
+        requestNotificationPermission();
 
         ActionBar actionBar = getSupportActionBar();
         if (actionBar != null) {
@@ -112,6 +117,13 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
 
         // Initialize alarm
         mAlarmReceiver = new AlarmReceiver();
+    }
+
+    private void requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, REQUEST_POST_NOTIFICATIONS);
+        }
     }
 
     void checkSubscription() {
