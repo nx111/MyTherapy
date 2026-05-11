@@ -1,9 +1,11 @@
 package medichine.mediacationalert.mytherapy.adapter;
 
 import android.app.Activity;
+import android.net.Uri;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.TextView;
 
@@ -12,12 +14,11 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import java.util.List;
 
-import medichine.mediacationalert.mytherapy.utils.ItemClickListener;
 import medichine.mediacationalert.mytherapy.R;
 import medichine.mediacationalert.mytherapy.model.ReminderItem;
-import medichine.mediacationalert.mytherapy.utils.ColorGenerator;
+import medichine.mediacationalert.mytherapy.utils.ItemClickListener;
 
-public class MedListAdapter extends RecyclerView.Adapter<MedListAdapter.simpleHolder> {
+public class MedListAdapter extends RecyclerView.Adapter<MedListAdapter.SimpleHolder> {
     private List<ReminderItem> mItems;
     Activity activity;
     ItemClickListener listener;
@@ -30,28 +31,25 @@ public class MedListAdapter extends RecyclerView.Adapter<MedListAdapter.simpleHo
 
     @NonNull
     @Override
-    public simpleHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
+    public SimpleHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         LayoutInflater inflater = LayoutInflater.from(activity);
         View root = inflater.inflate(R.layout.pill_recycle_items, parent, false);
-
-        return new simpleHolder(root);
+        return new SimpleHolder(root);
     }
 
     @Override
-    public void onBindViewHolder(@NonNull simpleHolder holder, int position) {
+    public void onBindViewHolder(@NonNull SimpleHolder holder, int position) {
         ReminderItem item = mItems.get(position);
         holder.setReminderTitle(item.mTitle);
         holder.setReminderDateTime(item.mDateTime);
-        holder.setReminderRepeatInfo(item.mRepeat, item.mRepeatNo, item.mRepeatType);
+        holder.setReminderDetails(item.mMedicineDetails);
+        holder.setStockInfo(item.mStockSummary);
         holder.setActiveImage(item.mActive);
+        holder.setIcon(item.mIconType, item.mIconUri);
+        holder.setTakenState(item.mTaken, "true".equals(item.mActive));
 
-
-        holder.itemView.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View v) {
-                listener.clickListener(position);
-            }
-        });
+        holder.itemView.setOnClickListener(v -> listener.clickListener(position));
+        holder.takenButton.setOnClickListener(v -> listener.confirmListener(position));
     }
 
     @Override
@@ -59,63 +57,60 @@ public class MedListAdapter extends RecyclerView.Adapter<MedListAdapter.simpleHo
         return mItems.size();
     }
 
-    class simpleHolder extends RecyclerView.ViewHolder {
-        private TextView mTitleText, mDateAndTimeText, mRepeatInfoText, text123;
+    class SimpleHolder extends RecyclerView.ViewHolder {
+        private TextView mTitleText, mDateAndTimeText, mRepeatInfoText, mStockInfoText;
         private ImageView mActiveImage, mThumbnailImage;
-        private ColorGenerator mColorGenerator = ColorGenerator.DEFAULT;
-        //            private TextDrawable mDrawableBuilder;
-        private MedListAdapter mAdapter;
+        private Button takenButton;
 
-        public simpleHolder(@NonNull View itemView) {
+        public SimpleHolder(@NonNull View itemView) {
             super(itemView);
-
-            mTitleText = (TextView) itemView.findViewById(R.id.recycle_title);
-            text123 = (TextView) itemView.findViewById(R.id.text123);
-            mDateAndTimeText = (TextView) itemView.findViewById(R.id.recycle_date_time);
-            mRepeatInfoText = (TextView) itemView.findViewById(R.id.recycle_repeat_info);
-            mActiveImage = (ImageView) itemView.findViewById(R.id.active_image);
-            mThumbnailImage = (ImageView) itemView.findViewById(R.id.thumbnail_image);
+            mTitleText = itemView.findViewById(R.id.recycle_title);
+            mDateAndTimeText = itemView.findViewById(R.id.recycle_date_time);
+            mRepeatInfoText = itemView.findViewById(R.id.recycle_repeat_info);
+            mStockInfoText = itemView.findViewById(R.id.recycle_stock_info);
+            mActiveImage = itemView.findViewById(R.id.active_image);
+            mThumbnailImage = itemView.findViewById(R.id.thumbnail_image);
+            takenButton = itemView.findViewById(R.id.taken_button);
         }
 
         public void setReminderTitle(String title) {
             mTitleText.setText(title);
-            String letter = "A";
-
-            if (title != null && !title.isEmpty()) {
-                letter = title.substring(0, 1);
-            }
-
-            text123.setText(letter);
-
-
-//                int color = R.color.colorPrimary;
-
-            // Create a circular icon consisting of  a random background colour and first letter of title
-//                mDrawableBuilder = TextDrawable.builder()
-//                        .buildRound(letter);
-//                mThumbnailImage.setImageDrawable(mDrawableBuilder);
         }
 
-        // Set date and time views
         public void setReminderDateTime(String datetime) {
             mDateAndTimeText.setText(datetime);
         }
 
-        // Set repeat views
-        public void setReminderRepeatInfo(String repeat, String repeatNo, String repeatType) {
-            if (repeat.equals("true")) {
-                mRepeatInfoText.setText("Every " + repeatNo + " " + repeatType + "(s)");
-            } else if (repeat.equals("false")) {
-                mRepeatInfoText.setText("Repeat Off");
+        public void setReminderDetails(String details) {
+            mRepeatInfoText.setText(details);
+        }
+
+        public void setStockInfo(String stockInfo) {
+            mStockInfoText.setText(stockInfo);
+        }
+
+        public void setActiveImage(String active) {
+            if ("true".equals(active)) {
+                mActiveImage.setImageResource(R.drawable.notification_icon);
+            } else {
+                mActiveImage.setImageResource(R.drawable.baseline_notifications_off_24);
             }
         }
 
-        // Set active image as on or off
-        public void setActiveImage(String active) {
-            if ("true".equals(active)) {
-                mActiveImage.setBackgroundResource(R.drawable.notification_icon);
+        public void setTakenState(boolean taken, boolean active) {
+            takenButton.setEnabled(active && !taken);
+            takenButton.setText(taken ? "Taken" : "Taken");
+        }
+
+        public void setIcon(String iconType, String iconUri) {
+            if (iconUri != null && iconUri.length() > 0) {
+                mThumbnailImage.setImageURI(Uri.parse(iconUri));
+            } else if ("capsule".equals(iconType)) {
+                mThumbnailImage.setImageResource(R.drawable.medicine_capsule);
+            } else if ("liquid".equals(iconType)) {
+                mThumbnailImage.setImageResource(R.drawable.medicine_liquid);
             } else {
-                mActiveImage.setBackgroundResource(R.drawable.baseline_notifications_off_24);
+                mThumbnailImage.setImageResource(R.drawable.medicine_pill);
             }
         }
     }

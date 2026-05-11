@@ -31,6 +31,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import medichine.mediacationalert.mytherapy.BuildConfig;
 import medichine.mediacationalert.mytherapy.utils.DateTimeComparator;
@@ -44,6 +45,7 @@ import medichine.mediacationalert.mytherapy.utils.Fun;
 import medichine.mediacationalert.mytherapy.utils.Prefs;
 import medichine.mediacationalert.mytherapy.utils.Reminder;
 import medichine.mediacationalert.mytherapy.utils.ReminderDatabase;
+import medichine.mediacationalert.mytherapy.utils.ReminderSchedule;
 
 public class MainActivity extends AppCompatActivity implements ItemClickListener {
     private static final int REQUEST_POST_NOTIFICATIONS = 1001;
@@ -98,13 +100,10 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         if (mTest.isEmpty()) {
             mNoReminderView.setVisibility(View.VISIBLE);
         }
-        medicineList = new ArrayList<>();
-        medicineList = generateData();
         // Create recycler view
         mList.setLayoutManager(new LinearLayoutManager(this));
         registerForContextMenu(mList);
-        mAdapter = new MedListAdapter(medicineList, this, this);
-        mList.setAdapter(mAdapter);
+        loadReminderList();
 
         // On clicking the floating action button
         mAddReminderButton.setOnClickListener(new View.OnClickListener() {
@@ -172,54 +171,111 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
 
     public List<ReminderItem> generateData() {
         ArrayList<ReminderItem> items = new ArrayList<>();
+        IDmap.clear();
 
         // Get all reminders from the database
         List<Reminder> reminders = rb.getAllReminders();
-
-        // Initialize lists
-        List<String> Titles = new ArrayList<>();
-        List<String> Repeats = new ArrayList<>();
-        List<String> RepeatNos = new ArrayList<>();
-        List<String> RepeatTypes = new ArrayList<>();
-        List<String> Actives = new ArrayList<>();
-        List<String> DateAndTime = new ArrayList<>();
-        List<Integer> IDList = new ArrayList<>();
         List<DateTimeSorter> DateTimeSortList = new ArrayList<>();
+        LinkedHashMap<Integer, String> scheduledById = new LinkedHashMap<>();
 
-        // Add details of all reminders in their respective lists
-        for (Reminder r : reminders) {
-            Titles.add(r.getTitle());
-            DateAndTime.add(r.getDate() + " " + r.getTime());
-            Repeats.add(r.getRepeat());
-            RepeatNos.add(r.getRepeatNo());
-            RepeatTypes.add(r.getRepeatType());
-            Actives.add(r.getActive());
-            IDList.add(r.getID());
-        }
-
-        int key = 0;
-
-        // Add date and time as DateTimeSorter objects
-        for (int k = 0; k < Titles.size(); k++) {
-            DateTimeSortList.add(new DateTimeSorter(key, DateAndTime.get(k)));
-            key++;
+        for (int i = 0; i < reminders.size(); i++) {
+            Reminder reminder = reminders.get(i);
+            String scheduledAt = ReminderSchedule.format(ReminderSchedule.currentOccurrence(reminder, rb));
+            scheduledById.put(reminder.getID(), scheduledAt);
+            DateTimeSortList.add(new DateTimeSorter(i, scheduledAt));
         }
 
         // Sort items according to date and time in ascending order
         Collections.sort(DateTimeSortList, new DateTimeComparator());
 
-        int k = 0;
+        LinkedHashMap<String, List<Reminder>> groups = new LinkedHashMap<>();
 
-        // Add data to each recycler view item
         for (DateTimeSorter item : DateTimeSortList) {
-            int i = item.getIndex();
+            Reminder reminder = reminders.get(item.getIndex());
+            String scheduledAt = scheduledById.get(reminder.getID());
+            if (!groups.containsKey(scheduledAt)) {
+                groups.put(scheduledAt, new ArrayList<>());
+            }
+            groups.get(scheduledAt).add(reminder);
+        }
 
-            items.add(new ReminderItem(Titles.get(i), DateAndTime.get(i), Repeats.get(i),
-                    RepeatNos.get(i), RepeatTypes.get(i), Actives.get(i)));
-            IDmap.put(k, IDList.get(i));
-            k++;
+        int position = 0;
+        for (Map.Entry<String, List<Reminder>> entry : groups.entrySet()) {
+            String scheduledAt = entry.getKey();
+            List<Reminder> groupReminders = entry.getValue();
+            if (groupReminders.isEmpty()) {
+                continue;
+            }
+
+            String[] parts = splitScheduledAt(scheduledAt);
+            String timeText = parts[1];
+            String dateText = parts[0] + " • " + groupReminders.size() + " medicine" + (groupReminders.size() > 1 ? "s" : "");
+
+            StringBuilder details = new StringBuilder();
+            boolean anyActive = false;
+            boolean allTaken = true;
+            ArrayList<Integer> reminderIds = new ArrayList<>();
+            Reminder firstReminder = groupReminders.get(0);
+
+            for (Reminder reminder : groupReminders) {
+                reminderIds.add(reminder.getID());
+                boolean active = "true".equals(reminder.getActive());
+                boolean taken = rb.isReminderTaken(reminder.getID(), scheduledAt);
+                if (active) {
+                    anyActive = true;
+                    if (!taken) {
+                        allTaken = false;
+                    }
+                }
+                double stock = rb.getTotalStock(reminder.getTitle());
+                if (details.length() > 0) {
+                    details.append("\n");
+                }
+                details.append(reminder.getTitle())
+                        .append(" x")
+                        .append(formatQuantity(reminder.getDose()))
+                        .append(" • stock ")
+                        .append(formatQuantity(stock));
+                if (!active) {
+                    details.append(" • paused");
+                } else if (taken) {
+                    details.append(" • taken");
+                }
+            }
+
+            items.add(new ReminderItem(
+                    timeText,
+                    dateText,
+                    "",
+                    "",
+                    "",
+                    anyActive ? "true" : "false",
+                    details.toString(),
+                    anyActive ? "Tap Taken after taking all medicines in this time group" : "Paused",
+                    scheduledAt,
+                    firstReminder.getIconType(),
+                    firstReminder.getIconUri(),
+                    anyActive && allTaken,
+                    reminderIds));
+            IDmap.put(position, firstReminder.getID());
+            position++;
         }
         return items;
+    }
+
+    private String[] splitScheduledAt(String scheduledAt) {
+        int index = scheduledAt.lastIndexOf(' ');
+        if (index <= 0 || index >= scheduledAt.length() - 1) {
+            return new String[]{scheduledAt, ""};
+        }
+        return new String[]{scheduledAt.substring(0, index), scheduledAt.substring(index + 1)};
+    }
+
+    private String formatQuantity(double value) {
+        if (Math.abs(value - Math.round(value)) < 0.000001) {
+            return String.valueOf((long) Math.round(value));
+        }
+        return String.format(java.util.Locale.US, "%.2f", value);
     }
 
     @Override
@@ -236,10 +292,11 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
             mNoReminderView.setVisibility(View.GONE);
         }
 
-        medicineList = new ArrayList<>();
+        loadReminderList();
+    }
+
+    private void loadReminderList() {
         medicineList = generateData();
-        mList.setLayoutManager(new LinearLayoutManager(this));
-        registerForContextMenu(mList);
         mAdapter = new MedListAdapter(medicineList, this, this);
         mList.setAdapter(mAdapter);
     }
@@ -262,6 +319,17 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         selectReminder(mReminderClickID);
         //  selectReminder(pos);
 
+    }
+
+    @Override
+    public void confirmListener(int pos) {
+        if (pos < 0 || pos >= medicineList.size()) {
+            return;
+        }
+        ReminderItem item = medicineList.get(pos);
+        ReminderDatabase.ConfirmResult result = rb.confirmReminderGroup(item.mReminderIds, item.mScheduledAt);
+        Toast.makeText(getApplicationContext(), result.message, Toast.LENGTH_SHORT).show();
+        loadReminderList();
     }
 
 }

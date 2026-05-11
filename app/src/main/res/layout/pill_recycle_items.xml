@@ -1,99 +1,112 @@
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/cardviewone"
     android:layout_width="match_parent"
-    android:layout_height="86dp"
-    android:background="?android:attr/selectableItemBackground">
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="8dp"
+    android:background="?android:attr/selectableItemBackground"
+    app:cardCornerRadius="8dp"
+    app:cardElevation="1dp">
 
-    <androidx.cardview.widget.CardView
-        android:id="@+id/cardviewone"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        app:cardCornerRadius="20dp"
-        >
+        android:orientation="vertical"
+        android:padding="12dp">
 
-        <RelativeLayout
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="@color/transperent">
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
 
-            <ImageView
-                android:id="@+id/thumbnail_image"
-                android:layout_width="45dp"
-                android:layout_height="45dp"
-                android:layout_centerVertical="true"
-                android:layout_marginLeft="16dp"
-                android:layout_marginRight="16dp"
-                android:background="@drawable/a3_grad"></ImageView>
+            <FrameLayout
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_marginRight="12dp">
 
-            <TextView
-                android:id="@+id/text123"
-                android:layout_width="45dp"
-                android:layout_height="45dp"
-                android:text="M"
-                android:gravity="center"
-                android:textColor="@color/white"
-                android:layout_centerVertical="true"
-                android:layout_marginLeft="16dp"
-                android:layout_marginRight="16dp"
+                <ImageView
+                    android:id="@+id/thumbnail_image"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:scaleType="centerCrop"
+                    android:src="@drawable/medicine_pill" />
 
-                ></TextView>
+                <TextView
+                    android:id="@+id/text123"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:gravity="center"
+                    android:textColor="@color/white"
+                    android:visibility="gone" />
+            </FrameLayout>
 
             <LinearLayout
-                android:layout_width="match_parent"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_centerVertical="true"
-                android:layout_marginTop="4dp"
-                android:layout_marginBottom="4dp"
-                android:layout_toLeftOf="@+id/active_image"
-                android:layout_toRightOf="@id/thumbnail_image"
+                android:layout_weight="1"
                 android:orientation="vertical">
 
                 <TextView
                     android:id="@+id/recycle_title"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:ellipsize="end"
-                    android:maxLines="2"
-                    android:textColor="@color/purple_200"
-                    android:textSize="16dp"
-                    tools:text="Title" />
+                    android:textColor="@color/black"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    tools:text="08:00" />
 
                 <TextView
                     android:id="@+id/recycle_date_time"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:ellipsize="marquee"
-                    android:singleLine="true"
-                    android:textColor="@color/black"
-                    android:textSize="13dp"
-                    tools:text="Date and Time" />
-
-                <TextView
-                    android:id="@+id/recycle_repeat_info"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:ellipsize="marquee"
-                    android:singleLine="true"
-                    android:text="gchgsfer"
                     android:textColor="@color/grey_calendar"
-                    android:textSize="13dp"
-                    tools:text="Repeat No and Type" />
-
+                    android:textSize="13sp"
+                    tools:text="11/5/2026 • 2 medicines" />
             </LinearLayout>
 
             <ImageView
                 android:id="@+id/active_image"
-                android:layout_width="30dp"
-                android:layout_height="30dp"
-                android:layout_alignParentRight="true"
-                android:layout_centerVertical="true"
-                android:layout_marginLeft="16dp"
-                android:layout_marginRight="16dp"
-                android:background="@drawable/notification_icon" />
-        </RelativeLayout>
+                android:layout_width="28dp"
+                android:layout_height="28dp"
+                android:layout_marginLeft="8dp"
+                android:src="@drawable/notification_icon" />
+        </LinearLayout>
 
-    </androidx.cardview.widget.CardView>
+        <TextView
+            android:id="@+id/recycle_repeat_info"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:lineSpacingExtra="2dp"
+            android:textColor="@color/black"
+            android:textSize="14sp"
+            tools:text="Medicine A x1 • stock 20&#10;Medicine B x0.5 • stock 8" />
 
-</RelativeLayout>
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/recycle_stock_info"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:textColor="@color/grey_calendar"
+                android:textSize="13sp"
+                tools:text="Stock ready" />
+
+            <Button
+                android:id="@+id/taken_button"
+                android:layout_width="wrap_content"
+                android:layout_height="40dp"
+                android:minWidth="96dp"
+                android:text="Taken"
+                android:textAllCaps="false" />
+        </LinearLayout>
+    </LinearLayout>
+</androidx.cardview.widget.CardView>
