@@ -235,21 +235,51 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 .setTitle(R.string.switch_account)
                 .setItems(labels, (dialog, which) -> switchToAccount(accounts.get(which).mId))
                 .setPositiveButton(R.string.add_account, (dialog, which) -> showAddAccountDialog())
+                .setNeutralButton(R.string.rename_account, (dialog, which) -> showRenameAccountDialog())
                 .setNegativeButton(R.string.cancel, null)
                 .show();
     }
 
     private void showAddAccountDialog() {
+        showAccountNameDialog(R.string.add_account, "", R.string.account_name_required, input -> {
+            int accountId = rb.addAccount(input);
+            if (accountId == -1) {
+                return false;
+            }
+            switchToAccount(accountId);
+            return true;
+        });
+    }
+
+    private void showRenameAccountDialog() {
+        showAccountNameDialog(R.string.rename_account, rb.getCurrentAccountName(), R.string.account_name_exists, input -> {
+            if (!rb.updateAccountName(rb.getCurrentAccountId(), input)) {
+                return false;
+            }
+            loadCurrentPage();
+            Toast.makeText(this, R.string.saved, Toast.LENGTH_SHORT).show();
+            return true;
+        });
+    }
+
+    private void showAccountNameDialog(int titleRes, String initialName, int saveErrorRes, AccountNameSaver saver) {
         EditText input = new EditText(this);
         input.setHint(R.string.account_name_hint);
         input.setSingleLine(true);
         input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_FLAG_CAP_SENTENCES);
+        input.setText(initialName == null ? "" : initialName);
+        input.setSelectAllOnFocus(true);
+
+        LinearLayout form = new LinearLayout(this);
+        form.setOrientation(LinearLayout.VERTICAL);
         int padding = dp(20);
-        input.setPadding(padding, dp(8), padding, 0);
+        form.setPadding(padding, dp(16), padding, dp(4));
+        form.addView(input, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
         AlertDialog dialog = new AlertDialog.Builder(this)
-                .setTitle(R.string.add_account)
-                .setView(input)
+                .setTitle(titleRes)
+                .setView(form)
                 .setPositiveButton(R.string.saved, null)
                 .setNegativeButton(R.string.cancel, null)
                 .create();
@@ -259,13 +289,11 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 input.setError(getString(R.string.account_name_required));
                 return;
             }
-            int accountId = rb.addAccount(name);
-            if (accountId == -1) {
-                input.setError(getString(R.string.account_name_required));
+            if (!saver.save(name)) {
+                input.setError(getString(saveErrorRes));
                 return;
             }
             dialog.dismiss();
-            switchToAccount(accountId);
         }));
         dialog.show();
     }
@@ -2252,5 +2280,9 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
 
     private interface CourseDateSelectedListener {
         void onDateSelected(String date);
+    }
+
+    private interface AccountNameSaver {
+        boolean save(String name);
     }
 }

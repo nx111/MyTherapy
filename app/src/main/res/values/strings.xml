@@ -144,8 +144,10 @@
     <string name="default_account">Default account</string>
     <string name="switch_account">Switch Account</string>
     <string name="add_account">Add Account</string>
+    <string name="rename_account">Rename Account</string>
     <string name="account_name_hint">Account name</string>
     <string name="account_name_required">Account name is required</string>
+    <string name="account_name_exists">Account name already exists</string>
     <string name="account_not_found">Account not found</string>
     <string name="account_switched">Switched to %1$s</string>
     <string name="current_account_format">%1$s (current)</string>

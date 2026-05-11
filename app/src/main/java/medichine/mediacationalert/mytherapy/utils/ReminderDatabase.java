@@ -398,6 +398,22 @@ public class ReminderDatabase extends SQLiteOpenHelper {
         return (int) db.insert(TABLE_ACCOUNTS, null, values);
     }
 
+    public boolean updateAccountName(int accountId, String name) {
+        String normalizedName = normalizeTitle(name);
+        if (normalizedName.length() == 0) {
+            return false;
+        }
+        int existingId = findAccountIdByName(normalizedName);
+        if (existingId != -1 && existingId != accountId) {
+            return false;
+        }
+        SQLiteDatabase db = this.getWritableDatabase();
+        ContentValues values = new ContentValues();
+        values.put(ACCOUNT_NAME, normalizedName);
+        return db.update(TABLE_ACCOUNTS, values, ACCOUNT_ID + "=?",
+                new String[]{String.valueOf(accountId)}) > 0;
+    }
+
     public boolean setCurrentAccountId(int accountId) {
         SQLiteDatabase db = this.getWritableDatabase();
         if (!accountExists(db, accountId)) {
