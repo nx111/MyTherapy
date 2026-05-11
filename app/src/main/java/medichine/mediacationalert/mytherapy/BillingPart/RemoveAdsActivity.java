@@ -79,7 +79,7 @@ public class RemoveAdsActivity extends AppCompatActivity implements ItemClickLis
             return;
         }
         initViews();
-        setTitle("Remove Ads");
+        setTitle(R.string.remove_ads);
         //Initialize a BillingClient with PurchasesUpdatedListener onCreate method
         billingClient = BillingClient.newBuilder(this)
                 .enablePendingPurchases()

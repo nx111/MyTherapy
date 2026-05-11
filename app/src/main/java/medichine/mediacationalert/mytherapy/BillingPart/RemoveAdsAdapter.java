@@ -46,15 +46,15 @@ public class RemoveAdsAdapter extends RecyclerView.Adapter<RemoveAdsAdapter.Remo
 
         if (position == 0) {
             holder.price.setText("$3.99");
-            holder.title.setText("1 Month");
+            holder.title.setText(context.getString(R.string.one_month));
         }
         if (position == 1) {
             holder.price.setText("$6.49");
-            holder.title.setText("3 Month");
+            holder.title.setText(context.getString(R.string.three_months));
         }
         if (position == 2) {
             holder.price.setText("$0.99");
-            holder.title.setText("7 Days");
+            holder.title.setText(context.getString(R.string.seven_days));
         }
         holder.itemView.setOnClickListener(new View.OnClickListener() {
             @Override

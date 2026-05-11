@@ -162,7 +162,7 @@ public class ReminderAddActivity extends AppCompatActivity implements
         mDateText.setText(mDate);
         mTimeText.setText(mTime);
         mRepeatNoText.setText(mRepeatNo);
-        mRepeatTypeText.setText(mRepeatType);
+        mRepeatTypeText.setText(repeatTypeLabel(mRepeatType));
         mDoseText.setText(formatQuantity(mDose));
         updateRepeatText();
         updateActiveButtons();
@@ -191,8 +191,8 @@ public class ReminderAddActivity extends AppCompatActivity implements
             mRepeatNo = savedRepeatNo;
 
             String savedRepeatType = savedInstanceState.getString(KEY_REPEAT_TYPE);
-            mRepeatTypeText.setText(savedRepeatType);
             mRepeatType = savedRepeatType;
+            mRepeatTypeText.setText(repeatTypeLabel(mRepeatType));
 
             mActive = savedInstanceState.getString(KEY_ACTIVE);
             mDose = savedInstanceState.getDouble(KEY_DOSE, 1.0);
@@ -281,23 +281,24 @@ public class ReminderAddActivity extends AppCompatActivity implements
 
     // On clicking repeat type button
     public void selectRepeatType(View v){
-        final String[] items = new String[5];
-
-        items[0] = "Minute";
-        items[1] = "Hour";
-        items[2] = "Day";
-        items[3] = "Week";
-        items[4] = "Month";
+        final String[] items = new String[]{
+                getString(R.string.minute),
+                getString(R.string.hour),
+                getString(R.string.day),
+                getString(R.string.week),
+                getString(R.string.month)
+        };
+        final String[] values = new String[]{"Minute", "Hour", "Day", "Week", "Month"};
 
         // Create List Dialog
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("Select Type");
+        builder.setTitle(R.string.select_type);
         builder.setItems(items, new DialogInterface.OnClickListener() {
 
             public void onClick(DialogInterface dialog, int item) {
 
-                mRepeatType = items[item];
-                mRepeatTypeText.setText(mRepeatType);
+                mRepeatType = values[item];
+                mRepeatTypeText.setText(items[item]);
                 updateRepeatText();
             }
         });
@@ -308,13 +309,13 @@ public class ReminderAddActivity extends AppCompatActivity implements
     // On clicking repeat interval button
     public void setRepeatNo(View v){
         AlertDialog.Builder alert = new AlertDialog.Builder(this);
-        alert.setTitle("Enter Number");
+        alert.setTitle(R.string.enter_number);
 
         // Create EditText box to input repeat number
         final EditText input = new EditText(this);
         input.setInputType(InputType.TYPE_CLASS_NUMBER);
         alert.setView(input);
-        alert.setPositiveButton("Ok",
+        alert.setPositiveButton(R.string.ok,
                 new DialogInterface.OnClickListener() {
                     public void onClick(DialogInterface dialog, int whichButton) {
 
@@ -334,7 +335,7 @@ public class ReminderAddActivity extends AppCompatActivity implements
                         }
                     }
                 });
-        alert.setNegativeButton("Cancel", new DialogInterface.OnClickListener() {
+        alert.setNegativeButton(R.string.cancel, new DialogInterface.OnClickListener() {
             public void onClick(DialogInterface dialog, int whichButton) {
                 // do nothing
             }
@@ -345,40 +346,40 @@ public class ReminderAddActivity extends AppCompatActivity implements
     public void addStockBatch(View v) {
         mTitle = mTitleText.getText().toString().trim();
         if (mTitle.length() == 0) {
-            mTitleText.setError("Medication name is required before adding stock");
+            mTitleText.setError(getString(R.string.medication_name_required_stock));
             return;
         }
 
         AlertDialog.Builder alert = new AlertDialog.Builder(this);
-        alert.setTitle("Add Stock Batch");
+        alert.setTitle(R.string.add_stock_batch);
         final EditText input = new EditText(this);
         input.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
         alert.setView(input);
-        alert.setPositiveButton("Ok", new DialogInterface.OnClickListener() {
+        alert.setPositiveButton(R.string.ok, new DialogInterface.OnClickListener() {
             public void onClick(DialogInterface dialog, int whichButton) {
                 try {
                     double quantity = Double.parseDouble(input.getText().toString().trim());
                     if (quantity <= 0) {
-                        Toast.makeText(getApplicationContext(), "Stock must be greater than 0", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(getApplicationContext(), R.string.stock_must_be_positive, Toast.LENGTH_SHORT).show();
                         return;
                     }
                     new ReminderDatabase(ReminderAddActivity.this).addStockBatch(mTitle, quantity);
                     updateStockText();
                 } catch (NumberFormatException e) {
-                    Toast.makeText(getApplicationContext(), "Enter a valid stock quantity", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(getApplicationContext(), R.string.enter_valid_stock_quantity, Toast.LENGTH_SHORT).show();
                 }
             }
         });
-        alert.setNegativeButton("Cancel", null);
+        alert.setNegativeButton(R.string.cancel, null);
         alert.show();
     }
 
     public void selectIconType(View v) {
-        final String[] labels = new String[]{"Pill", "Capsule", "Liquid"};
+        final String[] labels = new String[]{getString(R.string.pill), getString(R.string.capsule), getString(R.string.liquid)};
         final String[] values = new String[]{"pill", "capsule", "liquid"};
 
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("Select Icon");
+        builder.setTitle(R.string.select_icon);
         builder.setItems(labels, new DialogInterface.OnClickListener() {
             public void onClick(DialogInterface dialog, int item) {
                 mIconType = values[item];
@@ -390,9 +391,9 @@ public class ReminderAddActivity extends AppCompatActivity implements
     }
 
     public void selectIconImage(View v) {
-        final String[] items = new String[]{"Gallery", "Camera", "Use icon"};
+        final String[] items = new String[]{getString(R.string.gallery), getString(R.string.camera), getString(R.string.use_icon)};
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle("Medicine Photo");
+        builder.setTitle(R.string.medicine_photo);
         builder.setItems(items, new DialogInterface.OnClickListener() {
             public void onClick(DialogInterface dialog, int item) {
                 if (item == 0) {
@@ -419,7 +420,7 @@ public class ReminderAddActivity extends AppCompatActivity implements
     private void openCamera() {
         Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
         if (intent.resolveActivity(getPackageManager()) == null) {
-            Toast.makeText(getApplicationContext(), "Camera not available", Toast.LENGTH_SHORT).show();
+            Toast.makeText(getApplicationContext(), R.string.camera_not_available, Toast.LENGTH_SHORT).show();
             return;
         }
         startActivityForResult(intent, REQUEST_CAPTURE_IMAGE);
@@ -427,7 +428,7 @@ public class ReminderAddActivity extends AppCompatActivity implements
 
     private void updateRepeatText() {
         if ("true".equals(mRepeat)) {
-            mRepeatText.setText("Every " + mRepeatNo + " " + mRepeatType + "(s)");
+            mRepeatText.setText(getString(R.string.repeat_every, mRepeatNo, repeatTypeLabel(mRepeatType)));
         } else {
             mRepeatText.setText(R.string.repeat_off);
         }
@@ -452,10 +453,10 @@ public class ReminderAddActivity extends AppCompatActivity implements
         }
         if (mIconUri != null && mIconUri.length() > 0) {
             mIconPreview.setImageURI(Uri.parse(mIconUri));
-            mIconPhotoText.setText("Photo selected");
+            mIconPhotoText.setText(R.string.photo_selected);
         } else {
             mIconPreview.setImageResource(iconResourceForType(mIconType));
-            mIconPhotoText.setText("Gallery or Camera");
+            mIconPhotoText.setText(R.string.photo_source);
         }
         mIconTypeText.setText(iconLabel(mIconType));
     }
@@ -471,11 +472,24 @@ public class ReminderAddActivity extends AppCompatActivity implements
 
     private String iconLabel(String iconType) {
         if ("capsule".equals(iconType)) {
-            return "Capsule";
+            return getString(R.string.capsule);
         } else if ("liquid".equals(iconType)) {
-            return "Liquid";
+            return getString(R.string.liquid);
         }
-        return "Pill";
+        return getString(R.string.pill);
+    }
+
+    private String repeatTypeLabel(String repeatType) {
+        if ("Hour".equals(repeatType)) {
+            return getString(R.string.hour);
+        } else if ("Day".equals(repeatType)) {
+            return getString(R.string.day);
+        } else if ("Week".equals(repeatType)) {
+            return getString(R.string.week);
+        } else if ("Month".equals(repeatType)) {
+            return getString(R.string.month);
+        }
+        return getString(R.string.minute);
     }
 
     private void updateActiveButtons() {
@@ -518,7 +532,7 @@ public class ReminderAddActivity extends AppCompatActivity implements
     private boolean validateReminderInput() {
         mTitle = mTitleText.getText().toString().trim();
         if (mTitle.length() == 0) {
-            mTitleText.setError("Reminder Title cannot be blank!");
+            mTitleText.setError(getString(R.string.reminder_title_blank));
             return false;
         }
 
@@ -538,11 +552,11 @@ public class ReminderAddActivity extends AppCompatActivity implements
         try {
             mDose = Double.parseDouble(mDoseText.getText().toString().trim());
             if (mDose <= 0) {
-                mDoseText.setError("Dose must be greater than 0");
+                mDoseText.setError(getString(R.string.dose_must_be_positive));
                 return false;
             }
         } catch (NumberFormatException e) {
-            mDoseText.setError("Enter a valid dose");
+            mDoseText.setError(getString(R.string.enter_valid_dose));
             return false;
         }
 
@@ -596,7 +610,7 @@ public class ReminderAddActivity extends AppCompatActivity implements
             out.close();
             return Uri.fromFile(file).toString();
         } catch (IOException e) {
-            Toast.makeText(getApplicationContext(), "Could not save photo", Toast.LENGTH_SHORT).show();
+            Toast.makeText(getApplicationContext(), R.string.could_not_save_photo, Toast.LENGTH_SHORT).show();
             return "";
         }
     }
@@ -610,7 +624,7 @@ public class ReminderAddActivity extends AppCompatActivity implements
         Calendar reminderCalendar = buildReminderCalendar();
         if ("true".equals(mActive) && "false".equals(mRepeat)
                 && reminderCalendar.getTimeInMillis() <= System.currentTimeMillis()) {
-            Toast.makeText(getApplicationContext(), "Choose a future time", Toast.LENGTH_SHORT).show();
+            Toast.makeText(getApplicationContext(), R.string.choose_future_time, Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -618,7 +632,7 @@ public class ReminderAddActivity extends AppCompatActivity implements
         int ID = rb.addReminder(new Reminder(mTitle, mDate, mTime, mRepeat, mRepeatNo, mRepeatType, mActive,
                 mDose, mIconType, mIconUri));
         if (ID == -1) {
-            Toast.makeText(getApplicationContext(), "Could not save reminder", Toast.LENGTH_SHORT).show();
+            Toast.makeText(getApplicationContext(), R.string.could_not_save_reminder, Toast.LENGTH_SHORT).show();
             return;
         }
 
@@ -633,7 +647,7 @@ public class ReminderAddActivity extends AppCompatActivity implements
         }
 
         // Create toast to confirm new reminder
-        Toast.makeText(getApplicationContext(), "Saved",
+        Toast.makeText(getApplicationContext(), R.string.saved,
                 Toast.LENGTH_SHORT).show();
 
         finish();
@@ -672,7 +686,7 @@ public class ReminderAddActivity extends AppCompatActivity implements
             // On clicking discard reminder button
             // Discard any changes
             case R.id.discard_reminder:
-                Toast.makeText(getApplicationContext(), "Discarded",
+                Toast.makeText(getApplicationContext(), R.string.discarded,
                         Toast.LENGTH_SHORT).show();
                 Fun.addShow();
 

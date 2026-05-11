@@ -85,7 +85,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
             checkSubscription();
 
         } else if (BuildConfig.ADS_ENABLED) {
-            Toast.makeText(this, "Please Check Your Internet Connection", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, R.string.check_internet, Toast.LENGTH_SHORT).show();
         }
         FrameLayout adContainerView = findViewById(R.id.ad_view_container);
         showBanner(this, adContainerView);
@@ -209,7 +209,10 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
 
             String[] parts = splitScheduledAt(scheduledAt);
             String timeText = parts[1];
-            String dateText = parts[0] + " • " + groupReminders.size() + " medicine" + (groupReminders.size() > 1 ? "s" : "");
+            String countText = groupReminders.size() > 1
+                    ? getString(R.string.medicine_count_many, groupReminders.size())
+                    : getString(R.string.medicine_count_one, groupReminders.size());
+            String dateText = parts[0] + " • " + countText;
 
             StringBuilder details = new StringBuilder();
             boolean anyActive = false;
@@ -231,15 +234,14 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 if (details.length() > 0) {
                     details.append("\n");
                 }
-                details.append(reminder.getTitle())
-                        .append(" x")
-                        .append(formatQuantity(reminder.getDose()))
-                        .append(" • stock ")
-                        .append(formatQuantity(stock));
+                details.append(getString(R.string.medicine_detail_line,
+                        reminder.getTitle(),
+                        formatQuantity(reminder.getDose()),
+                        formatQuantity(stock)));
                 if (!active) {
-                    details.append(" • paused");
+                    details.append(getString(R.string.status_paused_suffix));
                 } else if (taken) {
-                    details.append(" • taken");
+                    details.append(getString(R.string.status_taken_suffix));
                 }
             }
 
@@ -251,7 +253,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                     "",
                     anyActive ? "true" : "false",
                     details.toString(),
-                    anyActive ? "Tap Taken after taking all medicines in this time group" : "Paused",
+                    anyActive ? getString(R.string.stock_ready) : getString(R.string.paused),
                     scheduledAt,
                     firstReminder.getIconType(),
                     firstReminder.getIconUri(),

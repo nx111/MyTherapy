@@ -30,7 +30,7 @@
                 android:background="@drawable/limited_offer_bg"
                 android:paddingHorizontal="16dp"
                 android:paddingVertical="2dp"
-                android:text="Subcribe Right Now"
+                android:text="@string/subscribe_now"
                 android:textColor="@color/white"
                 android:textSize="15sp" />
 
@@ -51,7 +51,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="10dp"
-                android:text="Monthly"
+                android:text="@string/monthly"
                 android:textAlignment="center"
                 android:textColor="#000"
 
@@ -65,7 +65,7 @@
                 android:background="@drawable/one_month"
                 android:gravity="center"
                 android:paddingVertical="10dp"
-                android:text="BUY NOW"
+                android:text="@string/buy_now"
                 android:layout_marginBottom="3dp"
                 android:textAlignment="center"
                 android:textColor="@color/white"
@@ -85,7 +85,7 @@
                     android:layout_weight="1"
                     android:drawableStart="@drawable/baseline_check_24"
                     android:drawablePadding="7dp"
-                    android:text="High Speed HD Streaming"
+                    android:text="@string/high_speed_streaming"
                     android:textAlignment="center"
                     android:textColor="#000"
 
@@ -98,7 +98,7 @@
                     android:layout_weight="1"
                     android:drawableStart="@drawable/baseline_check_24"
                     android:drawablePadding="7dp"
-                    android:text="RemoveAllADS"
+                    android:text="@string/remove_all_ads"
                     android:textAlignment="center"
                     android:textColor="#000"
                     android:textSize="16sp" />

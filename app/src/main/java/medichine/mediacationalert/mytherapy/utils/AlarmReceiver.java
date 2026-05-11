@@ -105,7 +105,7 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
             createNotificationChannel(notificationManager);
             NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
                     .setSmallIcon(R.drawable.baseline_access_alarm_24)
-                    .setContentTitle("Medication not confirmed")
+                    .setContentTitle(context.getString(R.string.medication_not_confirmed))
                     .setContentText(result.message)
                     .setAutoCancel(true);
             notificationManager.notify(notificationId, builder.build());
@@ -129,7 +129,9 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
                 AppUtils.Companion.getFlag());
 
         String contentText = buildGroupText(group);
-        String title = group.size() > 1 ? "Medication time: " + group.size() + " medicines" : "It's time to take your Medication";
+        String title = group.size() > 1
+                ? context.getString(R.string.medication_time_count, group.size())
+                : context.getString(R.string.time_to_take_medication);
 
         // Create Notification
         NotificationCompat.Builder mBuilder = new NotificationCompat.Builder(context, CHANNEL_ID)
@@ -144,7 +146,7 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
                 .setContentIntent(mClick)
                 .setAutoCancel(true)
                 .setOnlyAlertOnce(true)
-                .addAction(R.drawable.baseline_check_24, "Taken", takenClick);
+                .addAction(R.drawable.baseline_check_24, context.getString(R.string.taken), takenClick);
 
         this.manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
         createNotificationChannel(this.manager);

@@ -13,6 +13,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import medichine.mediacationalert.mytherapy.R;
+
 public class ReminderDatabase extends SQLiteOpenHelper {
     private static final int DATABASE_VERSION = 2;
     private static final String DATABASE_NAME = "MedicationDbTab";
@@ -44,6 +46,7 @@ public class ReminderDatabase extends SQLiteOpenHelper {
     private static final String LOG_DOSE = "dose";
     private static final String LOG_SCHEDULED_AT = "scheduled_at";
     private static final String LOG_TAKEN_AT = "taken_at";
+    private final Context mContext;
 
     public static class ConfirmResult {
         public final boolean success;
@@ -59,6 +62,7 @@ public class ReminderDatabase extends SQLiteOpenHelper {
 
     public ReminderDatabase(Context context) {
         super(context, DATABASE_NAME, null, DATABASE_VERSION);
+        mContext = context.getApplicationContext();
     }
 
     @Override
@@ -242,7 +246,7 @@ public class ReminderDatabase extends SQLiteOpenHelper {
 
     public ConfirmResult confirmReminderGroup(List<Integer> reminderIds, String scheduledAt) {
         if (reminderIds == null || reminderIds.isEmpty()) {
-            return new ConfirmResult(false, "No reminders selected", 0);
+            return new ConfirmResult(false, mContext.getString(R.string.no_reminders_selected), 0);
         }
 
         SQLiteDatabase db = this.getWritableDatabase();
@@ -266,15 +270,17 @@ public class ReminderDatabase extends SQLiteOpenHelper {
 
             if (remindersToConfirm.isEmpty()) {
                 db.setTransactionSuccessful();
-                return new ConfirmResult(true, "Already confirmed", 0);
+                return new ConfirmResult(true, mContext.getString(R.string.already_confirmed), 0);
             }
 
             for (Map.Entry<String, Double> entry : requiredByTitle.entrySet()) {
                 double stock = getTotalStock(entry.getKey());
                 if (stock + 0.000001 < entry.getValue()) {
                     return new ConfirmResult(false,
-                            "Insufficient stock for " + entry.getKey() + ". Need " + formatQuantity(entry.getValue())
-                                    + ", have " + formatQuantity(stock), 0);
+                            mContext.getString(R.string.insufficient_stock,
+                                    entry.getKey(),
+                                    formatQuantity(entry.getValue()),
+                                    formatQuantity(stock)), 0);
                 }
             }
 
@@ -294,7 +300,9 @@ public class ReminderDatabase extends SQLiteOpenHelper {
             }
 
             db.setTransactionSuccessful();
-            return new ConfirmResult(true, "Confirmed " + remindersToConfirm.size() + " dose(s)", remindersToConfirm.size());
+            return new ConfirmResult(true,
+                    mContext.getString(R.string.confirmed_doses, remindersToConfirm.size()),
+                    remindersToConfirm.size());
         } finally {
             db.endTransaction();
         }

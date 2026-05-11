@@ -153,7 +153,7 @@
                             android:id="@+id/set_date"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="gfgdgdg"
+                            android:text="@string/date"
                             android:textColor="@color/grey_calendar"
                             android:textSize="15dp" />
 
@@ -201,7 +201,7 @@
                             android:id="@+id/set_time"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="sdgfsrg"
+                            android:text="@string/time"
                             android:textColor="@color/grey_calendar"
                             android:textSize="15dp" />
 
@@ -248,7 +248,7 @@
                             android:id="@+id/set_repeat"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="kjdfhadf"
+                            android:text="@string/repeat"
                             android:textColor="@color/grey_calendar"
                             android:textSize="15dp" />
 
@@ -309,7 +309,7 @@
                             android:id="@+id/set_repeat_no"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="hsdghf"
+                            android:text="1"
                             android:textColor="@color/grey_calendar"
                             android:textSize="15dp" />
 
@@ -358,7 +358,7 @@
                             android:id="@+id/set_repeat_type"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="ghdgfs"
+                            android:text="@string/pill"
                             android:textColor="@color/grey_calendar"
                             android:textSize="15dp" />
 
@@ -391,7 +391,7 @@
                         android:layout_height="wrap_content"
                         android:layout_centerVertical="true"
                         android:layout_toRightOf="@id/dose_icon"
-                        android:text="Dose"
+                        android:text="@string/dose"
                         android:textColor="@color/black"
                         android:textSize="15dp" />
 
@@ -440,7 +440,7 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Current Stock"
+                            android:text="@string/current_stock"
                             android:textColor="@color/black"
                             android:textSize="15dp" />
 
@@ -485,7 +485,7 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Icon"
+                            android:text="@string/icon"
                             android:textColor="@color/black"
                             android:textSize="15dp" />
 
@@ -493,7 +493,7 @@
                             android:id="@+id/set_icon_type"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Pill"
+                            android:text="@string/pill"
                             android:textColor="@color/grey_calendar"
                             android:textSize="15dp" />
                     </LinearLayout>
@@ -531,7 +531,7 @@
                         <TextView
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Photo"
+                            android:text="@string/photo"
                             android:textColor="@color/black"
                             android:textSize="15dp" />
 
@@ -539,7 +539,7 @@
                             android:id="@+id/set_icon_photo"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="Gallery or Camera"
+                            android:text="@string/photo_source"
                             android:textColor="@color/grey_calendar"
                             android:textSize="15dp" />
                     </LinearLayout>

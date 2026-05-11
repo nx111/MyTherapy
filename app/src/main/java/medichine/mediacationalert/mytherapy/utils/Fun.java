@@ -189,7 +189,7 @@ public class Fun {
 
         if (clipboard != null) {
             clipboard.setPrimaryClip(clipe);
-            Toast.makeText(context, "Copied", Toast.LENGTH_SHORT).show();
+            Toast.makeText(context, R.string.copied, Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -261,7 +261,7 @@ public class Fun {
 
                 //  Log.e("Permission error", "You have asked for permission");
                 ActivityCompat.requestPermissions((Activity) context, new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE}, 1);
-                Toast.makeText(context, "Need to Permission for Download", Toast.LENGTH_SHORT).show();
+                Toast.makeText(context, R.string.download_permission_needed, Toast.LENGTH_SHORT).show();
                 return false;
             }
         } else { //you dont need to worry about these stuff below api level 23
@@ -303,7 +303,7 @@ public class Fun {
                                 .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName + "zip");
                         DownloadManager dm = (DownloadManager) context.getSystemService(Context.DOWNLOAD_SERVICE);
                         dm.enqueue(request);
-                        Toast.makeText(context, "Complete Download few second", Toast.LENGTH_SHORT).show();
+                        Toast.makeText(context, R.string.download_complete_soon, Toast.LENGTH_SHORT).show();
 
                     }
 
@@ -313,7 +313,7 @@ public class Fun {
             }
 
         } else
-            Toast.makeText(context, "Check internet connection", Toast.LENGTH_SHORT).show();
+            Toast.makeText(context, R.string.check_internet, Toast.LENGTH_SHORT).show();
 
     }
 
@@ -345,7 +345,7 @@ public class Fun {
                     .getLaunchIntentForPackage("org.xbmc.kodi");
             context.startActivity(LaunchIntent);
         } else {
-            Toast.makeText(context, "Not Found kodi player", Toast.LENGTH_SHORT).show();
+            Toast.makeText(context, R.string.kodi_not_found, Toast.LENGTH_SHORT).show();
 
         }
     }

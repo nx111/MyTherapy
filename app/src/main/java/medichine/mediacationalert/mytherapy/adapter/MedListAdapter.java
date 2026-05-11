@@ -99,7 +99,7 @@ public class MedListAdapter extends RecyclerView.Adapter<MedListAdapter.SimpleHo
 
         public void setTakenState(boolean taken, boolean active) {
             takenButton.setEnabled(active && !taken);
-            takenButton.setText(taken ? "Taken" : "Taken");
+            takenButton.setText(activity.getString(R.string.taken));
         }
 
         public void setIcon(String iconType, String iconUri) {
