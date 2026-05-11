@@ -99,7 +99,7 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
         long diffTime = calendar.getTimeInMillis() - currentTime;
 
         // Start alarm using notification time
-        mAlarmManager.set(AlarmManager.ELAPSED_REALTIME,
+        mAlarmManager.set(AlarmManager.ELAPSED_REALTIME_WAKEUP,
                 SystemClock.elapsedRealtime() + diffTime,
                 mPendingIntent);
 
@@ -125,7 +125,7 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
         long diffTime = calendar.getTimeInMillis() - currentTime;
 
         // Start alarm using initial notification time and repeat interval time
-        mAlarmManager.setRepeating(AlarmManager.ELAPSED_REALTIME,
+        mAlarmManager.setRepeating(AlarmManager.ELAPSED_REALTIME_WAKEUP,
                 SystemClock.elapsedRealtime() + diffTime,
                 RepeatTime , mPendingIntent);
 
