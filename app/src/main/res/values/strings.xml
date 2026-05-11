@@ -169,6 +169,10 @@
     <string name="edit_plan">Edit Plan</string>
     <string name="medicine_spec">Specification</string>
     <string name="medicine_spec_format">Spec: %1$s</string>
+    <string name="stock_alert_threshold">Stock Alert</string>
+    <string name="stock_alert_threshold_hint">Alert below this amount, 0 off</string>
+    <string name="stock_alert_title">Stock Alert</string>
+    <string name="stock_alert_message">%1$s stock is %2$s, below %3$s</string>
     <string name="dose_times_hint">Times, e.g. 8:00, 20:00</string>
     <string name="dose_times_invalid">Enter valid times such as 8:00, 20:00</string>
     <string name="start_date">Start Date</string>

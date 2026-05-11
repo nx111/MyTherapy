@@ -83,6 +83,7 @@ import medichine.mediacationalert.mytherapy.utils.Prefs;
 import medichine.mediacationalert.mytherapy.utils.Reminder;
 import medichine.mediacationalert.mytherapy.utils.ReminderDatabase;
 import medichine.mediacationalert.mytherapy.utils.ReminderSchedule;
+import medichine.mediacationalert.mytherapy.utils.StockAlertNotifier;
 
 public class MainActivity extends AppCompatActivity implements ItemClickListener {
     private static final int REQUEST_POST_NOTIFICATIONS = 1001;
@@ -1926,6 +1927,17 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         form.addView(spec, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
+        form.addView(formLabel(R.string.stock_alert_threshold));
+        EditText stockAlertThreshold = new EditText(this);
+        stockAlertThreshold.setHint(R.string.stock_alert_threshold_hint);
+        stockAlertThreshold.setSingleLine(true);
+        stockAlertThreshold.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        if (displayReminder.getStockAlertThreshold() > 0) {
+            stockAlertThreshold.setText(formatQuantity(displayReminder.getStockAlertThreshold()));
+        }
+        form.addView(stockAlertThreshold, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
         String[] selectedIconType = new String[]{displayReminder.getIconType()};
         String[] selectedIconUri = new String[]{displayReminder.getIconUri()};
         LinearLayout iconRow = new LinearLayout(this);
@@ -1972,7 +1984,12 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 name.setError(getString(R.string.duplicate_reminder_plan));
                 return;
             }
-            saveCourseMedicineInfo(groupIds, title, newTitle, newSpec, selectedIconType[0], selectedIconUri[0]);
+            Double threshold = parseStockAlertThreshold(stockAlertThreshold);
+            if (threshold == null) {
+                return;
+            }
+            saveCourseMedicineInfo(groupIds, title, newTitle, newSpec, threshold,
+                    selectedIconType[0], selectedIconUri[0]);
             Toast.makeText(getApplicationContext(), R.string.saved, Toast.LENGTH_SHORT).show();
             dialog.dismiss();
             refreshCourseDetail(groupIds, currentDialog);
@@ -2096,8 +2113,28 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 time);
         if (template != null) {
             reminder.setSpec(template.getSpec());
+            reminder.setStockAlertThreshold(template.getStockAlertThreshold());
         }
         return reminder;
+    }
+
+    private Double parseStockAlertThreshold(EditText input) {
+        String raw = input.getText().toString().trim();
+        if (raw.length() == 0) {
+            return 0.0;
+        }
+        double threshold;
+        try {
+            threshold = Double.parseDouble(raw);
+        } catch (NumberFormatException e) {
+            input.setError(getString(R.string.enter_valid_stock_quantity));
+            return null;
+        }
+        if (threshold < 0) {
+            input.setError(getString(R.string.enter_valid_stock_quantity));
+            return null;
+        }
+        return threshold > 0 ? threshold : 0.0;
     }
 
     private boolean saveSimpleCoursePlan(Reminder reminder, EditText doseInput, EditText doseTimesInput,
@@ -2260,23 +2297,28 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     }
 
     private void saveCourseMedicineInfo(List<Integer> groupIds, String oldTitle, String newTitle, String newSpec,
-                                        String iconType, String iconUri) {
+                                        double stockAlertThreshold, String iconType, String iconUri) {
         String oldName = normalizeTitle(oldTitle);
         String normalizedNewTitle = normalizeTitle(newTitle);
         if (courseRemindersForTitle(oldName).size() == groupIds.size()) {
-            rb.updateMedicineInfo(oldName, normalizedNewTitle, newSpec, iconType, iconUri);
-            return;
-        }
-        for (Integer id : groupIds) {
-            Reminder reminder = rb.getReminder(id);
-            if (reminder == null) {
-                continue;
+            rb.updateMedicineInfo(oldName, normalizedNewTitle, newSpec, stockAlertThreshold, iconType, iconUri);
+        } else {
+            for (Integer id : groupIds) {
+                Reminder reminder = rb.getReminder(id);
+                if (reminder == null) {
+                    continue;
+                }
+                reminder.setTitle(normalizedNewTitle);
+                reminder.setSpec(newSpec);
+                reminder.setStockAlertThreshold(stockAlertThreshold);
+                reminder.setIconType(iconType);
+                reminder.setIconUri(iconUri);
+                rb.updateReminder(reminder);
             }
-            reminder.setTitle(normalizedNewTitle);
-            reminder.setSpec(newSpec);
-            reminder.setIconType(iconType);
-            reminder.setIconUri(iconUri);
-            rb.updateReminder(reminder);
+        }
+        if (stockAlertThreshold > 0) {
+            StockAlertNotifier.notifyIfNeeded(this, normalizedNewTitle, newSpec,
+                    rb.getTotalStock(normalizedNewTitle), stockAlertThreshold);
         }
     }
 

@@ -22,7 +22,7 @@ import medichine.mediacationalert.mytherapy.model.Account;
 import medichine.mediacationalert.mytherapy.R;
 
 public class ReminderDatabase extends SQLiteOpenHelper {
-    private static final int DATABASE_VERSION = 7;
+    private static final int DATABASE_VERSION = 8;
     private static final String DATABASE_NAME = "MedicationDbTab";
     private static final int DEFAULT_ACCOUNT_ID = 1;
     private static final String PREF_ACTIVE_ACCOUNT_ID = "active_account_id";
@@ -44,6 +44,7 @@ public class ReminderDatabase extends SQLiteOpenHelper {
     private static final String KEY_ACTIVE = "active";
     private static final String KEY_DOSE = "dose";
     private static final String KEY_SPEC = "spec";
+    private static final String KEY_STOCK_ALERT_THRESHOLD = "stock_alert_threshold";
     private static final String KEY_ICON_TYPE = "icon_type";
     private static final String KEY_ICON_URI = "icon_uri";
     private static final String KEY_END_DATE = "end_date";
@@ -169,6 +170,10 @@ public class ReminderDatabase extends SQLiteOpenHelper {
         if (oldVersion < 7) {
             addColumnIfMissing(db, TABLE_REMINDERS, KEY_SPEC, KEY_SPEC + " TEXT DEFAULT ''");
         }
+        if (oldVersion < 8) {
+            addColumnIfMissing(db, TABLE_REMINDERS, KEY_STOCK_ALERT_THRESHOLD,
+                    KEY_STOCK_ALERT_THRESHOLD + " REAL DEFAULT 0");
+        }
     }
 
     private void createAccountTable(SQLiteDatabase db) {
@@ -247,6 +252,7 @@ public class ReminderDatabase extends SQLiteOpenHelper {
                 + KEY_ACTIVE + " TEXT,"
                 + KEY_DOSE + " REAL DEFAULT 1.0,"
                 + KEY_SPEC + " TEXT DEFAULT '',"
+                + KEY_STOCK_ALERT_THRESHOLD + " REAL DEFAULT 0,"
                 + KEY_ICON_TYPE + " TEXT DEFAULT 'pill',"
                 + KEY_ICON_URI + " TEXT DEFAULT '',"
                 + KEY_END_DATE + " TEXT DEFAULT '',"
@@ -529,7 +535,8 @@ public class ReminderDatabase extends SQLiteOpenHelper {
                 accountArgs(normalizeTitle(title)));
     }
 
-    public void updateMedicineInfo(String oldTitle, String newTitle, String spec, String iconType, String iconUri) {
+    public void updateMedicineInfo(String oldTitle, String newTitle, String spec, double stockAlertThreshold,
+                                   String iconType, String iconUri) {
         String oldName = normalizeTitle(oldTitle);
         String newName = normalizeTitle(newTitle);
         SQLiteDatabase db = this.getWritableDatabase();
@@ -538,6 +545,7 @@ public class ReminderDatabase extends SQLiteOpenHelper {
             ContentValues reminderValues = new ContentValues();
             reminderValues.put(KEY_TITLE, newName);
             reminderValues.put(KEY_SPEC, spec == null ? "" : spec.trim());
+            reminderValues.put(KEY_STOCK_ALERT_THRESHOLD, stockAlertThreshold > 0 ? stockAlertThreshold : 0);
             reminderValues.put(KEY_ICON_TYPE, iconType);
             reminderValues.put(KEY_ICON_URI, iconUri == null ? "" : iconUri);
             db.update(TABLE_REMINDERS, reminderValues, accountSelection(KEY_ACCOUNT_ID, KEY_TITLE + "=?"),
@@ -820,6 +828,8 @@ public class ReminderDatabase extends SQLiteOpenHelper {
             return new ConfirmResult(false, mContext.getString(R.string.no_reminders_selected), 0);
         }
 
+        List<Reminder> stockAlertReminders = new ArrayList<>();
+        ConfirmResult result;
         SQLiteDatabase db = this.getWritableDatabase();
         db.beginTransaction();
         try {
@@ -845,32 +855,35 @@ public class ReminderDatabase extends SQLiteOpenHelper {
 
             if (remindersToConfirm.isEmpty()) {
                 db.setTransactionSuccessful();
-                return new ConfirmResult(true, mContext.getString(R.string.already_confirmed), 0);
-            }
+                result = new ConfirmResult(true, mContext.getString(R.string.already_confirmed), 0);
+            } else {
+                for (Map.Entry<String, Double> entry : requiredByTitle.entrySet()) {
+                    consumeStock(db, entry.getKey(), entry.getValue());
+                }
 
-            for (Map.Entry<String, Double> entry : requiredByTitle.entrySet()) {
-                consumeStock(db, entry.getKey(), entry.getValue());
-            }
+                String takenAt = nowText();
+                for (Reminder reminder : remindersToConfirm) {
+                    ContentValues values = new ContentValues();
+                    values.put(LOG_ACCOUNT_ID, mCurrentAccountId);
+                    values.put(LOG_REMINDER_ID, reminder.getID());
+                    values.put(LOG_TITLE, normalizeTitle(reminder.getTitle()));
+                    values.put(LOG_DOSE, reminder.getDose());
+                    values.put(LOG_SCHEDULED_AT, scheduledAt);
+                    values.put(LOG_TAKEN_AT, takenAt);
+                    db.insertWithOnConflict(TABLE_INTAKE_LOGS, null, values, SQLiteDatabase.CONFLICT_IGNORE);
+                }
 
-            String takenAt = nowText();
-            for (Reminder reminder : remindersToConfirm) {
-                ContentValues values = new ContentValues();
-                values.put(LOG_ACCOUNT_ID, mCurrentAccountId);
-                values.put(LOG_REMINDER_ID, reminder.getID());
-                values.put(LOG_TITLE, normalizeTitle(reminder.getTitle()));
-                values.put(LOG_DOSE, reminder.getDose());
-                values.put(LOG_SCHEDULED_AT, scheduledAt);
-                values.put(LOG_TAKEN_AT, takenAt);
-                db.insertWithOnConflict(TABLE_INTAKE_LOGS, null, values, SQLiteDatabase.CONFLICT_IGNORE);
+                stockAlertReminders.addAll(remindersToConfirm);
+                db.setTransactionSuccessful();
+                result = new ConfirmResult(true,
+                        mContext.getString(R.string.confirmed_doses, remindersToConfirm.size()),
+                        remindersToConfirm.size());
             }
-
-            db.setTransactionSuccessful();
-            return new ConfirmResult(true,
-                    mContext.getString(R.string.confirmed_doses, remindersToConfirm.size()),
-                    remindersToConfirm.size());
         } finally {
             db.endTransaction();
         }
+        notifyLowStockIfNeeded(stockAlertReminders);
+        return result;
     }
 
     public ConfirmResult setReminderTakenStatus(int reminderId, String scheduledAt, boolean taken) {
@@ -879,6 +892,8 @@ public class ReminderDatabase extends SQLiteOpenHelper {
             return new ConfirmResult(false, mContext.getString(R.string.reminder_not_found), 0);
         }
 
+        boolean shouldCheckStockAlert = false;
+        ConfirmResult result;
         SQLiteDatabase db = this.getWritableDatabase();
         db.beginTransaction();
         try {
@@ -886,32 +901,65 @@ public class ReminderDatabase extends SQLiteOpenHelper {
             if (taken) {
                 if (existingLog != null) {
                     db.setTransactionSuccessful();
-                    return new ConfirmResult(true, mContext.getString(R.string.already_confirmed), 0);
+                    result = new ConfirmResult(true, mContext.getString(R.string.already_confirmed), 0);
+                } else {
+                    consumeStock(db, reminder.getTitle(), reminder.getDose());
+                    ContentValues values = new ContentValues();
+                    values.put(LOG_ACCOUNT_ID, mCurrentAccountId);
+                    values.put(LOG_REMINDER_ID, reminder.getID());
+                    values.put(LOG_TITLE, normalizeTitle(reminder.getTitle()));
+                    values.put(LOG_DOSE, reminder.getDose());
+                    values.put(LOG_SCHEDULED_AT, scheduledAt);
+                    values.put(LOG_TAKEN_AT, nowText());
+                    db.insertWithOnConflict(TABLE_INTAKE_LOGS, null, values, SQLiteDatabase.CONFLICT_IGNORE);
+                    shouldCheckStockAlert = true;
+                    db.setTransactionSuccessful();
+                    result = new ConfirmResult(true, mContext.getString(R.string.taken), 1);
                 }
-                consumeStock(db, reminder.getTitle(), reminder.getDose());
-                ContentValues values = new ContentValues();
-                values.put(LOG_ACCOUNT_ID, mCurrentAccountId);
-                values.put(LOG_REMINDER_ID, reminder.getID());
-                values.put(LOG_TITLE, normalizeTitle(reminder.getTitle()));
-                values.put(LOG_DOSE, reminder.getDose());
-                values.put(LOG_SCHEDULED_AT, scheduledAt);
-                values.put(LOG_TAKEN_AT, nowText());
-                db.insertWithOnConflict(TABLE_INTAKE_LOGS, null, values, SQLiteDatabase.CONFLICT_IGNORE);
             } else {
                 if (existingLog == null) {
                     db.setTransactionSuccessful();
-                    return new ConfirmResult(true, mContext.getString(R.string.not_taken), 0);
+                    result = new ConfirmResult(true, mContext.getString(R.string.not_taken), 0);
+                } else {
+                    db.delete(TABLE_INTAKE_LOGS,
+                            LOG_ID + "=? AND " + LOG_ACCOUNT_ID + "=?",
+                            new String[]{String.valueOf(existingLog.id), accountIdText()});
+                    restoreStock(db, existingLog.title, existingLog.dose);
+                    db.setTransactionSuccessful();
+                    result = new ConfirmResult(true, mContext.getString(R.string.not_taken), 1);
                 }
-                db.delete(TABLE_INTAKE_LOGS,
-                        LOG_ID + "=? AND " + LOG_ACCOUNT_ID + "=?",
-                        new String[]{String.valueOf(existingLog.id), accountIdText()});
-                restoreStock(db, existingLog.title, existingLog.dose);
             }
-            db.setTransactionSuccessful();
-            return new ConfirmResult(true, mContext.getString(taken ? R.string.taken : R.string.not_taken), 1);
         } finally {
             db.endTransaction();
         }
+        if (shouldCheckStockAlert) {
+            notifyLowStockIfNeeded(reminder);
+        }
+        return result;
+    }
+
+    private void notifyLowStockIfNeeded(List<Reminder> reminders) {
+        Set<String> notified = new HashSet<>();
+        for (Reminder reminder : reminders) {
+            notifyLowStockIfNeeded(reminder, notified);
+        }
+    }
+
+    private void notifyLowStockIfNeeded(Reminder reminder) {
+        notifyLowStockIfNeeded(reminder, new HashSet<>());
+    }
+
+    private void notifyLowStockIfNeeded(Reminder reminder, Set<String> notified) {
+        if (reminder == null || reminder.getStockAlertThreshold() <= 0) {
+            return;
+        }
+        String key = normalizeTitle(reminder.getTitle()) + "|" + normalizeSpec(reminder.getSpec());
+        if (!notified.add(key)) {
+            return;
+        }
+        double stock = getTotalStock(reminder.getTitle());
+        StockAlertNotifier.notifyIfNeeded(mContext, reminder.getTitle(), reminder.getSpec(),
+                stock, reminder.getStockAlertThreshold());
     }
 
     private void consumeStock(SQLiteDatabase db, String title, double amount) {
@@ -985,6 +1033,7 @@ public class ReminderDatabase extends SQLiteOpenHelper {
         values.put(KEY_ACTIVE, reminder.getActive());
         values.put(KEY_DOSE, reminder.getDose());
         values.put(KEY_SPEC, reminder.getSpec());
+        values.put(KEY_STOCK_ALERT_THRESHOLD, reminder.getStockAlertThreshold());
         values.put(KEY_ICON_TYPE, reminder.getIconType());
         values.put(KEY_ICON_URI, reminder.getIconUri());
         values.put(KEY_END_DATE, reminder.getEndDate());
@@ -1004,6 +1053,7 @@ public class ReminderDatabase extends SQLiteOpenHelper {
         reminder.setActive(cursor.getString(cursor.getColumnIndexOrThrow(KEY_ACTIVE)));
         reminder.setDose(cursor.getDouble(cursor.getColumnIndexOrThrow(KEY_DOSE)));
         reminder.setSpec(cursor.getString(cursor.getColumnIndexOrThrow(KEY_SPEC)));
+        reminder.setStockAlertThreshold(cursor.getDouble(cursor.getColumnIndexOrThrow(KEY_STOCK_ALERT_THRESHOLD)));
         reminder.setIconType(cursor.getString(cursor.getColumnIndexOrThrow(KEY_ICON_TYPE)));
         reminder.setIconUri(cursor.getString(cursor.getColumnIndexOrThrow(KEY_ICON_URI)));
         reminder.setEndDate(cursor.getString(cursor.getColumnIndexOrThrow(KEY_END_DATE)));
@@ -1071,6 +1121,7 @@ public class ReminderDatabase extends SQLiteOpenHelper {
                 KEY_ACTIVE,
                 KEY_DOSE,
                 KEY_SPEC,
+                KEY_STOCK_ALERT_THRESHOLD,
                 KEY_ICON_TYPE,
                 KEY_ICON_URI,
                 KEY_END_DATE,

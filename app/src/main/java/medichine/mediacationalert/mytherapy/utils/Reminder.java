@@ -13,6 +13,7 @@ public class Reminder {
     private String mActive;
     private double mDose;
     private String mSpec;
+    private double mStockAlertThreshold;
     private String mIconType;
     private String mIconUri;
     private String mEndDate;
@@ -39,6 +40,7 @@ public class Reminder {
         mActive = Active;
         mDose = Dose;
         mSpec = "";
+        mStockAlertThreshold = 0;
         mIconType = IconType == null || IconType.length() == 0 ? "pill" : IconType;
         mIconUri = IconUri == null ? "" : IconUri;
         mEndDate = cleanEndDate(EndDate, Date);
@@ -65,6 +67,7 @@ public class Reminder {
         mActive = Active;
         mDose = Dose;
         mSpec = "";
+        mStockAlertThreshold = 0;
         mIconType = IconType == null || IconType.length() == 0 ? "pill" : IconType;
         mIconUri = IconUri == null ? "" : IconUri;
         mEndDate = cleanEndDate(EndDate, Date);
@@ -74,6 +77,7 @@ public class Reminder {
     public Reminder() {
         mDose = 1.0;
         mSpec = "";
+        mStockAlertThreshold = 0;
         mIconType = "pill";
         mIconUri = "";
         mEndDate = "";
@@ -158,6 +162,14 @@ public class Reminder {
 
     public void setSpec(String spec) {
         mSpec = spec == null ? "" : spec.trim();
+    }
+
+    public double getStockAlertThreshold() {
+        return mStockAlertThreshold;
+    }
+
+    public void setStockAlertThreshold(double threshold) {
+        mStockAlertThreshold = threshold > 0 ? threshold : 0;
     }
 
     public String getIconType() {

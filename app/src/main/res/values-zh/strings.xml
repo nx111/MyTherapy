@@ -149,6 +149,10 @@
     <string name="edit_plan">修改计划</string>
     <string name="medicine_spec">规格</string>
     <string name="medicine_spec_format">规格：%1$s</string>
+    <string name="stock_alert_threshold">库存报警</string>
+    <string name="stock_alert_threshold_hint">低于该数量提醒，0 关闭</string>
+    <string name="stock_alert_title">库存报警</string>
+    <string name="stock_alert_message">%1$s 当前库存 %2$s，低于 %3$s</string>
     <string name="dose_times_hint">时间，例如 8:00, 20:00</string>
     <string name="dose_times_invalid">请输入有效时间，例如 8:00, 20:00</string>
     <string name="start_date">开始日期</string>
