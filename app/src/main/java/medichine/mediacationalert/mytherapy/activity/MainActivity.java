@@ -4,14 +4,20 @@ import static medichine.mediacationalert.mytherapy.utils.Fun.showBanner;
 
 import android.Manifest;
 import android.app.AlertDialog;
+import android.app.DatePickerDialog;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.Gravity;
 import android.view.View;
 import android.widget.FrameLayout;
+import android.widget.ImageButton;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -31,6 +37,7 @@ import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
@@ -67,6 +74,9 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     private MedListAdapter mAdapter;
     private SummaryListAdapter mSummaryAdapter;
     private TextView mNoReminderView;
+    private TextView mSelectedDateText;
+    private ImageButton mCalendarButton;
+    private LinearLayout mWeekCalendarRow;
     private FloatingActionButton mAddReminderButton;
     private FloatingActionButton mImportArchiveButton;
     private BottomNavigationView mBottomNavigation;
@@ -76,6 +86,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     private ReminderDatabase rb;
     private AlarmReceiver mAlarmReceiver;
     private int mCurrentPage = PAGE_TODAY;
+    private Calendar mSelectedDate;
 
     private List<ReminderItem> medicineList = new ArrayList<>();
     private List<SummaryItem> summaryList = new ArrayList<>();
@@ -108,7 +119,12 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         mImportArchiveButton = findViewById(R.id.import_archive);
         mList = findViewById(R.id.reminder_list);
         mNoReminderView = findViewById(R.id.no_reminder_text);
+        mSelectedDateText = findViewById(R.id.selected_date_text);
+        mCalendarButton = findViewById(R.id.calendar_button);
+        mWeekCalendarRow = findViewById(R.id.week_calendar_row);
         mBottomNavigation = findViewById(R.id.bottom_nav);
+        mSelectedDate = Calendar.getInstance();
+        normalizeDate(mSelectedDate);
 
         mList.setLayoutManager(new LinearLayoutManager(this));
         registerForContextMenu(mList);
@@ -132,8 +148,10 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
             }
         });
         mImportArchiveButton.setOnClickListener(v -> openArchiveImport());
+        mCalendarButton.setOnClickListener(v -> showSelectedDatePicker());
 
         mAlarmReceiver = new AlarmReceiver();
+        updateCalendarHeader();
         loadCurrentPage();
     }
 
@@ -142,6 +160,23 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, REQUEST_POST_NOTIFICATIONS);
         }
+    }
+
+    private void showSelectedDatePicker() {
+        DatePickerDialog dialog = new DatePickerDialog(
+                this,
+                (view, year, month, dayOfMonth) -> {
+                    mSelectedDate.set(Calendar.YEAR, year);
+                    mSelectedDate.set(Calendar.MONTH, month);
+                    mSelectedDate.set(Calendar.DAY_OF_MONTH, dayOfMonth);
+                    normalizeDate(mSelectedDate);
+                    updateCalendarHeader();
+                    loadCurrentPage();
+                },
+                mSelectedDate.get(Calendar.YEAR),
+                mSelectedDate.get(Calendar.MONTH),
+                mSelectedDate.get(Calendar.DAY_OF_MONTH));
+        dialog.show();
     }
 
     private void openArchiveImport() {
@@ -439,10 +474,74 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     }
 
     private void loadReminderList() {
+        updateCalendarHeader();
         medicineList = generateData();
         mAdapter = new MedListAdapter(medicineList, this, this);
         mList.setAdapter(mAdapter);
         updateEmptyState(medicineList.isEmpty(), R.string.no_today_reminders);
+    }
+
+    private void updateCalendarHeader() {
+        if (mSelectedDateText == null || mWeekCalendarRow == null) {
+            return;
+        }
+        Calendar today = Calendar.getInstance();
+        normalizeDate(today);
+        String dateText = new SimpleDateFormat("yyyy/M/d", java.util.Locale.getDefault()).format(mSelectedDate.getTime());
+        mSelectedDateText.setText(sameDate(mSelectedDate, today)
+                ? getString(R.string.nav_today) + " " + dateText
+                : dateText);
+
+        mWeekCalendarRow.removeAllViews();
+        Calendar cursor = (Calendar) mSelectedDate.clone();
+        cursor.add(Calendar.DAY_OF_MONTH, -3);
+        for (int i = 0; i < 7; i++) {
+            Calendar day = (Calendar) cursor.clone();
+            mWeekCalendarRow.addView(createCalendarDayView(day, sameDate(day, mSelectedDate)));
+            cursor.add(Calendar.DAY_OF_MONTH, 1);
+        }
+    }
+
+    private View createCalendarDayView(Calendar day, boolean selected) {
+        LinearLayout item = new LinearLayout(this);
+        item.setOrientation(LinearLayout.VERTICAL);
+        item.setGravity(Gravity.CENTER);
+        item.setClickable(true);
+        item.setPadding(0, 4, 0, 4);
+        item.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1));
+
+        TextView week = new TextView(this);
+        week.setGravity(Gravity.CENTER);
+        week.setText(new SimpleDateFormat("EEE", java.util.Locale.getDefault()).format(day.getTime()));
+        week.setTextSize(13);
+        week.setTextColor(selected ? getResources().getColor(R.color.nav_selected) : getResources().getColor(R.color.text_secondary));
+
+        TextView date = new TextView(this);
+        date.setGravity(Gravity.CENTER);
+        date.setText(String.valueOf(day.get(Calendar.DAY_OF_MONTH)));
+        date.setTextSize(20);
+        date.setTypeface(Typeface.DEFAULT_BOLD);
+        date.setTextColor(selected ? getResources().getColor(R.color.white) : getResources().getColor(R.color.black));
+        LinearLayout.LayoutParams dateParams = new LinearLayout.LayoutParams(dp(42), dp(36));
+        dateParams.topMargin = dp(4);
+        date.setLayoutParams(dateParams);
+        if (selected) {
+            GradientDrawable selectedBg = new GradientDrawable();
+            selectedBg.setShape(GradientDrawable.RECTANGLE);
+            selectedBg.setCornerRadius(dp(8));
+            selectedBg.setColor(getResources().getColor(R.color.nav_selected));
+            date.setBackground(selectedBg);
+        }
+
+        item.addView(week, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        item.addView(date);
+        item.setOnClickListener(v -> {
+            mSelectedDate = (Calendar) day.clone();
+            normalizeDate(mSelectedDate);
+            updateCalendarHeader();
+            loadCurrentPage();
+        });
+        return item;
     }
 
     private void selectReminder(int pos) {
@@ -507,11 +606,8 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     }
 
     private long startOfTodayMillis() {
-        Calendar calendar = Calendar.getInstance();
-        calendar.set(Calendar.HOUR_OF_DAY, 0);
-        calendar.set(Calendar.MINUTE, 0);
-        calendar.set(Calendar.SECOND, 0);
-        calendar.set(Calendar.MILLISECOND, 0);
+        Calendar calendar = (Calendar) mSelectedDate.clone();
+        normalizeDate(calendar);
         return calendar.getTimeInMillis();
     }
 
@@ -527,6 +623,22 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
 
     private String normalizeTitle(String title) {
         return title == null ? "" : title.trim();
+    }
+
+    private void normalizeDate(Calendar calendar) {
+        calendar.set(Calendar.HOUR_OF_DAY, 0);
+        calendar.set(Calendar.MINUTE, 0);
+        calendar.set(Calendar.SECOND, 0);
+        calendar.set(Calendar.MILLISECOND, 0);
+    }
+
+    private boolean sameDate(Calendar left, Calendar right) {
+        return left.get(Calendar.YEAR) == right.get(Calendar.YEAR)
+                && left.get(Calendar.DAY_OF_YEAR) == right.get(Calendar.DAY_OF_YEAR);
+    }
+
+    private int dp(int value) {
+        return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
     }
 
     private static class ScheduledReminder {
