@@ -346,9 +346,10 @@ public class MedicineIconFactory {
             canvas.save();
             canvas.rotate(-18, 125, 125);
             RectF rect = "thick".equals(shape)
-                    ? new RectF(32, 68, 218, 182)
+                    ? new RectF(32, 82.25f, 218, 167.75f)
                     : new RectF(18, 88, 232, 162);
-            drawRound(canvas, rect, rect.height() / 2f);
+            canvas.drawRoundRect(rect, rect.height() / 2f, rect.height() / 2f, fill);
+            canvas.drawRoundRect(rect, rect.height() / 2f, rect.height() / 2f, stroke);
             canvas.drawLine(125, rect.top + 12, 125, rect.bottom - 12, line);
             canvas.restore();
         }
