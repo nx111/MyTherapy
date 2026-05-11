@@ -921,13 +921,21 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 + ": " + rb.getCurrentAccountName());
         bindAccountButtonActions();
         mCourseShowAll.setVisibility(mCurrentPage == PAGE_COURSE ? View.VISIBLE : View.GONE);
-        if (mCurrentPage == PAGE_COURSE) {
+        if (mCurrentPage == PAGE_LAB) {
+            mAddReminderButton.setVisibility(View.VISIBLE);
+            mAddReminderButton.setContentDescription(getString(R.string.add_lab_result));
+            mAddReminderButton.setOnClickListener(v -> showLabActionsDialog());
+        } else if (mCurrentPage == PAGE_COURSE) {
             mAddReminderButton.setVisibility(View.VISIBLE);
             mAddReminderButton.setContentDescription(getString(R.string.title_activity_add_reminder));
             mAddReminderButton.setOnClickListener(v -> {
                 Intent intent = new Intent(v.getContext(), ReminderAddActivity.class);
                 startActivity(intent);
             });
+        } else if (mCurrentPage == PAGE_JOURNAL) {
+            mAddReminderButton.setVisibility(View.VISIBLE);
+            mAddReminderButton.setContentDescription(getString(R.string.add_health_entry));
+            mAddReminderButton.setOnClickListener(v -> showAddHealthEntryDialog());
         } else {
             mAddReminderButton.setVisibility(View.GONE);
         }
