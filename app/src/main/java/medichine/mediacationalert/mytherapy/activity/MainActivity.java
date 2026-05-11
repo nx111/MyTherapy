@@ -1233,7 +1233,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         List<LabTestItem> items = rb.getLabTestItems();
         AlertDialog.Builder builder = new AlertDialog.Builder(this)
                 .setTitle(R.string.manage_lab_items)
-                .setPositiveButton(R.string.add_lab_item, (dialog, which) -> showLabTestItemForm(null));
+                .setPositiveButton(R.string.add_lab_item, (dialog, which) -> showLabTestItemForm(null, true));
         if (items.isEmpty()) {
             builder.setMessage(R.string.no_lab_items);
         } else {
@@ -1244,12 +1244,16 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                         + formatQuantity(item.mReferenceMin) + "-"
                         + formatQuantity(item.mReferenceMax) + " " + item.mUnit;
             }
-            builder.setItems(labels, (dialog, which) -> showLabTestItemForm(items.get(which)));
+            builder.setItems(labels, (dialog, which) -> showLabTestItemForm(items.get(which), true));
         }
         builder.setNegativeButton(R.string.cancel, null).show();
     }
 
     private void showLabTestItemForm(LabTestItem existing) {
+        showLabTestItemForm(existing, false);
+    }
+
+    private void showLabTestItemForm(LabTestItem existing, boolean returnToManage) {
         LinearLayout form = new LinearLayout(this);
         form.setOrientation(LinearLayout.VERTICAL);
         int padding = dp(20);
@@ -1293,6 +1297,9 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         dialog.setOnShowListener(d -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
             if (saveLabTestItem(existing, name, referenceMin, referenceMax, unit)) {
                 dialog.dismiss();
+                if (returnToManage) {
+                    showManageLabItemsDialog();
+                }
             }
         }));
         dialog.show();
