@@ -6,6 +6,7 @@ import android.Manifest;
 import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
@@ -28,6 +29,8 @@ import com.android.billingclient.api.QueryPurchasesParams;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
@@ -45,6 +48,7 @@ import medichine.mediacationalert.mytherapy.model.SummaryItem;
 import medichine.mediacationalert.mytherapy.utils.AlarmReceiver;
 import medichine.mediacationalert.mytherapy.utils.Fun;
 import medichine.mediacationalert.mytherapy.utils.ItemClickListener;
+import medichine.mediacationalert.mytherapy.utils.MyTherapyArchiveImporter;
 import medichine.mediacationalert.mytherapy.utils.Prefs;
 import medichine.mediacationalert.mytherapy.utils.Reminder;
 import medichine.mediacationalert.mytherapy.utils.ReminderDatabase;
@@ -55,6 +59,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     private static final int PAGE_TODAY = 0;
     private static final int PAGE_HISTORY = 1;
     private static final int PAGE_COURSE = 2;
+    private static final int REQUEST_IMPORT_ARCHIVE = 3001;
 
     private BillingClient billingClient;
     private Prefs prefs;
@@ -63,6 +68,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     private SummaryListAdapter mSummaryAdapter;
     private TextView mNoReminderView;
     private FloatingActionButton mAddReminderButton;
+    private FloatingActionButton mImportArchiveButton;
     private BottomNavigationView mBottomNavigation;
     private final LinkedHashMap<Integer, Integer> IDmap = new LinkedHashMap<>();
     private final LinkedHashMap<Integer, Integer> summaryIDmap = new LinkedHashMap<>();
@@ -99,6 +105,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         FrameLayout adContainerView = findViewById(R.id.ad_view_container);
         showBanner(this, adContainerView);
         mAddReminderButton = findViewById(R.id.add_reminder);
+        mImportArchiveButton = findViewById(R.id.import_archive);
         mList = findViewById(R.id.reminder_list);
         mNoReminderView = findViewById(R.id.no_reminder_text);
         mBottomNavigation = findViewById(R.id.bottom_nav);
@@ -124,6 +131,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 startActivity(intent);
             }
         });
+        mImportArchiveButton.setOnClickListener(v -> openArchiveImport());
 
         mAlarmReceiver = new AlarmReceiver();
         loadCurrentPage();
@@ -133,6 +141,48 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
                 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, REQUEST_POST_NOTIFICATIONS);
+        }
+    }
+
+    private void openArchiveImport() {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("*/*");
+        intent.putExtra(Intent.EXTRA_MIME_TYPES, new String[]{
+                "text/csv",
+                "text/comma-separated-values",
+                "text/plain",
+                "application/vnd.ms-excel"
+        });
+        startActivityForResult(intent, REQUEST_IMPORT_ARCHIVE);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != REQUEST_IMPORT_ARCHIVE || resultCode != RESULT_OK || data == null) {
+            return;
+        }
+
+        Uri uri = data.getData();
+        if (uri == null) {
+            return;
+        }
+        try (InputStream inputStream = getContentResolver().openInputStream(uri)) {
+            if (inputStream == null) {
+                Toast.makeText(this, R.string.import_failed, Toast.LENGTH_SHORT).show();
+                return;
+            }
+            MyTherapyArchiveImporter.Result result = new MyTherapyArchiveImporter().importArchive(this, inputStream);
+            Toast.makeText(this,
+                    getString(R.string.import_archive_success,
+                            result.createdReminders,
+                            result.importedLogs,
+                            result.rejectedRows),
+                    Toast.LENGTH_LONG).show();
+            loadCurrentPage();
+        } catch (IOException | RuntimeException e) {
+            Toast.makeText(this, R.string.import_failed, Toast.LENGTH_SHORT).show();
         }
     }
 

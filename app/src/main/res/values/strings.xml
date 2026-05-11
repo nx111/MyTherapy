@@ -119,4 +119,7 @@
     <string name="times_per_period">%1$s time(s)</string>
     <string name="schedule_summary">%1$s • %2$s • %3$s</string>
     <string name="end_date_before_start">End date cannot be before start date</string>
+    <string name="import_archive">Import Archive</string>
+    <string name="import_archive_success">Imported %1$d reminders and %2$d history records. %3$d rejected records kept as not taken.</string>
+    <string name="import_failed">Import failed</string>
 </resources>

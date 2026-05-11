@@ -103,4 +103,7 @@
     <string name="times_per_period">%1$s مرة</string>
     <string name="schedule_summary">%1$s • %2$s • %3$s</string>
     <string name="end_date_before_start">لا يمكن أن يكون تاريخ الانتهاء قبل تاريخ البدء</string>
+    <string name="import_archive">استيراد الأرشيف</string>
+    <string name="import_archive_success">تم استيراد %1$d تذكير و%2$d سجل تاريخ. بقيت %3$d سجلات مرفوضة كغير متناولة.</string>
+    <string name="import_failed">فشل الاستيراد</string>
 </resources>

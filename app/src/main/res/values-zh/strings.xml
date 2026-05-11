@@ -103,4 +103,7 @@
     <string name="times_per_period">%1$s 次</string>
     <string name="schedule_summary">%1$s • %2$s • %3$s</string>
     <string name="end_date_before_start">结束日期不能早于开始日期</string>
+    <string name="import_archive">导入归档</string>
+    <string name="import_archive_success">已导入 %1$d 个提醒和 %2$d 条历史记录。%3$d 条拒绝记录保留为未服药。</string>
+    <string name="import_failed">导入失败</string>
 </resources>

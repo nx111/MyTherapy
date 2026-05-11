@@ -103,4 +103,7 @@
     <string name="times_per_period">%1$s fois</string>
     <string name="schedule_summary">%1$s • %2$s • %3$s</string>
     <string name="end_date_before_start">La date de fin ne peut pas précéder la date de début</string>
+    <string name="import_archive">Importer archive</string>
+    <string name="import_archive_success">%1$d rappels et %2$d historiques importés. %3$d refus restent non pris.</string>
+    <string name="import_failed">Import impossible</string>
 </resources>

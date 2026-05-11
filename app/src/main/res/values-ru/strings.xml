@@ -103,4 +103,7 @@
     <string name="times_per_period">%1$s раз(а)</string>
     <string name="schedule_summary">%1$s • %2$s • %3$s</string>
     <string name="end_date_before_start">Дата окончания не может быть раньше даты начала</string>
+    <string name="import_archive">Импорт архива</string>
+    <string name="import_archive_success">Импортировано напоминаний: %1$d, записей истории: %2$d. Отклонено и оставлено как не принято: %3$d.</string>
+    <string name="import_failed">Ошибка импорта</string>
 </resources>

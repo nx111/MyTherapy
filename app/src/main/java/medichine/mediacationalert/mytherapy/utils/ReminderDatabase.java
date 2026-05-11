@@ -261,6 +261,18 @@ public class ReminderDatabase extends SQLiteOpenHelper {
         return exists;
     }
 
+    public boolean insertIntakeLog(int reminderId, String title, double dose, String scheduledAt, String takenAt) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        ContentValues values = new ContentValues();
+        values.put(LOG_REMINDER_ID, reminderId);
+        values.put(LOG_TITLE, normalizeTitle(title));
+        values.put(LOG_DOSE, dose);
+        values.put(LOG_SCHEDULED_AT, scheduledAt);
+        values.put(LOG_TAKEN_AT, takenAt == null || takenAt.length() == 0 ? nowText() : takenAt);
+        long id = db.insertWithOnConflict(TABLE_INTAKE_LOGS, null, values, SQLiteDatabase.CONFLICT_IGNORE);
+        return id != -1;
+    }
+
     public ConfirmResult confirmReminderGroup(List<Integer> reminderIds, String scheduledAt) {
         if (reminderIds == null || reminderIds.isEmpty()) {
             return new ConfirmResult(false, mContext.getString(R.string.no_reminders_selected), 0);

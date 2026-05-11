@@ -103,4 +103,7 @@
     <string name="times_per_period">%1$s Mal</string>
     <string name="schedule_summary">%1$s • %2$s • %3$s</string>
     <string name="end_date_before_start">Das Enddatum darf nicht vor dem Startdatum liegen</string>
+    <string name="import_archive">Archiv importieren</string>
+    <string name="import_archive_success">%1$d Erinnerungen und %2$d Verlaufseinträge importiert. %3$d abgelehnte Einträge bleiben nicht eingenommen.</string>
+    <string name="import_failed">Import fehlgeschlagen</string>
 </resources>

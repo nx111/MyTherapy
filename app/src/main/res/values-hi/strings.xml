@@ -103,4 +103,7 @@
     <string name="times_per_period">%1$s बार</string>
     <string name="schedule_summary">%1$s • %2$s • %3$s</string>
     <string name="end_date_before_start">समाप्ति तारीख शुरू तारीख से पहले नहीं हो सकती</string>
+    <string name="import_archive">आर्काइव आयात करें</string>
+    <string name="import_archive_success">%1$d रिमाइंडर और %2$d इतिहास रिकॉर्ड आयात हुए। %3$d अस्वीकार रिकॉर्ड नहीं ली के रूप में रखे गए।</string>
+    <string name="import_failed">आयात विफल</string>
 </resources>

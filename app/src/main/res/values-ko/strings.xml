@@ -103,4 +103,7 @@
     <string name="times_per_period">%1$s회</string>
     <string name="schedule_summary">%1$s • %2$s • %3$s</string>
     <string name="end_date_before_start">종료일은 시작일보다 빠를 수 없습니다</string>
+    <string name="import_archive">보관 파일 가져오기</string>
+    <string name="import_archive_success">알림 %1$d개와 기록 %2$d개를 가져왔습니다. 거부 기록 %3$d개는 미복용으로 유지됩니다.</string>
+    <string name="import_failed">가져오기에 실패했습니다</string>
 </resources>
