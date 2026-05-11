@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="purple_200">#4DB8E8</color>
+    <color name="purple_500">#4DB8E8</color>
+    <color name="purple_700">#1E6C8E</color>
+    <color name="teal_200">#5ADBD5</color>
+    <color name="teal_700">#30AFAA</color>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="app_background">#101820</color>
+    <color name="surface">#18232C</color>
+    <color name="surface_variant">#22313C</color>
+    <color name="text_primary">#F4F8FB</color>
+    <color name="text_secondary">#B5C1C9</color>
+    <color name="grey_calendar">#B5C1C9</color>
+    <color name="outline">#344B58</color>
+    <color name="on_accent">#FFFFFFFF</color>
+    <color name="nav_selected">#4DB8E8</color>
+    <color name="nav_unselected">#B5C1C9</color>
+    <color name="history_taken">#63D297</color>
+    <color name="history_missed">#FFB07A</color>
+    <color name="history_row_divider">#30424D</color>
+    <color name="gray_color">#101820</color>
+    <color name="line_color">#344B58</color>
+    <color name="transperent">#00ffffff</color>
+</resources>

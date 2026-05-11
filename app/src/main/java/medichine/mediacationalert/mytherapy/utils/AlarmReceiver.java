@@ -253,8 +253,7 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
 
     private Calendar nextPendingOccurrence(Context context, Reminder reminder, long afterMillis) {
         ReminderDatabase rb = new ReminderDatabase(context);
-        long endMillis = ReminderSchedule.parseDate(reminder.getEndDate()).getTimeInMillis()
-                + 24L * 60L * 60L * 1000L - 1L;
+        long endMillis = ReminderSchedule.searchEndMillis(reminder, afterMillis);
         Calendar next = null;
         for (Calendar occurrence : ReminderSchedule.occurrencesBetween(reminder, afterMillis, endMillis)) {
             String scheduledAt = ReminderSchedule.format(occurrence);

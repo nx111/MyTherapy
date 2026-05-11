@@ -21,6 +21,7 @@ import java.util.Map;
 
 public class MyTherapyArchiveImporter {
     private static final SimpleDateFormat ARCHIVE_DATE_TIME = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US);
+    private static final SimpleDateFormat ARCHIVE_DATE = new SimpleDateFormat("yyyy-MM-dd", Locale.US);
     private static final SimpleDateFormat STORAGE_DATE_TIME = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US);
 
     public static class Result {
@@ -44,6 +45,7 @@ public class MyTherapyArchiveImporter {
         double value;
         String unit;
         String status;
+        Calendar endAt;
     }
 
     private static class ScheduledDose {
@@ -59,6 +61,9 @@ public class MyTherapyArchiveImporter {
         String time;
         String startDate;
         String endDate;
+        String sourceEndDate;
+        boolean noEndDate;
+        String importedEndDate;
         ArrayList<ScheduledDose> doses = new ArrayList<>();
     }
 
@@ -93,6 +98,7 @@ public class MyTherapyArchiveImporter {
         Map<String, Integer> reminderIdByDoseKey = new HashMap<>();
 
         for (Segment segment : segments) {
+            String active = isOngoing(segment.endDate) ? "true" : "false";
             int reminderId = findExistingReminder(database.getAllReminders(), segment);
             if (reminderId == -1) {
                 Reminder reminder = new Reminder(
@@ -102,7 +108,7 @@ public class MyTherapyArchiveImporter {
                         "true",
                         "1",
                         "Day",
-                        isOngoing(segment.endDate) ? "true" : "false",
+                        active,
                         segment.dose,
                         iconTypeFor(segment),
                         "",
@@ -111,6 +117,18 @@ public class MyTherapyArchiveImporter {
                 reminderId = database.addReminder(reminder);
                 result.createdReminders++;
             } else {
+                Reminder existing = database.getReminder(reminderId);
+                String mergedEndDate = existing == null ? segment.endDate : mergeEndDate(existing.getEndDate(), segment.endDate);
+                String mergedActive = existing != null && "true".equals(existing.getActive()) || isOngoing(mergedEndDate)
+                        ? "true"
+                        : "false";
+                if (existing != null
+                        && (!mergedEndDate.equals(existing.getEndDate())
+                        || !mergedActive.equals(existing.getActive()))) {
+                    existing.setEndDate(mergedEndDate);
+                    existing.setActive(mergedActive);
+                    database.updateReminder(existing);
+                }
                 result.reusedReminders++;
             }
 
@@ -150,6 +168,10 @@ public class MyTherapyArchiveImporter {
         if (header == null || !header.contains("scheduled_date") || !header.contains("actual_date")) {
             throw new IOException("Invalid MyTherapy archive");
         }
+        List<String> headerFields = parseCsvLine(header);
+        int endDateIndex = findColumnIndex(headerFields, "end_date", "enddate", "end_at",
+                "expiration_date", "expiration", "expires_at", "expiry_date", "expirydate",
+                "expiry", "valid_until", "until", "到期日期", "结束日期");
 
         String line;
         while ((line = reader.readLine()) != null) {
@@ -165,6 +187,9 @@ public class MyTherapyArchiveImporter {
             row.value = parseDouble(fields.get(4));
             row.unit = fields.get(5).trim();
             row.status = fields.get(6).trim();
+            if (endDateIndex >= 0 && endDateIndex < fields.size()) {
+                row.endAt = parseArchiveEndDate(fields.get(endDateIndex));
+            }
             rows.add(row);
         }
         return rows;
@@ -198,8 +223,20 @@ public class MyTherapyArchiveImporter {
                     segments.add(current);
                 }
                 current.endDate = dose.date;
+                if (dose.row.endAt != null) {
+                    current.importedEndDate = ReminderSchedule.formatDate(dose.row.endAt);
+                }
                 current.doses.add(dose);
                 previousDate = currentDate;
+            }
+        }
+        for (Segment segment : segments) {
+            segment.sourceEndDate = segment.endDate;
+            if (segment.importedEndDate == null || segment.importedEndDate.length() == 0) {
+                segment.noEndDate = true;
+                segment.endDate = Reminder.NO_END_DATE;
+            } else {
+                segment.endDate = segment.importedEndDate;
             }
         }
         return segments;
@@ -208,17 +245,27 @@ public class MyTherapyArchiveImporter {
     private int findExistingReminder(List<Reminder> reminders, Segment segment) {
         for (Reminder reminder : reminders) {
             if (segment.name.equals(reminder.getTitle())
-                    && segment.startDate.equals(reminder.getDate())
-                    && segment.endDate.equals(reminder.getEndDate())
-                    && segment.time.equals(reminder.getDoseTimes())
-                    && Math.abs(segment.dose - reminder.getDose()) < 0.000001) {
+                    && Math.abs(segment.dose - reminder.getDose()) < 0.000001
+                    && ReminderSchedule.doseTimes(reminder).contains(segment.time)) {
                 return reminder.getID();
             }
         }
         return -1;
     }
 
+    private String mergeEndDate(String currentEndDate, String importedEndDate) {
+        if (Reminder.isNoEndDate(currentEndDate) || Reminder.isNoEndDate(importedEndDate)) {
+            return Reminder.NO_END_DATE;
+        }
+        Calendar current = ReminderSchedule.parseDate(currentEndDate);
+        Calendar imported = ReminderSchedule.parseDate(importedEndDate);
+        return imported.getTimeInMillis() > current.getTimeInMillis() ? importedEndDate : currentEndDate;
+    }
+
     private boolean isOngoing(String endDate) {
+        if (Reminder.isNoEndDate(endDate)) {
+            return true;
+        }
         return ReminderSchedule.parseDate(endDate).getTimeInMillis() >= startOfToday().getTimeInMillis();
     }
 
@@ -265,6 +312,41 @@ public class MyTherapyArchiveImporter {
         calendar.set(Calendar.SECOND, 0);
         calendar.set(Calendar.MILLISECOND, 0);
         return calendar;
+    }
+
+    private Calendar parseArchiveEndDate(String value) {
+        if (value == null || value.trim().length() == 0) {
+            return null;
+        }
+        Calendar calendar = parseArchiveDate(value);
+        if (calendar != null) {
+            return calendar;
+        }
+        calendar = Calendar.getInstance();
+        try {
+            calendar.setTime(ARCHIVE_DATE.parse(value.trim()));
+        } catch (ParseException e) {
+            return null;
+        }
+        calendar.set(Calendar.HOUR_OF_DAY, 0);
+        calendar.set(Calendar.MINUTE, 0);
+        calendar.set(Calendar.SECOND, 0);
+        calendar.set(Calendar.MILLISECOND, 0);
+        return calendar;
+    }
+
+    private int findColumnIndex(List<String> headers, String... names) {
+        for (int i = 0; i < headers.size(); i++) {
+            String header = headers.get(i).trim().toLowerCase(Locale.US)
+                    .replace(" ", "_")
+                    .replace("-", "_");
+            for (String name : names) {
+                if (header.equals(name.toLowerCase(Locale.US))) {
+                    return i;
+                }
+            }
+        }
+        return -1;
     }
 
     private double parseDouble(String value) {

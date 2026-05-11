@@ -11,6 +11,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_margin="5dp"
+        app:cardBackgroundColor="@color/surface"
         app:cardCornerRadius="8dp"
         app:cardElevation="2dp">
 
@@ -41,7 +42,7 @@
                 android:layout_marginTop="5dp"
                 android:text="$3.29"
                 android:textAlignment="center"
-                android:textColor="#000"
+                android:textColor="@color/text_primary"
 
                 android:textSize="36sp"
                 android:textStyle="bold" />
@@ -53,7 +54,7 @@
                 android:layout_marginBottom="10dp"
                 android:text="@string/monthly"
                 android:textAlignment="center"
-                android:textColor="#000"
+                android:textColor="@color/text_primary"
 
                 android:textSize="18sp" />
 
@@ -87,7 +88,7 @@
                     android:drawablePadding="7dp"
                     android:text="@string/high_speed_streaming"
                     android:textAlignment="center"
-                    android:textColor="#000"
+                    android:textColor="@color/text_primary"
 
                     android:textSize="16sp" />
 
@@ -100,7 +101,7 @@
                     android:drawablePadding="7dp"
                     android:text="@string/remove_all_ads"
                     android:textAlignment="center"
-                    android:textColor="#000"
+                    android:textColor="@color/text_primary"
                     android:textSize="16sp" />
 
 

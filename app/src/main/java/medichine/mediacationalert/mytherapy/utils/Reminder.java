@@ -2,6 +2,7 @@ package medichine.mediacationalert.mytherapy.utils;
 
 // Reminder class
 public class Reminder {
+    public static final String NO_END_DATE = "NO_END_DATE";
     private int mID;
     private String mTitle;
     private String mDate;
@@ -38,7 +39,7 @@ public class Reminder {
         mDose = Dose;
         mIconType = IconType == null || IconType.length() == 0 ? "pill" : IconType;
         mIconUri = IconUri == null ? "" : IconUri;
-        mEndDate = EndDate == null || EndDate.length() == 0 ? Date : EndDate;
+        mEndDate = cleanEndDate(EndDate, Date);
         mDoseTimes = DoseTimes == null || DoseTimes.length() == 0 ? Time : DoseTimes;
     }
 
@@ -63,7 +64,7 @@ public class Reminder {
         mDose = Dose;
         mIconType = IconType == null || IconType.length() == 0 ? "pill" : IconType;
         mIconUri = IconUri == null ? "" : IconUri;
-        mEndDate = EndDate == null || EndDate.length() == 0 ? Date : EndDate;
+        mEndDate = cleanEndDate(EndDate, Date);
         mDoseTimes = DoseTimes == null || DoseTimes.length() == 0 ? Time : DoseTimes;
     }
 
@@ -164,11 +165,11 @@ public class Reminder {
     }
 
     public String getEndDate() {
-        return mEndDate == null || mEndDate.length() == 0 ? mDate : mEndDate;
+        return cleanEndDate(mEndDate, mDate);
     }
 
     public void setEndDate(String endDate) {
-        mEndDate = endDate == null || endDate.length() == 0 ? mDate : endDate;
+        mEndDate = cleanEndDate(endDate, mDate);
     }
 
     public String getDoseTimes() {
@@ -177,5 +178,16 @@ public class Reminder {
 
     public void setDoseTimes(String doseTimes) {
         mDoseTimes = doseTimes == null || doseTimes.length() == 0 ? mTime : doseTimes;
+    }
+
+    public static boolean isNoEndDate(String endDate) {
+        return NO_END_DATE.equals(endDate);
+    }
+
+    private String cleanEndDate(String endDate, String fallbackDate) {
+        if (NO_END_DATE.equals(endDate)) {
+            return NO_END_DATE;
+        }
+        return endDate == null || endDate.length() == 0 ? fallbackDate : endDate;
     }
 }

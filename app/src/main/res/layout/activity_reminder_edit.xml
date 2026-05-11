@@ -3,7 +3,7 @@
     xmlns:fab="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/gray_color">
+    android:background="@color/app_background">
 
     <androidx.appcompat.widget.Toolbar
         android:id="@+id/toolbar"
@@ -57,7 +57,8 @@
         android:layout_marginBottom="20dp"
         android:orientation="horizontal"
         app:cardCornerRadius="20dp"
-        app:cardElevation="20dip">
+        app:cardElevation="20dip"
+        app:cardBackgroundColor="@color/surface">
 
         <ScrollView
             android:layout_width="fill_parent"
@@ -110,7 +111,7 @@
                     android:fontFamily="@font/gothic_a1_medium"
                     android:gravity="center_vertical"
                     android:text="@string/details"
-                    android:textColor="@color/black"
+                    android:textColor="@color/text_primary"
                     android:textSize="20dp" />
 
                 <RelativeLayout
@@ -146,7 +147,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="@string/start_date"
-                            android:textColor="@color/black"
+                            android:textColor="@color/text_primary"
                             android:textSize="15dp" />
 
                         <TextView
@@ -193,7 +194,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="@string/end_date"
-                            android:textColor="@color/black"
+                            android:textColor="@color/text_primary"
                             android:textSize="15dp" />
 
                         <TextView
@@ -239,7 +240,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="@string/dose_times"
-                            android:textColor="@color/black"
+                            android:textColor="@color/text_primary"
                             android:textSize="15dp" />
 
                         <TextView
@@ -286,7 +287,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="@string/repeat"
-                            android:textColor="@color/black"
+                            android:textColor="@color/text_primary"
                             android:textSize="15dp" />
 
                         <TextView
@@ -347,7 +348,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="@string/times_per_repeat"
-                            android:textColor="@color/black"
+                            android:textColor="@color/text_primary"
                             android:textSize="15dp" />
 
                         <TextView
@@ -396,7 +397,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="@string/repeat_type"
-                            android:textColor="@color/black"
+                            android:textColor="@color/text_primary"
                             android:textSize="15dp" />
 
                         <TextView
@@ -437,7 +438,7 @@
                         android:layout_centerVertical="true"
                         android:layout_toRightOf="@id/dose_icon"
                         android:text="@string/dose"
-                        android:textColor="@color/black"
+                        android:textColor="@color/text_primary"
                         android:textSize="15dp" />
 
                     <EditText
@@ -486,7 +487,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="@string/current_stock"
-                            android:textColor="@color/black"
+                            android:textColor="@color/text_primary"
                             android:textSize="15dp" />
 
                         <TextView
@@ -531,7 +532,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="@string/icon"
-                            android:textColor="@color/black"
+                            android:textColor="@color/text_primary"
                             android:textSize="15dp" />
 
                         <TextView
@@ -577,7 +578,7 @@
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
                             android:text="@string/photo"
-                            android:textColor="@color/black"
+                            android:textColor="@color/text_primary"
                             android:textSize="15dp" />
 
                         <TextView
@@ -598,7 +599,8 @@
     <FrameLayout
         android:id="@+id/ad_view_container"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="0dp"
         android:layout_alignParentBottom="true"
-        android:layout_centerInParent="true" />
+        android:layout_centerInParent="true"
+        android:visibility="gone" />
 </RelativeLayout>

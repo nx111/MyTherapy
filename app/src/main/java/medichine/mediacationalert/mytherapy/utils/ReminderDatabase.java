@@ -13,10 +13,13 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import medichine.mediacationalert.mytherapy.model.HealthEntry;
+import medichine.mediacationalert.mytherapy.model.LabResult;
+import medichine.mediacationalert.mytherapy.model.LabTestItem;
 import medichine.mediacationalert.mytherapy.R;
 
 public class ReminderDatabase extends SQLiteOpenHelper {
-    private static final int DATABASE_VERSION = 3;
+    private static final int DATABASE_VERSION = 5;
     private static final String DATABASE_NAME = "MedicationDbTab";
 
     private static final String TABLE_REMINDERS = "TableMedRe";
@@ -48,6 +51,29 @@ public class ReminderDatabase extends SQLiteOpenHelper {
     private static final String LOG_DOSE = "dose";
     private static final String LOG_SCHEDULED_AT = "scheduled_at";
     private static final String LOG_TAKEN_AT = "taken_at";
+
+    private static final String TABLE_HEALTH_ENTRIES = "HealthEntries";
+    private static final String HEALTH_ID = "id";
+    private static final String HEALTH_TYPE = "type";
+    private static final String HEALTH_LABEL = "label";
+    private static final String HEALTH_VALUE = "value_text";
+    private static final String HEALTH_UNIT = "unit";
+    private static final String HEALTH_NOTE = "note";
+    private static final String HEALTH_SITE = "site";
+    private static final String HEALTH_CREATED_AT = "created_at";
+
+    private static final String TABLE_LAB_ITEMS = "LabTestItems";
+    private static final String LAB_ITEM_ID = "id";
+    private static final String LAB_ITEM_NAME = "name";
+    private static final String LAB_ITEM_REF_MIN = "reference_min";
+    private static final String LAB_ITEM_REF_MAX = "reference_max";
+    private static final String LAB_ITEM_UNIT = "unit";
+
+    private static final String TABLE_LAB_RESULTS = "LabResults";
+    private static final String LAB_RESULT_ID = "id";
+    private static final String LAB_RESULT_ITEM_ID = "item_id";
+    private static final String LAB_RESULT_VALUE = "value";
+    private static final String LAB_RESULT_CREATED_AT = "created_at";
     private final Context mContext;
 
     public static class ConfirmResult {
@@ -72,6 +98,8 @@ public class ReminderDatabase extends SQLiteOpenHelper {
         createReminderTable(db);
         createStockTable(db);
         createIntakeLogTable(db);
+        createHealthEntryTable(db);
+        createLabTestTables(db);
     }
 
     @Override
@@ -90,6 +118,12 @@ public class ReminderDatabase extends SQLiteOpenHelper {
                     + KEY_END_DATE + "=" + KEY_DATE + " WHERE " + KEY_END_DATE + "=''");
             db.execSQL("UPDATE " + TABLE_REMINDERS + " SET "
                     + KEY_DOSE_TIMES + "=" + KEY_TIME + " WHERE " + KEY_DOSE_TIMES + "=''");
+        }
+        if (oldVersion < 4) {
+            createHealthEntryTable(db);
+        }
+        if (oldVersion < 5) {
+            createLabTestTables(db);
         }
     }
 
@@ -136,6 +170,39 @@ public class ReminderDatabase extends SQLiteOpenHelper {
         db.execSQL(sql);
     }
 
+    private void createHealthEntryTable(SQLiteDatabase db) {
+        String sql = "CREATE TABLE IF NOT EXISTS " + TABLE_HEALTH_ENTRIES + "("
+                + HEALTH_ID + " INTEGER PRIMARY KEY AUTOINCREMENT,"
+                + HEALTH_TYPE + " TEXT NOT NULL,"
+                + HEALTH_LABEL + " TEXT NOT NULL,"
+                + HEALTH_VALUE + " TEXT DEFAULT '',"
+                + HEALTH_UNIT + " TEXT DEFAULT '',"
+                + HEALTH_NOTE + " TEXT DEFAULT '',"
+                + HEALTH_SITE + " TEXT DEFAULT '',"
+                + HEALTH_CREATED_AT + " TEXT NOT NULL"
+                + ")";
+        db.execSQL(sql);
+    }
+
+    private void createLabTestTables(SQLiteDatabase db) {
+        String itemsSql = "CREATE TABLE IF NOT EXISTS " + TABLE_LAB_ITEMS + "("
+                + LAB_ITEM_ID + " INTEGER PRIMARY KEY AUTOINCREMENT,"
+                + LAB_ITEM_NAME + " TEXT NOT NULL,"
+                + LAB_ITEM_REF_MIN + " REAL NOT NULL,"
+                + LAB_ITEM_REF_MAX + " REAL NOT NULL,"
+                + LAB_ITEM_UNIT + " TEXT DEFAULT ''"
+                + ")";
+        db.execSQL(itemsSql);
+
+        String resultsSql = "CREATE TABLE IF NOT EXISTS " + TABLE_LAB_RESULTS + "("
+                + LAB_RESULT_ID + " INTEGER PRIMARY KEY AUTOINCREMENT,"
+                + LAB_RESULT_ITEM_ID + " INTEGER NOT NULL,"
+                + LAB_RESULT_VALUE + " REAL NOT NULL,"
+                + LAB_RESULT_CREATED_AT + " TEXT NOT NULL"
+                + ")";
+        db.execSQL(resultsSql);
+    }
+
     public int addReminder(Reminder reminder) {
         SQLiteDatabase db = this.getWritableDatabase();
         long ID = db.insert(TABLE_REMINDERS, null, toReminderValues(reminder));
@@ -172,6 +239,21 @@ public class ReminderDatabase extends SQLiteOpenHelper {
         }
         cursor.close();
         return reminderList;
+    }
+
+    public Reminder findDuplicateReminder(Reminder candidate, int excludedId) {
+        String title = normalizeTitle(candidate.getTitle());
+        for (Reminder reminder : getAllReminders()) {
+            if (reminder.getID() == excludedId) {
+                continue;
+            }
+            if (title.equals(normalizeTitle(reminder.getTitle()))
+                    && Math.abs(candidate.getDose() - reminder.getDose()) < 0.000001
+                    && hasMatchingDoseTime(candidate, reminder)) {
+                return reminder;
+            }
+        }
+        return null;
     }
 
     public List<Reminder> getActiveRemindersAt(String date, String time) {
@@ -271,6 +353,156 @@ public class ReminderDatabase extends SQLiteOpenHelper {
         values.put(LOG_TAKEN_AT, takenAt == null || takenAt.length() == 0 ? nowText() : takenAt);
         long id = db.insertWithOnConflict(TABLE_INTAKE_LOGS, null, values, SQLiteDatabase.CONFLICT_IGNORE);
         return id != -1;
+    }
+
+    public int getIntakeLogCountSince(String takenAtLowerBound) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = db.rawQuery(
+                "SELECT COUNT(*) FROM " + TABLE_INTAKE_LOGS + " WHERE " + LOG_TAKEN_AT + ">=?",
+                new String[]{takenAtLowerBound});
+        int count = 0;
+        if (cursor.moveToFirst()) {
+            count = cursor.getInt(0);
+        }
+        cursor.close();
+        return count;
+    }
+
+    public long addHealthEntry(HealthEntry entry) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        ContentValues values = new ContentValues();
+        values.put(HEALTH_TYPE, entry.mType);
+        values.put(HEALTH_LABEL, normalizeTitle(entry.mLabel));
+        values.put(HEALTH_VALUE, entry.mValue);
+        values.put(HEALTH_UNIT, entry.mUnit);
+        values.put(HEALTH_NOTE, entry.mNote);
+        values.put(HEALTH_SITE, entry.mSite);
+        values.put(HEALTH_CREATED_AT, entry.mCreatedAt == null || entry.mCreatedAt.length() == 0
+                ? nowText()
+                : entry.mCreatedAt);
+        long id = db.insert(TABLE_HEALTH_ENTRIES, null, values);
+        db.close();
+        return id;
+    }
+
+    public List<HealthEntry> getHealthEntries() {
+        return getHealthEntriesSince("");
+    }
+
+    public List<HealthEntry> getHealthEntriesSince(String createdAtLowerBound) {
+        List<HealthEntry> entries = new ArrayList<>();
+        SQLiteDatabase db = this.getReadableDatabase();
+        String selection = null;
+        String[] args = null;
+        if (createdAtLowerBound != null && createdAtLowerBound.length() > 0) {
+            selection = HEALTH_CREATED_AT + ">=?";
+            args = new String[]{createdAtLowerBound};
+        }
+        Cursor cursor = db.query(TABLE_HEALTH_ENTRIES, healthEntryColumns(), selection, args,
+                null, null, HEALTH_CREATED_AT + " DESC, " + HEALTH_ID + " DESC");
+
+        if (cursor.moveToFirst()) {
+            do {
+                entries.add(readHealthEntry(cursor));
+            } while (cursor.moveToNext());
+        }
+        cursor.close();
+        return entries;
+    }
+
+    public int getHealthEntryCountSince(String createdAtLowerBound) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = db.rawQuery(
+                "SELECT COUNT(*) FROM " + TABLE_HEALTH_ENTRIES + " WHERE " + HEALTH_CREATED_AT + ">=?",
+                new String[]{createdAtLowerBound});
+        int count = 0;
+        if (cursor.moveToFirst()) {
+            count = cursor.getInt(0);
+        }
+        cursor.close();
+        return count;
+    }
+
+    public long addLabTestItem(LabTestItem item) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        ContentValues values = toLabTestItemValues(item);
+        long id = db.insert(TABLE_LAB_ITEMS, null, values);
+        db.close();
+        return id;
+    }
+
+    public int updateLabTestItem(LabTestItem item) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        return db.update(TABLE_LAB_ITEMS, toLabTestItemValues(item), LAB_ITEM_ID + "=?",
+                new String[]{String.valueOf(item.mId)});
+    }
+
+    public LabTestItem getLabTestItem(int id) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = db.query(TABLE_LAB_ITEMS, labItemColumns(), LAB_ITEM_ID + "=?",
+                new String[]{String.valueOf(id)}, null, null, null, "1");
+        if (!cursor.moveToFirst()) {
+            cursor.close();
+            return null;
+        }
+        LabTestItem item = readLabTestItem(cursor);
+        cursor.close();
+        return item;
+    }
+
+    public List<LabTestItem> getLabTestItems() {
+        List<LabTestItem> items = new ArrayList<>();
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = db.query(TABLE_LAB_ITEMS, labItemColumns(), null, null,
+                null, null, LAB_ITEM_NAME + " COLLATE NOCASE ASC");
+        if (cursor.moveToFirst()) {
+            do {
+                items.add(readLabTestItem(cursor));
+            } while (cursor.moveToNext());
+        }
+        cursor.close();
+        return items;
+    }
+
+    public long addLabResult(LabResult result) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        ContentValues values = new ContentValues();
+        values.put(LAB_RESULT_ITEM_ID, result.mItemId);
+        values.put(LAB_RESULT_VALUE, result.mValue);
+        values.put(LAB_RESULT_CREATED_AT, result.mCreatedAt == null || result.mCreatedAt.length() == 0
+                ? nowText()
+                : result.mCreatedAt);
+        long id = db.insert(TABLE_LAB_RESULTS, null, values);
+        db.close();
+        return id;
+    }
+
+    public List<LabResult> getLabResults() {
+        List<LabResult> results = new ArrayList<>();
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = db.rawQuery(labResultSelectSql() + " ORDER BY r." + LAB_RESULT_CREATED_AT + " DESC, r." + LAB_RESULT_ID + " DESC", null);
+        if (cursor.moveToFirst()) {
+            do {
+                results.add(readLabResult(cursor));
+            } while (cursor.moveToNext());
+        }
+        cursor.close();
+        return results;
+    }
+
+    public LabResult getLatestLabResult(int itemId) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = db.rawQuery(labResultSelectSql()
+                        + " WHERE r." + LAB_RESULT_ITEM_ID + "=?"
+                        + " ORDER BY r." + LAB_RESULT_CREATED_AT + " DESC, r." + LAB_RESULT_ID + " DESC LIMIT 1",
+                new String[]{String.valueOf(itemId)});
+        if (!cursor.moveToFirst()) {
+            cursor.close();
+            return null;
+        }
+        LabResult result = readLabResult(cursor);
+        cursor.close();
+        return result;
     }
 
     public ConfirmResult confirmReminderGroup(List<Integer> reminderIds, String scheduledAt) {
@@ -397,6 +629,46 @@ public class ReminderDatabase extends SQLiteOpenHelper {
         return reminder;
     }
 
+    private HealthEntry readHealthEntry(Cursor cursor) {
+        return new HealthEntry(
+                cursor.getInt(cursor.getColumnIndexOrThrow(HEALTH_ID)),
+                cursor.getString(cursor.getColumnIndexOrThrow(HEALTH_TYPE)),
+                cursor.getString(cursor.getColumnIndexOrThrow(HEALTH_LABEL)),
+                cursor.getString(cursor.getColumnIndexOrThrow(HEALTH_VALUE)),
+                cursor.getString(cursor.getColumnIndexOrThrow(HEALTH_UNIT)),
+                cursor.getString(cursor.getColumnIndexOrThrow(HEALTH_NOTE)),
+                cursor.getString(cursor.getColumnIndexOrThrow(HEALTH_SITE)),
+                cursor.getString(cursor.getColumnIndexOrThrow(HEALTH_CREATED_AT)));
+    }
+
+    private ContentValues toLabTestItemValues(LabTestItem item) {
+        ContentValues values = new ContentValues();
+        values.put(LAB_ITEM_NAME, normalizeTitle(item.mName));
+        values.put(LAB_ITEM_REF_MIN, item.mReferenceMin);
+        values.put(LAB_ITEM_REF_MAX, item.mReferenceMax);
+        values.put(LAB_ITEM_UNIT, item.mUnit == null ? "" : item.mUnit.trim());
+        return values;
+    }
+
+    private LabTestItem readLabTestItem(Cursor cursor) {
+        return new LabTestItem(
+                cursor.getInt(cursor.getColumnIndexOrThrow(LAB_ITEM_ID)),
+                cursor.getString(cursor.getColumnIndexOrThrow(LAB_ITEM_NAME)),
+                cursor.getDouble(cursor.getColumnIndexOrThrow(LAB_ITEM_REF_MIN)),
+                cursor.getDouble(cursor.getColumnIndexOrThrow(LAB_ITEM_REF_MAX)),
+                cursor.getString(cursor.getColumnIndexOrThrow(LAB_ITEM_UNIT)));
+    }
+
+    private LabResult readLabResult(Cursor cursor) {
+        return new LabResult(
+                cursor.getInt(cursor.getColumnIndexOrThrow(LAB_RESULT_ID)),
+                cursor.getInt(cursor.getColumnIndexOrThrow(LAB_RESULT_ITEM_ID)),
+                cursor.getString(cursor.getColumnIndexOrThrow(LAB_ITEM_NAME)),
+                cursor.getDouble(cursor.getColumnIndexOrThrow(LAB_RESULT_VALUE)),
+                cursor.getString(cursor.getColumnIndexOrThrow(LAB_ITEM_UNIT)),
+                cursor.getString(cursor.getColumnIndexOrThrow(LAB_RESULT_CREATED_AT)));
+    }
+
     private String[] reminderColumns() {
         return new String[]{
                 KEY_ID,
@@ -415,8 +687,49 @@ public class ReminderDatabase extends SQLiteOpenHelper {
         };
     }
 
+    private String[] healthEntryColumns() {
+        return new String[]{
+                HEALTH_ID,
+                HEALTH_TYPE,
+                HEALTH_LABEL,
+                HEALTH_VALUE,
+                HEALTH_UNIT,
+                HEALTH_NOTE,
+                HEALTH_SITE,
+                HEALTH_CREATED_AT
+        };
+    }
+
+    private String[] labItemColumns() {
+        return new String[]{
+                LAB_ITEM_ID,
+                LAB_ITEM_NAME,
+                LAB_ITEM_REF_MIN,
+                LAB_ITEM_REF_MAX,
+                LAB_ITEM_UNIT
+        };
+    }
+
+    private String labResultSelectSql() {
+        return "SELECT r." + LAB_RESULT_ID + ", r." + LAB_RESULT_ITEM_ID + ", i." + LAB_ITEM_NAME + ", "
+                + "r." + LAB_RESULT_VALUE + ", i." + LAB_ITEM_UNIT + ", r." + LAB_RESULT_CREATED_AT
+                + " FROM " + TABLE_LAB_RESULTS + " r"
+                + " LEFT JOIN " + TABLE_LAB_ITEMS + " i ON i." + LAB_ITEM_ID + "=r." + LAB_RESULT_ITEM_ID;
+    }
+
     private String normalizeTitle(String title) {
         return title == null ? "" : title.trim();
+    }
+
+    private boolean hasMatchingDoseTime(Reminder left, Reminder right) {
+        List<String> leftTimes = ReminderSchedule.doseTimes(left);
+        List<String> rightTimes = ReminderSchedule.doseTimes(right);
+        for (String time : leftTimes) {
+            if (rightTimes.contains(time)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private String nowText() {

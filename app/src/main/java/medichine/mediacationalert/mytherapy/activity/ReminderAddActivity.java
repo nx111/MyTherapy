@@ -8,6 +8,7 @@ import androidx.appcompat.widget.Toolbar;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.res.Configuration;
 import android.graphics.Bitmap;
 import android.net.Uri;
 import android.os.Bundle;
@@ -32,6 +33,7 @@ import com.wdullaer.materialdatetimepicker.time.TimePickerDialog;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.text.DateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
@@ -40,6 +42,7 @@ import java.util.Locale;
 import medichine.mediacationalert.mytherapy.R;
 import medichine.mediacationalert.mytherapy.utils.AlarmReceiver;
 import medichine.mediacationalert.mytherapy.utils.Fun;
+import medichine.mediacationalert.mytherapy.utils.MedicineIconFactory;
 import medichine.mediacationalert.mytherapy.utils.Reminder;
 import medichine.mediacationalert.mytherapy.utils.ReminderDatabase;
 
@@ -163,8 +166,8 @@ public class ReminderAddActivity extends AppCompatActivity implements
         });
 
         // Setup TextViews using reminder values
-        mDateText.setText(mDate);
-        mEndDateText.setText(mEndDate);
+        mDateText.setText(formatDateForDisplay(mDate));
+        mEndDateText.setText(formatDateForDisplay(mEndDate));
         updateDoseTimesText();
         mRepeatNoText.setText(timesCountLabel());
         mRepeatTypeText.setText(repeatTypeLabel(mRepeatType));
@@ -185,12 +188,12 @@ public class ReminderAddActivity extends AppCompatActivity implements
             mTime = savedTime;
 
             String savedDate = savedInstanceState.getString(KEY_DATE);
-            mDateText.setText(savedDate);
             mDate = savedDate;
+            mDateText.setText(formatDateForDisplay(mDate));
 
             String savedEndDate = savedInstanceState.getString(KEY_END_DATE);
             mEndDate = savedEndDate == null ? mDate : savedEndDate;
-            mEndDateText.setText(mEndDate);
+            mEndDateText.setText(formatDateForDisplay(mEndDate));
 
             restoreDoseTimes(savedInstanceState.getString(KEY_DOSE_TIMES, mTime));
 
@@ -224,7 +227,7 @@ public class ReminderAddActivity extends AppCompatActivity implements
 
         outState.putCharSequence(KEY_TITLE, mTitleText.getText());
         outState.putCharSequence(KEY_TIME, mTimeText.getText());
-        outState.putCharSequence(KEY_DATE, mDateText.getText());
+        outState.putString(KEY_DATE, mDate);
         outState.putString(KEY_END_DATE, mEndDate);
         outState.putString(KEY_DOSE_TIMES, joinDoseTimes());
         outState.putString(KEY_REPEAT, mRepeat);
@@ -268,7 +271,7 @@ public class ReminderAddActivity extends AppCompatActivity implements
                 minute,
                 false
         );
-        tpd.setThemeDark(false);
+        tpd.setThemeDark(isNightMode());
         tpd.show(getSupportFragmentManager(), "Timepickerdialog");
     }
 
@@ -285,14 +288,20 @@ public class ReminderAddActivity extends AppCompatActivity implements
 
     private void showDatePicker(String dateText) {
         Calendar now = Calendar.getInstance();
-        Calendar selected = parseDate(dateText);
+        Calendar selected = parseDate(Reminder.isNoEndDate(dateText) ? mDate : dateText);
         DatePickerDialog dpd = DatePickerDialog.newInstance(
                 this,
                 selected == null ? now.get(Calendar.YEAR) : selected.get(Calendar.YEAR),
                 selected == null ? now.get(Calendar.MONTH) : selected.get(Calendar.MONTH),
                 selected == null ? now.get(Calendar.DAY_OF_MONTH) : selected.get(Calendar.DAY_OF_MONTH)
         );
+        dpd.setThemeDark(isNightMode());
         dpd.show(getSupportFragmentManager(), "Datepickerdialog");
+    }
+
+    private boolean isNightMode() {
+        return (getResources().getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK)
+                == Configuration.UI_MODE_NIGHT_YES;
     }
 
 
@@ -400,19 +409,11 @@ public class ReminderAddActivity extends AppCompatActivity implements
     }
 
     public void selectIconType(View v) {
-        final String[] labels = new String[]{getString(R.string.pill), getString(R.string.capsule), getString(R.string.liquid)};
-        final String[] values = new String[]{"pill", "capsule", "liquid"};
-
-        AlertDialog.Builder builder = new AlertDialog.Builder(this);
-        builder.setTitle(R.string.select_icon);
-        builder.setItems(labels, new DialogInterface.OnClickListener() {
-            public void onClick(DialogInterface dialog, int item) {
-                mIconType = values[item];
-                mIconUri = "";
-                updateIconPreview();
-            }
+        MedicineIconFactory.showPicker(this, iconType -> {
+            mIconType = iconType;
+            mIconUri = "";
+            updateIconPreview();
         });
-        builder.create().show();
     }
 
     public void selectIconImage(View v) {
@@ -480,31 +481,13 @@ public class ReminderAddActivity extends AppCompatActivity implements
             return;
         }
         if (mIconUri != null && mIconUri.length() > 0) {
-            mIconPreview.setImageURI(Uri.parse(mIconUri));
+            MedicineIconFactory.apply(mIconPreview, mIconType, mIconUri);
             mIconPhotoText.setText(R.string.photo_selected);
         } else {
-            mIconPreview.setImageResource(iconResourceForType(mIconType));
+            MedicineIconFactory.apply(mIconPreview, mIconType, "");
             mIconPhotoText.setText(R.string.photo_source);
         }
-        mIconTypeText.setText(iconLabel(mIconType));
-    }
-
-    private int iconResourceForType(String iconType) {
-        if ("capsule".equals(iconType)) {
-            return R.drawable.medicine_capsule;
-        } else if ("liquid".equals(iconType)) {
-            return R.drawable.medicine_liquid;
-        }
-        return R.drawable.medicine_pill;
-    }
-
-    private String iconLabel(String iconType) {
-        if ("capsule".equals(iconType)) {
-            return getString(R.string.capsule);
-        } else if ("liquid".equals(iconType)) {
-            return getString(R.string.liquid);
-        }
-        return getString(R.string.pill);
+        mIconTypeText.setText(MedicineIconFactory.label(this, mIconType));
     }
 
     private String repeatTypeLabel(String repeatType) {
@@ -543,8 +526,9 @@ public class ReminderAddActivity extends AppCompatActivity implements
         adjustDoseTimes(repeatNo);
 
         Calendar start = parseDate(mDate);
-        Calendar end = parseDate(mEndDate);
-        if (start == null || end == null || end.getTimeInMillis() < start.getTimeInMillis()) {
+        Calendar end = Reminder.isNoEndDate(mEndDate) ? null : parseDate(mEndDate);
+        if (start == null || (!Reminder.isNoEndDate(mEndDate)
+                && (end == null || end.getTimeInMillis() < start.getTimeInMillis()))) {
             Toast.makeText(getApplicationContext(), R.string.end_date_before_start, Toast.LENGTH_SHORT).show();
             return false;
         }
@@ -637,6 +621,17 @@ public class ReminderAddActivity extends AppCompatActivity implements
         }
     }
 
+    private String formatDateForDisplay(String date) {
+        if (Reminder.isNoEndDate(date)) {
+            return getString(R.string.no_expiration);
+        }
+        Calendar calendar = parseDate(date);
+        if (calendar == null) {
+            return date == null ? "" : date;
+        }
+        return DateFormat.getDateInstance(DateFormat.MEDIUM, Locale.getDefault()).format(calendar.getTime());
+    }
+
     private String formatQuantity(double value) {
         if (Math.abs(value - Math.round(value)) < 0.000001) {
             return String.valueOf((long) Math.round(value));
@@ -664,8 +659,12 @@ public class ReminderAddActivity extends AppCompatActivity implements
                 getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
             } catch (SecurityException ignored) {
             }
-            mIconUri = uri.toString();
-            updateIconPreview();
+            try {
+                mIconUri = MedicineIconFactory.saveScaledIcon(this, uri);
+                updateIconPreview();
+            } catch (IOException e) {
+                Toast.makeText(getApplicationContext(), R.string.could_not_save_photo, Toast.LENGTH_SHORT).show();
+            }
         } else if (requestCode == REQUEST_CAPTURE_IMAGE && data.getExtras() != null) {
             Object bitmap = data.getExtras().get("data");
             if (bitmap instanceof Bitmap) {
@@ -676,12 +675,8 @@ public class ReminderAddActivity extends AppCompatActivity implements
     }
 
     private String saveCameraBitmap(Bitmap bitmap) {
-        File file = new File(getFilesDir(), "medicine_icon_" + System.currentTimeMillis() + ".png");
         try {
-            FileOutputStream out = new FileOutputStream(file);
-            bitmap.compress(Bitmap.CompressFormat.PNG, 100, out);
-            out.close();
-            return Uri.fromFile(file).toString();
+            return MedicineIconFactory.saveScaledIcon(this, bitmap);
         } catch (IOException e) {
             Toast.makeText(getApplicationContext(), R.string.could_not_save_photo, Toast.LENGTH_SHORT).show();
             return "";
@@ -703,6 +698,10 @@ public class ReminderAddActivity extends AppCompatActivity implements
         }
 
         ReminderDatabase rb = new ReminderDatabase(this);
+        if (rb.findDuplicateReminder(newReminder, -1) != null) {
+            Toast.makeText(getApplicationContext(), R.string.duplicate_reminder_plan, Toast.LENGTH_SHORT).show();
+            return;
+        }
         int ID = rb.addReminder(newReminder);
         if (ID == -1) {
             Toast.makeText(getApplicationContext(), R.string.could_not_save_reminder, Toast.LENGTH_SHORT).show();
@@ -778,10 +777,10 @@ public class ReminderAddActivity extends AppCompatActivity implements
         String selectedDate = dayOfMonth + "/" + monthOfYear + "/" + year;
         if (mDatePickerTarget == DATE_TARGET_END) {
             mEndDate = selectedDate;
-            mEndDateText.setText(mEndDate);
+            mEndDateText.setText(formatDateForDisplay(mEndDate));
         } else {
             mDate = selectedDate;
-            mDateText.setText(mDate);
+            mDateText.setText(formatDateForDisplay(mDate));
         }
     }
 

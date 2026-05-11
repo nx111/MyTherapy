@@ -4,11 +4,19 @@
         android:icon="@drawable/ic_today_24"
         android:title="@string/nav_today" />
     <item
-        android:id="@+id/nav_history"
-        android:icon="@drawable/ic_history_24"
-        android:title="@string/nav_history" />
+        android:id="@+id/nav_lab"
+        android:icon="@drawable/ic_lab_24"
+        android:title="@string/nav_lab" />
     <item
         android:id="@+id/nav_course"
         android:icon="@drawable/ic_course_24"
         android:title="@string/nav_course" />
+    <item
+        android:id="@+id/nav_journal"
+        android:icon="@drawable/ic_journal_24"
+        android:title="@string/nav_journal" />
+    <item
+        android:id="@+id/nav_report"
+        android:icon="@drawable/ic_report_24"
+        android:title="@string/nav_report" />
 </menu>

@@ -3,26 +3,17 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#F2F4F6"
+    android:background="@color/app_background"
     tools:context=".activity.MainActivity">
-
-    <RelativeLayout
-        android:id="@+id/baner"
-        android:layout_width="match_parent"
-        android:layout_height="230dp"
-        android:layout_marginStart="-5dp"
-        android:layout_marginTop="-20dp"
-        android:layout_marginEnd="-5dp"
-        android:background="@drawable/medication_banner" />
 
     <LinearLayout
         android:id="@+id/calendar_header"
         android:layout_width="match_parent"
-        android:layout_height="132dp"
+        android:layout_height="wrap_content"
         android:layout_marginStart="15dp"
-        android:layout_marginTop="48dp"
+        android:layout_marginTop="16dp"
         android:layout_marginEnd="15dp"
-        android:background="@color/white"
+        android:background="@color/surface"
         android:elevation="2dp"
         android:orientation="vertical"
         android:paddingStart="14dp"
@@ -41,7 +32,7 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:textColor="@color/black"
+                android:textColor="@color/text_primary"
                 android:textSize="24sp"
                 android:textStyle="bold"
                 tools:text="今日 2026/5/11" />
@@ -70,7 +61,7 @@
         android:layout_width="match_parent"
         android:layout_height="64dp"
         android:layout_alignParentBottom="true"
-        android:background="@color/white"
+        android:background="@color/surface"
         app:itemIconTint="@color/bottom_nav_item"
         app:itemTextColor="@color/bottom_nav_item"
         app:labelVisibilityMode="labeled"
@@ -79,16 +70,18 @@
     <FrameLayout
         android:id="@+id/ad_view_container"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_above="@id/bottom_nav" />
+        android:layout_height="0dp"
+        android:layout_above="@id/bottom_nav"
+        android:visibility="gone" />
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/reminder_list"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_above="@id/ad_view_container"
+        android:layout_below="@id/calendar_header"
+        android:layout_above="@id/bottom_nav"
         android:layout_marginStart="15dp"
-        android:layout_marginTop="196dp"
+        android:layout_marginTop="16dp"
         android:layout_marginEnd="15dp"
         android:layout_marginBottom="8dp" />
 
@@ -102,8 +95,24 @@
         android:gravity="center"
         android:padding="16dp"
         android:text="@string/no_reminders"
-        android:textColor="@color/black"
+        android:textColor="@color/text_primary"
         android:textSize="16sp"
+        android:visibility="gone" />
+
+    <CheckBox
+        android:id="@+id/course_show_all"
+        android:layout_width="wrap_content"
+        android:layout_height="48dp"
+        android:layout_above="@id/bottom_nav"
+        android:layout_alignParentLeft="true"
+        android:layout_marginLeft="16dp"
+        android:layout_marginBottom="16dp"
+        android:buttonTint="@color/nav_selected"
+        android:paddingStart="8dp"
+        android:paddingEnd="12dp"
+        android:text="@string/course_show_all"
+        android:textColor="@color/text_primary"
+        android:textSize="15sp"
         android:visibility="gone" />
 
     <com.google.android.material.floatingactionbutton.FloatingActionButton

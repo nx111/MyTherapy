@@ -5,6 +5,7 @@
     android:layout_height="wrap_content"
     android:layout_marginBottom="8dp"
     android:background="?android:attr/selectableItemBackground"
+    app:cardBackgroundColor="@color/surface"
     app:cardCornerRadius="8dp"
     app:cardElevation="1dp">
 
@@ -38,7 +39,7 @@
                     android:id="@+id/summary_title"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:textColor="@color/black"
+                    android:textColor="@color/text_primary"
                     android:textSize="18sp"
                     android:textStyle="bold"
                     tools:text="Medicine A" />
@@ -66,7 +67,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
             android:lineSpacingExtra="2dp"
-            android:textColor="@color/black"
+            android:textColor="@color/text_primary"
             android:textSize="14sp"
             tools:text="Dose 1 • Taken" />
 

@@ -24,6 +24,7 @@ import android.util.DisplayMetrics;
 import android.util.Log;
 import android.util.TypedValue;
 import android.view.Display;
+import android.view.View;
 import android.webkit.MimeTypeMap;
 import android.widget.FrameLayout;
 import android.widget.Toast;
@@ -79,15 +80,13 @@ public class Fun {
     }
 
     public static void showBanner(Activity activity, FrameLayout adContainerView) {
+        if (adContainerView != null) {
+            adContainerView.removeAllViews();
+            adContainerView.setVisibility(View.GONE);
+        }
         if (!BuildConfig.ADS_ENABLED || removeAds || adContainerView == null) {
             return;
         }
-
-        // Step 1 - Create an AdView and set the ad unit ID on it.
-        adView = new AdView(activity);
-        adView.setAdUnitId(activity.getString(R.string.banner_ad));
-        adContainerView.addView(adView);
-        loadBanner(activity);
 
     }
 

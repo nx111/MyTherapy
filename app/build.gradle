@@ -3,7 +3,7 @@ plugins {
     id 'org.jetbrains.kotlin.android'
 }
 
-def adsEnabled = (project.findProperty("adsEnabled") ?: "false").toString().toBoolean()
+def adsEnabled = false
 
 android {
     namespace 'medichine.mediacationalert.mytherapy'

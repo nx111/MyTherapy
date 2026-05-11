@@ -111,9 +111,15 @@ public class ReminderSchedule {
     public static List<Calendar> occurrencesBetween(Reminder reminder, long startMillis, long endMillis) {
         ArrayList<Calendar> occurrences = new ArrayList<>();
         Calendar planDate = parseDate(reminder.getDate());
+        Calendar rangeEndDate = Calendar.getInstance();
+        rangeEndDate.setTimeInMillis(endMillis);
+        rangeEndDate = startOfDay(rangeEndDate);
         Calendar endDate = "true".equals(reminder.getRepeat())
-                ? parseDate(reminder.getEndDate())
+                ? scheduleEndDate(reminder, rangeEndDate)
                 : parseDate(reminder.getDate());
+        if (endDate.getTimeInMillis() > rangeEndDate.getTimeInMillis()) {
+            endDate = rangeEndDate;
+        }
         List<String> times = doseTimes(reminder);
 
         while (planDate.getTimeInMillis() <= endDate.getTimeInMillis()) {
@@ -133,7 +139,7 @@ public class ReminderSchedule {
     }
 
     public static Calendar nextOccurrenceAfter(Reminder reminder, long afterMillis) {
-        List<Calendar> occurrences = occurrencesBetween(reminder, afterMillis, endOfDay(parseDate(reminder.getEndDate())).getTimeInMillis());
+        List<Calendar> occurrences = occurrencesBetween(reminder, afterMillis, searchEndMillis(reminder, afterMillis));
         Calendar next = null;
         for (Calendar occurrence : occurrences) {
             if (occurrence.getTimeInMillis() >= afterMillis
@@ -153,12 +159,12 @@ public class ReminderSchedule {
         Calendar scheduled = parseScheduledAt(scheduledAt);
         long scheduledMillis = scheduled.getTimeInMillis();
         Calendar startDate = parseDate(reminder.getDate());
-        Calendar endDate = "true".equals(reminder.getRepeat())
+        Calendar endDate = "true".equals(reminder.getRepeat()) && !hasNoEndDate(reminder)
                 ? parseDate(reminder.getEndDate())
                 : parseDate(reminder.getDate());
 
         if (scheduledMillis < startDate.getTimeInMillis()
-                || scheduledMillis > endOfDay(endDate).getTimeInMillis()) {
+                || (!hasNoEndDate(reminder) && scheduledMillis > endOfDay(endDate).getTimeInMillis())) {
             return false;
         }
 
@@ -183,6 +189,21 @@ public class ReminderSchedule {
             return false;
         }
         return true;
+    }
+
+    public static boolean hasNoEndDate(Reminder reminder) {
+        return reminder != null && Reminder.isNoEndDate(reminder.getEndDate());
+    }
+
+    public static long searchEndMillis(Reminder reminder, long afterMillis) {
+        if (hasNoEndDate(reminder)) {
+            return afterMillis + 366L * MIL_DAY;
+        }
+        return endOfDay(parseDate(reminder.getEndDate())).getTimeInMillis();
+    }
+
+    private static Calendar scheduleEndDate(Reminder reminder, Calendar fallbackEndDate) {
+        return hasNoEndDate(reminder) ? fallbackEndDate : parseDate(reminder.getEndDate());
     }
 
     private static void advance(Calendar calendar, String repeatType) {

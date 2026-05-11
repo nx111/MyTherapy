@@ -20,6 +20,7 @@ import java.util.List;
 import medichine.mediacationalert.mytherapy.R;
 import medichine.mediacationalert.mytherapy.model.ReminderItem;
 import medichine.mediacationalert.mytherapy.utils.ItemClickListener;
+import medichine.mediacationalert.mytherapy.utils.MedicineIconFactory;
 
 public class MedListAdapter extends RecyclerView.Adapter<MedListAdapter.SimpleHolder> {
     private List<ReminderItem> mItems;
@@ -141,7 +142,7 @@ public class MedListAdapter extends RecyclerView.Adapter<MedListAdapter.SimpleHo
 
                 TextView title = new TextView(activity);
                 title.setText(line.title);
-                title.setTextColor(activity.getResources().getColor(R.color.black));
+                title.setTextColor(activity.getResources().getColor(R.color.text_primary));
                 title.setTextSize(16);
                 title.setTypeface(Typeface.DEFAULT_BOLD);
 
@@ -166,15 +167,7 @@ public class MedListAdapter extends RecyclerView.Adapter<MedListAdapter.SimpleHo
         }
 
         private void setMedicineIcon(ImageView imageView, String iconType, String iconUri) {
-            if (iconUri != null && iconUri.length() > 0) {
-                imageView.setImageURI(Uri.parse(iconUri));
-            } else if ("capsule".equals(iconType)) {
-                imageView.setImageResource(R.drawable.medicine_capsule);
-            } else if ("liquid".equals(iconType)) {
-                imageView.setImageResource(R.drawable.medicine_liquid);
-            } else {
-                imageView.setImageResource(R.drawable.medicine_pill);
-            }
+            MedicineIconFactory.apply(imageView, iconType, iconUri);
         }
 
         private int dp(int value) {

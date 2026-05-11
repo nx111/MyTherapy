@@ -16,6 +16,7 @@ import java.util.List;
 import medichine.mediacationalert.mytherapy.R;
 import medichine.mediacationalert.mytherapy.model.SummaryItem;
 import medichine.mediacationalert.mytherapy.utils.ItemClickListener;
+import medichine.mediacationalert.mytherapy.utils.MedicineIconFactory;
 
 public class SummaryListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
     private static final int TYPE_HEADER = 0;
@@ -105,15 +106,7 @@ public class SummaryListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHo
         }
 
         void setIcon(String iconType, String iconUri) {
-            if (iconUri != null && iconUri.length() > 0) {
-                thumbnail.setImageURI(Uri.parse(iconUri));
-            } else if ("capsule".equals(iconType)) {
-                thumbnail.setImageResource(R.drawable.medicine_capsule);
-            } else if ("liquid".equals(iconType)) {
-                thumbnail.setImageResource(R.drawable.medicine_liquid);
-            } else {
-                thumbnail.setImageResource(R.drawable.medicine_pill);
-            }
+            MedicineIconFactory.apply(thumbnail, iconType, iconUri);
         }
 
         void bindMode(SummaryItem item, boolean clickable) {

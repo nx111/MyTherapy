@@ -3,7 +3,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="@color/white"
+    android:background="@color/surface"
     android:orientation="vertical">
 
     <LinearLayout
@@ -35,7 +35,7 @@
                 android:id="@+id/summary_title"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:textColor="@color/black"
+                android:textColor="@color/text_primary"
                 android:textSize="20sp"
                 android:textStyle="bold"
                 tools:text="五酯胶囊" />
@@ -44,7 +44,7 @@
                 android:id="@+id/summary_details"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:textColor="@color/black"
+                android:textColor="@color/text_primary"
                 android:textSize="18sp"
                 tools:text="1 药片" />
 

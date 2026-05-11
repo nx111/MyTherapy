@@ -7,8 +7,14 @@
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
-    <color name="grey_calendar">#434343</color>
+    <color name="app_background">#F2F4F6</color>
+    <color name="surface">#FFFFFFFF</color>
+    <color name="surface_variant">#EEEEEE</color>
+    <color name="text_primary">#111827</color>
     <color name="text_secondary">#434343</color>
+    <color name="grey_calendar">#434343</color>
+    <color name="outline">#BBE1EB</color>
+    <color name="on_accent">#FFFFFFFF</color>
     <color name="nav_selected">#006C9C</color>
     <color name="nav_unselected">#434343</color>
     <color name="history_taken">#007A4D</color>
