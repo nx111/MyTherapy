@@ -12,6 +12,10 @@ public class LabResult {
         this(0, itemId, "", value, "", "");
     }
 
+    public LabResult(int itemId, double value, String createdAt) {
+        this(0, itemId, "", value, "", createdAt);
+    }
+
     public LabResult(int id, int itemId, String itemName, double value, String unit, String createdAt) {
         mId = id;
         mItemId = itemId;

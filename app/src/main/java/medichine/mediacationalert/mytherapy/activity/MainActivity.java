@@ -1383,6 +1383,16 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         value.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL | InputType.TYPE_NUMBER_FLAG_SIGNED);
         form.addView(value, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
+        String[] resultDate = new String[]{""};
+        TextView resultDateText = dateSelectorText(R.string.lab_result_date, resultDate[0]);
+        resultDateText.setOnClickListener(v -> showCourseDatePicker(
+                resultDate[0].length() == 0 ? ReminderSchedule.formatDate(Calendar.getInstance()) : resultDate[0],
+                date -> {
+                    resultDate[0] = date;
+                    resultDateText.setText(dateSelectorLabel(R.string.lab_result_date, resultDate[0]));
+                }));
+        form.addView(resultDateText);
+
         TextView reference = new TextView(this);
         reference.setText(getString(R.string.lab_reference_range,
                 formatQuantity(item.mReferenceMin),
@@ -1403,7 +1413,11 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 value.setError(getString(R.string.lab_result_required));
                 return;
             }
-            long id = rb.addLabResult(new LabResult(item.mId, resultValue));
+            if (resultDate[0].length() == 0) {
+                Toast.makeText(this, R.string.lab_result_date_required, Toast.LENGTH_SHORT).show();
+                return;
+            }
+            long id = rb.addLabResult(new LabResult(item.mId, resultValue, labResultCreatedAt(resultDate[0])));
             if (id == -1) {
                 Toast.makeText(this, R.string.could_not_save_lab_result, Toast.LENGTH_SHORT).show();
                 return;
@@ -1413,6 +1427,19 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
             loadCurrentPage();
         }));
         dialog.show();
+    }
+
+    private String labResultCreatedAt(String resultDate) {
+        Calendar calendar = parseCourseDate(resultDate);
+        if (calendar == null) {
+            calendar = Calendar.getInstance();
+        }
+        Calendar now = Calendar.getInstance();
+        calendar.set(Calendar.HOUR_OF_DAY, now.get(Calendar.HOUR_OF_DAY));
+        calendar.set(Calendar.MINUTE, now.get(Calendar.MINUTE));
+        calendar.set(Calendar.SECOND, now.get(Calendar.SECOND));
+        calendar.set(Calendar.MILLISECOND, 0);
+        return new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(calendar.getTime());
     }
 
     private Double parseNumber(EditText editText) {
