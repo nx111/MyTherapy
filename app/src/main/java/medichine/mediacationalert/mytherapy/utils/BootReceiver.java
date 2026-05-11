@@ -38,43 +38,53 @@ public class BootReceiver extends BroadcastReceiver {
 
     @Override
     public void onReceive(Context context, Intent intent) {
-        if (intent.getAction().equals("android.intent.action.BOOT_COMPLETED")) {
+        if (!Intent.ACTION_BOOT_COMPLETED.equals(intent.getAction())) {
+            return;
+        }
 
-            ReminderDatabase rb = new ReminderDatabase(context);
-            mCalendar = Calendar.getInstance();
-            mAlarmReceiver = new AlarmReceiver();
+        ReminderDatabase rb = new ReminderDatabase(context);
+        mAlarmReceiver = new AlarmReceiver();
 
-            List<Reminder> reminders = rb.getAllReminders();
+        List<Reminder> reminders = rb.getAllReminders();
 
-            for (Reminder rm : reminders) {
-                mReceivedID = rm.getID();
-                mRepeat = rm.getRepeat();
-                mRepeatNo = rm.getRepeatNo();
-                mRepeatType = rm.getRepeatType();
-                mActive = rm.getActive();
-                mDate = rm.getDate();
-                mTime = rm.getTime();
+        for (Reminder rm : reminders) {
+            mReceivedID = rm.getID();
+            mRepeat = rm.getRepeat();
+            mRepeatNo = rm.getRepeatNo();
+            mRepeatType = rm.getRepeatType();
+            mActive = rm.getActive();
+            mDate = rm.getDate();
+            mTime = rm.getTime();
+            if (mDate == null || mTime == null || mRepeatNo == null || mRepeatType == null) {
+                continue;
+            }
 
-                mDateSplit = mDate.split("/");
-                mTimeSplit = mTime.split(":");
+            mDateSplit = mDate.split("/");
+            mTimeSplit = mTime.split(":");
 
+            try {
                 mDay = Integer.parseInt(mDateSplit[0]);
                 mMonth = Integer.parseInt(mDateSplit[1]);
                 mYear = Integer.parseInt(mDateSplit[2]);
                 mHour = Integer.parseInt(mTimeSplit[0]);
                 mMinute = Integer.parseInt(mTimeSplit[1]);
+            } catch (NumberFormatException | ArrayIndexOutOfBoundsException e) {
+                continue;
+            }
 
-                mCalendar.set(Calendar.MONTH, --mMonth);
-                mCalendar.set(Calendar.YEAR, mYear);
-                mCalendar.set(Calendar.DAY_OF_MONTH, mDay);
-                mCalendar.set(Calendar.HOUR_OF_DAY, mHour);
-                mCalendar.set(Calendar.MINUTE, mMinute);
-                mCalendar.set(Calendar.SECOND, 0);
+            mCalendar = Calendar.getInstance();
+            mCalendar.set(Calendar.MONTH, mMonth - 1);
+            mCalendar.set(Calendar.YEAR, mYear);
+            mCalendar.set(Calendar.DAY_OF_MONTH, mDay);
+            mCalendar.set(Calendar.HOUR_OF_DAY, mHour);
+            mCalendar.set(Calendar.MINUTE, mMinute);
+            mCalendar.set(Calendar.SECOND, 0);
+            mCalendar.set(Calendar.MILLISECOND, 0);
 
-                // Cancel existing notification of the reminder by using its ID
-                // mAlarmReceiver.cancelAlarm(context, mReceivedID);
+            // Cancel existing notification of the reminder by using its ID
+            // mAlarmReceiver.cancelAlarm(context, mReceivedID);
 
-                // Check repeat type
+            try {
                 if (mRepeatType.equals("Minute")) {
                     mRepeatTime = Integer.parseInt(mRepeatNo) * milMinute;
                 } else if (mRepeatType.equals("Hour")) {
@@ -85,15 +95,19 @@ public class BootReceiver extends BroadcastReceiver {
                     mRepeatTime = Integer.parseInt(mRepeatNo) * milWeek;
                 } else if (mRepeatType.equals("Month")) {
                     mRepeatTime = Integer.parseInt(mRepeatNo) * milMonth;
+                } else {
+                    continue;
                 }
+            } catch (NumberFormatException e) {
+                continue;
+            }
 
-                // Create a new notification
-                if (mActive.equals("true")) {
-                    if (mRepeat.equals("true")) {
-                        mAlarmReceiver.setRepeatAlarm(context, mCalendar, mReceivedID, mRepeatTime);
-                    } else if (mRepeat.equals("false")) {
-                        mAlarmReceiver.setAlarm(context, mCalendar, mReceivedID);
-                    }
+            // Create a new notification
+            if ("true".equals(mActive)) {
+                if ("true".equals(mRepeat)) {
+                    mAlarmReceiver.setRepeatAlarm(context, mCalendar, mReceivedID, mRepeatTime);
+                } else if ("false".equals(mRepeat)) {
+                    mAlarmReceiver.setAlarm(context, mCalendar, mReceivedID);
                 }
             }
         }

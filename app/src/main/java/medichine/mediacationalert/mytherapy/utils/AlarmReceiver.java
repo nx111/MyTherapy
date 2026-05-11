@@ -24,6 +24,7 @@ import androidx.legacy.content.WakefulBroadcastReceiver;
 
 
 import java.util.Calendar;
+import java.util.List;
 
 import medichine.mediacationalert.mytherapy.R;
 import medichine.mediacationalert.mytherapy.activity.ReminderEditActivity;
@@ -34,10 +35,22 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
     PendingIntent mPendingIntent;
     NotificationManager manager;
     Notification myNotication2;
+    private static final String CHANNEL_ID = "Channel_id";
+    private static final String CHANNEL_NAME = "Notification";
 
     @Override
     public void onReceive(Context context, Intent intent) {
-        int mReceivedID = Integer.parseInt(intent.getStringExtra(ReminderEditActivity.EXTRA_REMINDER_ID));
+        String reminderId = intent.getStringExtra(ReminderEditActivity.EXTRA_REMINDER_ID);
+        if (reminderId == null) {
+            return;
+        }
+
+        int mReceivedID;
+        try {
+            mReceivedID = Integer.parseInt(reminderId);
+        } catch (NumberFormatException e) {
+            return;
+        }
 
         // Get notification title from Reminder Database
         ReminderDatabase rb = new ReminderDatabase(context);
@@ -47,18 +60,16 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
         }
         String mTitle = reminder.getTitle();
 
-        String CHANNEL_ID = "Channel_id";
-        String CHANNEL_NAME = "Notification";
         // Create intent to open ReminderEditActivity on notification click
         Intent editIntent = new Intent(context, ReminderEditActivity.class);
         editIntent.putExtra(ReminderEditActivity.EXTRA_REMINDER_ID, Integer.toString(mReceivedID));
         PendingIntent mClick = PendingIntent.getActivity(context, mReceivedID, editIntent, AppUtils.Companion.getFlag());
 
         // Create Notification
-        NotificationCompat.Builder mBuilder = new NotificationCompat.Builder(context)
+        NotificationCompat.Builder mBuilder = new NotificationCompat.Builder(context, CHANNEL_ID)
                 .setLargeIcon(BitmapFactory.decodeResource(context.getResources(), R.drawable.pill_reminder_icon))
                 .setSmallIcon(R.drawable.baseline_access_alarm_24)
-                .setContentTitle("It's time to take your Medicion…")
+                .setContentTitle("It's time to take your Medication")
                 .setTicker(mTitle)
                 .setVibrate(new long[]{0, 500, 1000})
                 .setContentText(mTitle)
@@ -88,7 +99,7 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
 //        manager.notify(mReceivedID, mBuilder.build());
     }
 
-    public void setAlarm(Context context, Calendar calendar, int ID) {
+    public boolean setAlarm(Context context, Calendar calendar, int ID) {
         mAlarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
 
         // Put Reminder ID in Intent Extra
@@ -100,6 +111,9 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
         Calendar c = Calendar.getInstance();
         long currentTime = c.getTimeInMillis();
         long diffTime = calendar.getTimeInMillis() - currentTime;
+        if (diffTime <= 0) {
+            return false;
+        }
 
         // Start alarm using notification time
         mAlarmManager.set(AlarmManager.ELAPSED_REALTIME_WAKEUP,
@@ -107,14 +121,14 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
                 mPendingIntent);
 
         // Restart alarm if device is rebooted
-        ComponentName receiver = new ComponentName(context, BootReceiver.class);
-        PackageManager pm = context.getPackageManager();
-        pm.setComponentEnabledSetting(receiver,
-                PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
-                PackageManager.DONT_KILL_APP);
+        setBootReceiverEnabled(context, true);
+        return true;
     }
 
-    public void setRepeatAlarm(Context context, Calendar calendar, int ID, long RepeatTime) {
+    public boolean setRepeatAlarm(Context context, Calendar calendar, int ID, long RepeatTime) {
+        if (RepeatTime <= 0) {
+            return false;
+        }
         mAlarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
 
         // Put Reminder ID in Intent Extra
@@ -126,6 +140,9 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
         Calendar c = Calendar.getInstance();
         long currentTime = c.getTimeInMillis();
         long diffTime = calendar.getTimeInMillis() - currentTime;
+        while (diffTime <= 0) {
+            diffTime += RepeatTime;
+        }
 
         // Start alarm using initial notification time and repeat interval time
         mAlarmManager.setRepeating(AlarmManager.ELAPSED_REALTIME_WAKEUP,
@@ -133,11 +150,8 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
                 RepeatTime , mPendingIntent);
 
         // Restart alarm if device is rebooted
-        ComponentName receiver = new ComponentName(context, BootReceiver.class);
-        PackageManager pm = context.getPackageManager();
-        pm.setComponentEnabledSetting(receiver,
-                PackageManager.COMPONENT_ENABLED_STATE_ENABLED,
-                PackageManager.DONT_KILL_APP);
+        setBootReceiverEnabled(context, true);
+        return true;
     }
 
     public void cancelAlarm(Context context, int ID) {
@@ -148,11 +162,27 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
         mPendingIntent = PendingIntent.getBroadcast(context, ID, new Intent(context, AlarmReceiver.class), AppUtils.Companion.getFlag());
         mAlarmManager.cancel(mPendingIntent);
 
-        // Disable alarm
+        if (!hasActiveReminders(context)) {
+            setBootReceiverEnabled(context, false);
+        }
+    }
+
+    private boolean hasActiveReminders(Context context) {
+        ReminderDatabase rb = new ReminderDatabase(context);
+        List<Reminder> reminders = rb.getAllReminders();
+        for (Reminder reminder : reminders) {
+            if ("true".equals(reminder.getActive())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void setBootReceiverEnabled(Context context, boolean enabled) {
         ComponentName receiver = new ComponentName(context, BootReceiver.class);
         PackageManager pm = context.getPackageManager();
         pm.setComponentEnabledSetting(receiver,
-                PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
+                enabled ? PackageManager.COMPONENT_ENABLED_STATE_ENABLED : PackageManager.COMPONENT_ENABLED_STATE_DISABLED,
                 PackageManager.DONT_KILL_APP);
     }
 }
