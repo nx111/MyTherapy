@@ -366,6 +366,185 @@
 
                 </RelativeLayout>
 
+                <RelativeLayout
+                    android:id="@+id/Dose"
+                    android:layout_width="match_parent"
+                    android:layout_height="70dp"
+                    android:layout_marginStart="10dp"
+                    android:layout_marginTop="10dp"
+                    android:layout_marginEnd="10dp"
+                    android:background="@drawable/corner1">
+
+                    <ImageView
+                        android:id="@+id/dose_icon"
+                        android:layout_width="50dp"
+                        android:layout_height="50dp"
+                        android:layout_alignParentLeft="true"
+                        android:layout_centerVertical="true"
+                        android:layout_marginLeft="16dp"
+                        android:layout_marginRight="32dp"
+                        android:background="@drawable/baseline_check_24" />
+
+                    <TextView
+                        android:id="@+id/dose_text"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_centerVertical="true"
+                        android:layout_toRightOf="@id/dose_icon"
+                        android:text="Dose"
+                        android:textColor="@color/black"
+                        android:textSize="15dp" />
+
+                    <EditText
+                        android:id="@+id/set_dose"
+                        android:layout_width="100dp"
+                        android:layout_height="wrap_content"
+                        android:layout_alignParentRight="true"
+                        android:layout_centerVertical="true"
+                        android:layout_marginRight="16dp"
+                        android:gravity="right"
+                        android:inputType="numberDecimal"
+                        android:text="1.0"
+                        android:textColor="@color/grey_calendar"
+                        android:textSize="15dp" />
+                </RelativeLayout>
+
+                <RelativeLayout
+                    android:id="@+id/Stock"
+                    android:layout_width="match_parent"
+                    android:layout_height="70dp"
+                    android:layout_marginStart="10dp"
+                    android:layout_marginTop="10dp"
+                    android:layout_marginEnd="10dp"
+                    android:background="@drawable/corner1"
+                    android:clickable="true"
+                    android:onClick="addStockBatch">
+
+                    <ImageView
+                        android:id="@+id/stock_icon"
+                        android:layout_width="50dp"
+                        android:layout_height="50dp"
+                        android:layout_alignParentLeft="true"
+                        android:layout_centerVertical="true"
+                        android:layout_marginLeft="16dp"
+                        android:layout_marginRight="32dp"
+                        android:background="@drawable/baseline_add_24" />
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_centerVertical="true"
+                        android:layout_toRightOf="@id/stock_icon"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Current Stock"
+                            android:textColor="@color/black"
+                            android:textSize="15dp" />
+
+                        <TextView
+                            android:id="@+id/set_stock"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="0"
+                            android:textColor="@color/grey_calendar"
+                            android:textSize="15dp" />
+                    </LinearLayout>
+                </RelativeLayout>
+
+                <RelativeLayout
+                    android:id="@+id/IconType"
+                    android:layout_width="match_parent"
+                    android:layout_height="70dp"
+                    android:layout_marginStart="10dp"
+                    android:layout_marginTop="10dp"
+                    android:layout_marginEnd="10dp"
+                    android:background="@drawable/corner1"
+                    android:clickable="true"
+                    android:onClick="selectIconType">
+
+                    <ImageView
+                        android:id="@+id/icon_preview"
+                        android:layout_width="50dp"
+                        android:layout_height="50dp"
+                        android:layout_alignParentLeft="true"
+                        android:layout_centerVertical="true"
+                        android:layout_marginLeft="16dp"
+                        android:layout_marginRight="32dp"
+                        android:src="@drawable/medicine_pill" />
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_centerVertical="true"
+                        android:layout_toRightOf="@id/icon_preview"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Icon"
+                            android:textColor="@color/black"
+                            android:textSize="15dp" />
+
+                        <TextView
+                            android:id="@+id/set_icon_type"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Pill"
+                            android:textColor="@color/grey_calendar"
+                            android:textSize="15dp" />
+                    </LinearLayout>
+                </RelativeLayout>
+
+                <RelativeLayout
+                    android:id="@+id/IconPhoto"
+                    android:layout_width="match_parent"
+                    android:layout_height="70dp"
+                    android:layout_marginStart="10dp"
+                    android:layout_marginTop="10dp"
+                    android:layout_marginEnd="10dp"
+                    android:layout_marginBottom="10dp"
+                    android:background="@drawable/corner1"
+                    android:clickable="true"
+                    android:onClick="selectIconImage">
+
+                    <ImageView
+                        android:id="@+id/icon_photo_icon"
+                        android:layout_width="50dp"
+                        android:layout_height="50dp"
+                        android:layout_alignParentLeft="true"
+                        android:layout_centerVertical="true"
+                        android:layout_marginLeft="16dp"
+                        android:layout_marginRight="32dp"
+                        android:background="@drawable/baseline_add_24" />
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_centerVertical="true"
+                        android:layout_toRightOf="@id/icon_photo_icon"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Photo"
+                            android:textColor="@color/black"
+                            android:textSize="15dp" />
+
+                        <TextView
+                            android:id="@+id/set_icon_photo"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Gallery or Camera"
+                            android:textColor="@color/grey_calendar"
+                            android:textSize="15dp" />
+                    </LinearLayout>
+                </RelativeLayout>
+
             </LinearLayout>
 
         </ScrollView>

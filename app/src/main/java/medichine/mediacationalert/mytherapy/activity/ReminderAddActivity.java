@@ -7,7 +7,11 @@ import androidx.appcompat.widget.Toolbar;
 
 import android.app.AlertDialog;
 import android.content.DialogInterface;
+import android.content.Intent;
+import android.graphics.Bitmap;
+import android.net.Uri;
 import android.os.Bundle;
+import android.provider.MediaStore;
 import android.text.Editable;
 import android.text.InputType;
 import android.text.TextWatcher;
@@ -16,6 +20,7 @@ import android.view.MenuItem;
 import android.view.View;
 import android.widget.EditText;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -24,7 +29,11 @@ import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.wdullaer.materialdatetimepicker.date.DatePickerDialog;
 import com.wdullaer.materialdatetimepicker.time.TimePickerDialog;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.util.Calendar;
+import java.util.Locale;
 
 import medichine.mediacationalert.mytherapy.R;
 import medichine.mediacationalert.mytherapy.utils.AlarmReceiver;
@@ -38,7 +47,9 @@ public class ReminderAddActivity extends AppCompatActivity implements
 
     private Toolbar mToolbar;
     private EditText mTitleText;
-    private TextView mDateText, mTimeText, mRepeatText, mRepeatNoText, mRepeatTypeText;
+    private EditText mDoseText;
+    private TextView mDateText, mTimeText, mRepeatText, mRepeatNoText, mRepeatTypeText, mStockText, mIconTypeText, mIconPhotoText;
+    private ImageView mIconPreview;
     private FloatingActionButton mFAB1;
     private FloatingActionButton mFAB2;
     private int mYear, mMonth, mHour, mMinute, mDay;
@@ -50,6 +61,9 @@ public class ReminderAddActivity extends AppCompatActivity implements
     private String mRepeatNo;
     private String mRepeatType;
     private String mActive;
+    private double mDose;
+    private String mIconType;
+    private String mIconUri;
 
     // Values for orientation change
     private static final String KEY_TITLE = "title_key";
@@ -59,6 +73,12 @@ public class ReminderAddActivity extends AppCompatActivity implements
     private static final String KEY_REPEAT_NO = "repeat_no_key";
     private static final String KEY_REPEAT_TYPE = "repeat_type_key";
     private static final String KEY_ACTIVE = "active_key";
+    private static final String KEY_DOSE = "dose_key";
+    private static final String KEY_ICON_TYPE = "icon_type_key";
+    private static final String KEY_ICON_URI = "icon_uri_key";
+
+    private static final int REQUEST_PICK_IMAGE = 2001;
+    private static final int REQUEST_CAPTURE_IMAGE = 2002;
 
     // Constant values in milliseconds
     private static final long milMinute = 60000L;
@@ -80,6 +100,11 @@ public class ReminderAddActivity extends AppCompatActivity implements
         mRepeatText = (TextView) findViewById(R.id.set_repeat);
         mRepeatNoText = (TextView) findViewById(R.id.set_repeat_no);
         mRepeatTypeText = (TextView) findViewById(R.id.set_repeat_type);
+        mDoseText = (EditText) findViewById(R.id.set_dose);
+        mStockText = (TextView) findViewById(R.id.set_stock);
+        mIconTypeText = (TextView) findViewById(R.id.set_icon_type);
+        mIconPhotoText = (TextView) findViewById(R.id.set_icon_photo);
+        mIconPreview = (ImageView) findViewById(R.id.icon_preview);
         mFAB1 = (FloatingActionButton) findViewById(R.id.starred1);
         mFAB2 = (FloatingActionButton) findViewById(R.id.starred2);
 
@@ -100,6 +125,9 @@ public class ReminderAddActivity extends AppCompatActivity implements
         mRepeat = "true";
         mRepeatNo = Integer.toString(1);
         mRepeatType = "Minute";
+        mDose = 1.0;
+        mIconType = "pill";
+        mIconUri = "";
 
         Calendar now = Calendar.getInstance();
         mHour = now.get(Calendar.HOUR_OF_DAY);
@@ -122,6 +150,7 @@ public class ReminderAddActivity extends AppCompatActivity implements
             public void onTextChanged(CharSequence s, int start, int before, int count) {
                 mTitle = s.toString().trim();
                 mTitleText.setError(null);
+                updateStockText();
             }
 
             @Override
@@ -134,8 +163,11 @@ public class ReminderAddActivity extends AppCompatActivity implements
         mTimeText.setText(mTime);
         mRepeatNoText.setText(mRepeatNo);
         mRepeatTypeText.setText(mRepeatType);
+        mDoseText.setText(formatQuantity(mDose));
         updateRepeatText();
         updateActiveButtons();
+        updateStockText();
+        updateIconPreview();
 
         // To save state on device rotation
         if (savedInstanceState != null) {
@@ -163,7 +195,13 @@ public class ReminderAddActivity extends AppCompatActivity implements
             mRepeatType = savedRepeatType;
 
             mActive = savedInstanceState.getString(KEY_ACTIVE);
+            mDose = savedInstanceState.getDouble(KEY_DOSE, 1.0);
+            mDoseText.setText(formatQuantity(mDose));
+            mIconType = savedInstanceState.getString(KEY_ICON_TYPE, "pill");
+            mIconUri = savedInstanceState.getString(KEY_ICON_URI, "");
             updateActiveButtons();
+            updateStockText();
+            updateIconPreview();
         }
     }
 
@@ -178,6 +216,13 @@ public class ReminderAddActivity extends AppCompatActivity implements
         outState.putCharSequence(KEY_REPEAT_NO, mRepeatNoText.getText());
         outState.putCharSequence(KEY_REPEAT_TYPE, mRepeatTypeText.getText());
         outState.putCharSequence(KEY_ACTIVE, mActive);
+        try {
+            outState.putDouble(KEY_DOSE, Double.parseDouble(mDoseText.getText().toString().trim()));
+        } catch (NumberFormatException e) {
+            outState.putDouble(KEY_DOSE, mDose);
+        }
+        outState.putString(KEY_ICON_TYPE, mIconType);
+        outState.putString(KEY_ICON_URI, mIconUri);
     }
 
 
@@ -297,12 +342,140 @@ public class ReminderAddActivity extends AppCompatActivity implements
         alert.show();
     }
 
+    public void addStockBatch(View v) {
+        mTitle = mTitleText.getText().toString().trim();
+        if (mTitle.length() == 0) {
+            mTitleText.setError("Medication name is required before adding stock");
+            return;
+        }
+
+        AlertDialog.Builder alert = new AlertDialog.Builder(this);
+        alert.setTitle("Add Stock Batch");
+        final EditText input = new EditText(this);
+        input.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        alert.setView(input);
+        alert.setPositiveButton("Ok", new DialogInterface.OnClickListener() {
+            public void onClick(DialogInterface dialog, int whichButton) {
+                try {
+                    double quantity = Double.parseDouble(input.getText().toString().trim());
+                    if (quantity <= 0) {
+                        Toast.makeText(getApplicationContext(), "Stock must be greater than 0", Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    new ReminderDatabase(ReminderAddActivity.this).addStockBatch(mTitle, quantity);
+                    updateStockText();
+                } catch (NumberFormatException e) {
+                    Toast.makeText(getApplicationContext(), "Enter a valid stock quantity", Toast.LENGTH_SHORT).show();
+                }
+            }
+        });
+        alert.setNegativeButton("Cancel", null);
+        alert.show();
+    }
+
+    public void selectIconType(View v) {
+        final String[] labels = new String[]{"Pill", "Capsule", "Liquid"};
+        final String[] values = new String[]{"pill", "capsule", "liquid"};
+
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Select Icon");
+        builder.setItems(labels, new DialogInterface.OnClickListener() {
+            public void onClick(DialogInterface dialog, int item) {
+                mIconType = values[item];
+                mIconUri = "";
+                updateIconPreview();
+            }
+        });
+        builder.create().show();
+    }
+
+    public void selectIconImage(View v) {
+        final String[] items = new String[]{"Gallery", "Camera", "Use icon"};
+        AlertDialog.Builder builder = new AlertDialog.Builder(this);
+        builder.setTitle("Medicine Photo");
+        builder.setItems(items, new DialogInterface.OnClickListener() {
+            public void onClick(DialogInterface dialog, int item) {
+                if (item == 0) {
+                    openGallery();
+                } else if (item == 1) {
+                    openCamera();
+                } else {
+                    mIconUri = "";
+                    updateIconPreview();
+                }
+            }
+        });
+        builder.create().show();
+    }
+
+    private void openGallery() {
+        Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("image/*");
+        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION);
+        startActivityForResult(intent, REQUEST_PICK_IMAGE);
+    }
+
+    private void openCamera() {
+        Intent intent = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+        if (intent.resolveActivity(getPackageManager()) == null) {
+            Toast.makeText(getApplicationContext(), "Camera not available", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        startActivityForResult(intent, REQUEST_CAPTURE_IMAGE);
+    }
+
     private void updateRepeatText() {
         if ("true".equals(mRepeat)) {
             mRepeatText.setText("Every " + mRepeatNo + " " + mRepeatType + "(s)");
         } else {
             mRepeatText.setText(R.string.repeat_off);
         }
+    }
+
+    private void updateStockText() {
+        if (mStockText == null) {
+            return;
+        }
+        String title = mTitleText == null ? "" : mTitleText.getText().toString().trim();
+        if (title.length() == 0) {
+            mStockText.setText("0");
+            return;
+        }
+        double stock = new ReminderDatabase(this).getTotalStock(title);
+        mStockText.setText(formatQuantity(stock));
+    }
+
+    private void updateIconPreview() {
+        if (mIconPreview == null) {
+            return;
+        }
+        if (mIconUri != null && mIconUri.length() > 0) {
+            mIconPreview.setImageURI(Uri.parse(mIconUri));
+            mIconPhotoText.setText("Photo selected");
+        } else {
+            mIconPreview.setImageResource(iconResourceForType(mIconType));
+            mIconPhotoText.setText("Gallery or Camera");
+        }
+        mIconTypeText.setText(iconLabel(mIconType));
+    }
+
+    private int iconResourceForType(String iconType) {
+        if ("capsule".equals(iconType)) {
+            return R.drawable.medicine_capsule;
+        } else if ("liquid".equals(iconType)) {
+            return R.drawable.medicine_liquid;
+        }
+        return R.drawable.medicine_pill;
+    }
+
+    private String iconLabel(String iconType) {
+        if ("capsule".equals(iconType)) {
+            return "Capsule";
+        } else if ("liquid".equals(iconType)) {
+            return "Liquid";
+        }
+        return "Pill";
     }
 
     private void updateActiveButtons() {
@@ -361,8 +534,27 @@ public class ReminderAddActivity extends AppCompatActivity implements
             mRepeatNoText.setText("1");
             mRepeatNo = "1";
         }
+
+        try {
+            mDose = Double.parseDouble(mDoseText.getText().toString().trim());
+            if (mDose <= 0) {
+                mDoseText.setError("Dose must be greater than 0");
+                return false;
+            }
+        } catch (NumberFormatException e) {
+            mDoseText.setError("Enter a valid dose");
+            return false;
+        }
+
         updateRepeatText();
         return true;
+    }
+
+    private String formatQuantity(double value) {
+        if (Math.abs(value - Math.round(value)) < 0.000001) {
+            return String.valueOf((long) Math.round(value));
+        }
+        return String.format(Locale.US, "%.2f", value);
     }
 
     private String formatTime(int hour, int minute) {
@@ -370,6 +562,43 @@ public class ReminderAddActivity extends AppCompatActivity implements
             return hour + ":0" + minute;
         }
         return hour + ":" + minute;
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (resultCode != RESULT_OK || data == null) {
+            return;
+        }
+
+        if (requestCode == REQUEST_PICK_IMAGE && data.getData() != null) {
+            Uri uri = data.getData();
+            try {
+                getContentResolver().takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+            } catch (SecurityException ignored) {
+            }
+            mIconUri = uri.toString();
+            updateIconPreview();
+        } else if (requestCode == REQUEST_CAPTURE_IMAGE && data.getExtras() != null) {
+            Object bitmap = data.getExtras().get("data");
+            if (bitmap instanceof Bitmap) {
+                mIconUri = saveCameraBitmap((Bitmap) bitmap);
+                updateIconPreview();
+            }
+        }
+    }
+
+    private String saveCameraBitmap(Bitmap bitmap) {
+        File file = new File(getFilesDir(), "medicine_icon_" + System.currentTimeMillis() + ".png");
+        try {
+            FileOutputStream out = new FileOutputStream(file);
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, out);
+            out.close();
+            return Uri.fromFile(file).toString();
+        } catch (IOException e) {
+            Toast.makeText(getApplicationContext(), "Could not save photo", Toast.LENGTH_SHORT).show();
+            return "";
+        }
     }
 
     // On clicking the save button
@@ -386,7 +615,8 @@ public class ReminderAddActivity extends AppCompatActivity implements
         }
 
         ReminderDatabase rb = new ReminderDatabase(this);
-        int ID = rb.addReminder(new Reminder(mTitle, mDate, mTime, mRepeat, mRepeatNo, mRepeatType, mActive));
+        int ID = rb.addReminder(new Reminder(mTitle, mDate, mTime, mRepeat, mRepeatNo, mRepeatType, mActive,
+                mDose, mIconType, mIconUri));
         if (ID == -1) {
             Toast.makeText(getApplicationContext(), "Could not save reminder", Toast.LENGTH_SHORT).show();
             return;
