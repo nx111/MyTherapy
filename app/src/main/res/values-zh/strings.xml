@@ -221,6 +221,9 @@
     <string name="lab_result_value_hint">检验结果</string>
     <string name="lab_result_date">检验日期</string>
     <string name="lab_reference_range">参考值 %1$s-%2$s %3$s</string>
+    <string name="lab_reference_min_only">参考值 ≥ %1$s %2$s</string>
+    <string name="lab_reference_max_only">参考值 ≤ %1$s %2$s</string>
+    <string name="lab_reference_empty">未填写参考值</string>
     <string name="lab_latest_result">最近 %1$s %2$s · %3$s</string>
     <string name="lab_no_result">暂无结果</string>
     <string name="lab_trend_title">%1$s趋势</string>

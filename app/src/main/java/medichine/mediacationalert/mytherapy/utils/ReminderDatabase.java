@@ -27,7 +27,7 @@ import medichine.mediacationalert.mytherapy.model.Account;
 import medichine.mediacationalert.mytherapy.R;
 
 public class ReminderDatabase extends SQLiteOpenHelper {
-    private static final int DATABASE_VERSION = 8;
+    private static final int DATABASE_VERSION = 9;
     public static final String DATABASE_NAME = "MedicationDbTab";
     public static final String COMPLETE_CSV_MARKER = "MYTHERAPY_CSV_V2";
     private static final String CSV_NULL = "__MYTHERAPY_NULL__";
@@ -181,6 +181,9 @@ public class ReminderDatabase extends SQLiteOpenHelper {
             addColumnIfMissing(db, TABLE_REMINDERS, KEY_STOCK_ALERT_THRESHOLD,
                     KEY_STOCK_ALERT_THRESHOLD + " REAL DEFAULT 0");
         }
+        if (oldVersion < 9) {
+            migrateNullableLabReferences(db);
+        }
     }
 
     private void createAccountTable(SQLiteDatabase db) {
@@ -329,8 +332,8 @@ public class ReminderDatabase extends SQLiteOpenHelper {
         String itemsSql = "CREATE TABLE IF NOT EXISTS " + TABLE_LAB_ITEMS + "("
                 + LAB_ITEM_ID + " INTEGER PRIMARY KEY AUTOINCREMENT,"
                 + LAB_ITEM_NAME + " TEXT NOT NULL,"
-                + LAB_ITEM_REF_MIN + " REAL NOT NULL,"
-                + LAB_ITEM_REF_MAX + " REAL NOT NULL,"
+                + LAB_ITEM_REF_MIN + " REAL,"
+                + LAB_ITEM_REF_MAX + " REAL,"
                 + LAB_ITEM_UNIT + " TEXT DEFAULT ''"
                 + ")";
         db.execSQL(itemsSql);
@@ -342,6 +345,25 @@ public class ReminderDatabase extends SQLiteOpenHelper {
                 + LAB_RESULT_CREATED_AT + " TEXT NOT NULL"
                 + ")";
         db.execSQL(resultsSql);
+    }
+
+    private void migrateNullableLabReferences(SQLiteDatabase db) {
+        String tempTable = TABLE_LAB_ITEMS + "_v9";
+        db.execSQL("DROP TABLE IF EXISTS " + tempTable);
+        db.execSQL("CREATE TABLE " + tempTable + "("
+                + LAB_ITEM_ID + " INTEGER PRIMARY KEY AUTOINCREMENT,"
+                + LAB_ITEM_NAME + " TEXT NOT NULL,"
+                + LAB_ITEM_REF_MIN + " REAL,"
+                + LAB_ITEM_REF_MAX + " REAL,"
+                + LAB_ITEM_UNIT + " TEXT DEFAULT ''"
+                + ")");
+        db.execSQL("INSERT INTO " + tempTable + "("
+                + LAB_ITEM_ID + "," + LAB_ITEM_NAME + "," + LAB_ITEM_REF_MIN + ","
+                + LAB_ITEM_REF_MAX + "," + LAB_ITEM_UNIT + ") SELECT "
+                + LAB_ITEM_ID + "," + LAB_ITEM_NAME + "," + LAB_ITEM_REF_MIN + ","
+                + LAB_ITEM_REF_MAX + "," + LAB_ITEM_UNIT + " FROM " + TABLE_LAB_ITEMS);
+        db.execSQL("DROP TABLE " + TABLE_LAB_ITEMS);
+        db.execSQL("ALTER TABLE " + tempTable + " RENAME TO " + TABLE_LAB_ITEMS);
     }
 
     public int addReminder(Reminder reminder) {
@@ -1229,18 +1251,28 @@ public class ReminderDatabase extends SQLiteOpenHelper {
     private ContentValues toLabTestItemValues(LabTestItem item) {
         ContentValues values = new ContentValues();
         values.put(LAB_ITEM_NAME, normalizeTitle(item.mName));
-        values.put(LAB_ITEM_REF_MIN, item.mReferenceMin);
-        values.put(LAB_ITEM_REF_MAX, item.mReferenceMax);
+        if (item.mReferenceMin == null) {
+            values.putNull(LAB_ITEM_REF_MIN);
+        } else {
+            values.put(LAB_ITEM_REF_MIN, item.mReferenceMin);
+        }
+        if (item.mReferenceMax == null) {
+            values.putNull(LAB_ITEM_REF_MAX);
+        } else {
+            values.put(LAB_ITEM_REF_MAX, item.mReferenceMax);
+        }
         values.put(LAB_ITEM_UNIT, item.mUnit == null ? "" : item.mUnit.trim());
         return values;
     }
 
     private LabTestItem readLabTestItem(Cursor cursor) {
+        int referenceMinIndex = cursor.getColumnIndexOrThrow(LAB_ITEM_REF_MIN);
+        int referenceMaxIndex = cursor.getColumnIndexOrThrow(LAB_ITEM_REF_MAX);
         return new LabTestItem(
                 cursor.getInt(cursor.getColumnIndexOrThrow(LAB_ITEM_ID)),
                 cursor.getString(cursor.getColumnIndexOrThrow(LAB_ITEM_NAME)),
-                cursor.getDouble(cursor.getColumnIndexOrThrow(LAB_ITEM_REF_MIN)),
-                cursor.getDouble(cursor.getColumnIndexOrThrow(LAB_ITEM_REF_MAX)),
+                cursor.isNull(referenceMinIndex) ? null : cursor.getDouble(referenceMinIndex),
+                cursor.isNull(referenceMaxIndex) ? null : cursor.getDouble(referenceMaxIndex),
                 cursor.getString(cursor.getColumnIndexOrThrow(LAB_ITEM_UNIT)));
     }
 

@@ -1098,6 +1098,27 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         return String.format(java.util.Locale.US, "%.2f", value);
     }
 
+    private String formatQuantity(Double value) {
+        return value == null ? "" : formatQuantity(value.doubleValue());
+    }
+
+    private String formatLabReferenceRange(LabTestItem item) {
+        String unitText = item.mUnit == null ? "" : item.mUnit.trim();
+        if (item.mReferenceMin != null && item.mReferenceMax != null) {
+            return getString(R.string.lab_reference_range,
+                    formatQuantity(item.mReferenceMin),
+                    formatQuantity(item.mReferenceMax),
+                    unitText);
+        }
+        if (item.mReferenceMin != null) {
+            return getString(R.string.lab_reference_min_only, formatQuantity(item.mReferenceMin), unitText);
+        }
+        if (item.mReferenceMax != null) {
+            return getString(R.string.lab_reference_max_only, formatQuantity(item.mReferenceMax), unitText);
+        }
+        return getString(R.string.lab_reference_empty);
+    }
+
     private String formatDoseQuantity(Reminder reminder) {
         return formatDoseQuantity(reminder, reminder.getDose());
     }
@@ -1248,10 +1269,11 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         for (LabTestItem item : rb.getLabTestItems()) {
             LabResult latest = rb.getLatestLabResult(item.mId);
             boolean hasResult = latest != null;
-            boolean inRange = hasResult
-                    && latest.mValue >= item.mReferenceMin
-                    && latest.mValue <= item.mReferenceMax;
-            boolean outOfRange = hasResult && !inRange;
+            boolean belowRange = hasResult && item.mReferenceMin != null && latest.mValue < item.mReferenceMin;
+            boolean aboveRange = hasResult && item.mReferenceMax != null && latest.mValue > item.mReferenceMax;
+            boolean hasReference = item.mReferenceMin != null || item.mReferenceMax != null;
+            boolean inRange = hasResult && hasReference && !belowRange && !aboveRange;
+            boolean outOfRange = belowRange || aboveRange;
             String unitText = item.mUnit == null ? "" : item.mUnit;
             String details = hasResult
                     ? getString(R.string.lab_latest_result,
@@ -1262,21 +1284,20 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
             String status;
             if (!hasResult) {
                 status = getString(R.string.lab_no_result);
-            } else if (latest.mValue < item.mReferenceMin) {
+            } else if (belowRange) {
                 status = getString(R.string.lab_low);
-            } else if (latest.mValue > item.mReferenceMax) {
+            } else if (aboveRange) {
                 status = getString(R.string.lab_high);
-            } else {
+            } else if (hasReference) {
                 status = getString(R.string.lab_normal);
+            } else {
+                status = getString(R.string.lab_reference_empty);
             }
 
             labItemMap.put(items.size(), item.mId);
             items.add(new SummaryItem(
                     item.mName,
-                    getString(R.string.lab_reference_range,
-                            formatQuantity(item.mReferenceMin),
-                            formatQuantity(item.mReferenceMax),
-                            unitText),
+                    formatLabReferenceRange(item),
                     details,
                     status,
                     "liquid",
@@ -1299,10 +1320,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         content.setPadding(padding, dp(8), padding, 0);
 
         TextView reference = new TextView(this);
-        reference.setText(getString(R.string.lab_reference_range,
-                formatQuantity(item.mReferenceMin),
-                formatQuantity(item.mReferenceMax),
-                item.mUnit));
+        reference.setText(formatLabReferenceRange(item));
         reference.setTextColor(getResources().getColor(R.color.text_secondary));
         reference.setTextSize(13);
         content.addView(reference, new LinearLayout.LayoutParams(
@@ -1500,9 +1518,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
             String[] labels = new String[items.size()];
             for (int i = 0; i < items.size(); i++) {
                 LabTestItem item = items.get(i);
-                labels[i] = item.mName + "  "
-                        + formatQuantity(item.mReferenceMin) + "-"
-                        + formatQuantity(item.mReferenceMax) + " " + item.mUnit;
+                labels[i] = item.mName + "  " + formatLabReferenceRange(item);
             }
             builder.setItems(labels, (dialog, which) -> showLabTestItemForm(items.get(which), true));
         }
@@ -1573,17 +1589,19 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
             return false;
         }
 
-        Double min = parseNumber(referenceMin);
-        Double max = parseNumber(referenceMax);
-        if (min == null) {
-            referenceMin.setError(getString(R.string.lab_reference_required));
+        String minText = referenceMin.getText().toString().trim();
+        String maxText = referenceMax.getText().toString().trim();
+        Double min = minText.length() == 0 ? null : parseNumber(referenceMin);
+        Double max = maxText.length() == 0 ? null : parseNumber(referenceMax);
+        if (minText.length() > 0 && min == null) {
+            referenceMin.setError(getString(R.string.enter_number));
             return false;
         }
-        if (max == null) {
-            referenceMax.setError(getString(R.string.lab_reference_required));
+        if (maxText.length() > 0 && max == null) {
+            referenceMax.setError(getString(R.string.enter_number));
             return false;
         }
-        if (min > max) {
+        if (min != null && max != null && min > max) {
             referenceMax.setError(getString(R.string.lab_reference_invalid));
             return false;
         }
@@ -1652,10 +1670,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         form.addView(resultDateText);
 
         TextView reference = new TextView(this);
-        reference.setText(getString(R.string.lab_reference_range,
-                formatQuantity(item.mReferenceMin),
-                formatQuantity(item.mReferenceMax),
-                item.mUnit));
+        reference.setText(formatLabReferenceRange(item));
         reference.setTextColor(getResources().getColor(R.color.text_secondary));
         form.addView(reference, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 

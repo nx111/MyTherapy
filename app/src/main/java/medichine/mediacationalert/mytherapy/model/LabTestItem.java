@@ -3,15 +3,15 @@ package medichine.mediacationalert.mytherapy.model;
 public class LabTestItem {
     public int mId;
     public String mName;
-    public double mReferenceMin;
-    public double mReferenceMax;
+    public Double mReferenceMin;
+    public Double mReferenceMax;
     public String mUnit;
 
-    public LabTestItem(String name, double referenceMin, double referenceMax, String unit) {
+    public LabTestItem(String name, Double referenceMin, Double referenceMax, String unit) {
         this(0, name, referenceMin, referenceMax, unit);
     }
 
-    public LabTestItem(int id, String name, double referenceMin, double referenceMax, String unit) {
+    public LabTestItem(int id, String name, Double referenceMin, Double referenceMax, String unit) {
         mId = id;
         mName = clean(name);
         mReferenceMin = referenceMin;
