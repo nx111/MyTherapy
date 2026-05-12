@@ -395,26 +395,33 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         int padding = dp(20);
         content.setPadding(padding, dp(8), padding, 0);
 
-        LinearLayout header = new LinearLayout(this);
-        header.setOrientation(LinearLayout.HORIZONTAL);
-        header.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout titleRow = new LinearLayout(this);
+        titleRow.setOrientation(LinearLayout.HORIZONTAL);
+        titleRow.setGravity(Gravity.CENTER_VERTICAL);
+        titleRow.setPadding(dp(20), dp(10), dp(12), dp(2));
+
+        TextView title = new TextView(this);
+        title.setText(R.string.account_info);
+        title.setTextColor(getResources().getColor(R.color.text_primary));
+        title.setTextSize(20);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        titleRow.addView(title, new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
 
         TextView accountName = new TextView(this);
         accountName.setText(rb.getCurrentAccountName());
         accountName.setTextColor(getResources().getColor(R.color.text_primary));
         accountName.setTextSize(18);
         accountName.setTypeface(Typeface.DEFAULT_BOLD);
-        header.addView(accountName, new LinearLayout.LayoutParams(
-                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+        content.addView(accountName, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
         ImageButton settingsButton = new ImageButton(this);
         settingsButton.setImageResource(R.drawable.baseline_settings_24);
         settingsButton.setColorFilter(getResources().getColor(R.color.text_primary));
         settingsButton.setBackgroundResource(android.R.drawable.list_selector_background);
         settingsButton.setContentDescription(getString(R.string.settings));
-        header.addView(settingsButton, new LinearLayout.LayoutParams(dp(44), dp(44)));
-        content.addView(header, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        titleRow.addView(settingsButton, new LinearLayout.LayoutParams(dp(44), dp(44)));
 
         LinearLayout actions = new LinearLayout(this);
         actions.setOrientation(LinearLayout.HORIZONTAL);
@@ -432,7 +439,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         actions.addView(renameButton);
 
         AlertDialog dialog = new AlertDialog.Builder(this)
-                .setTitle(R.string.account_info)
+                .setCustomTitle(titleRow)
                 .setView(content)
                 .setNegativeButton(R.string.cancel, null)
                 .create();
