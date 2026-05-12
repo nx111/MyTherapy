@@ -3,9 +3,13 @@ package medichine.mediacationalert.mytherapy.activity;
 import static medichine.mediacationalert.mytherapy.utils.Fun.showBanner;
 
 import android.Manifest;
+import android.app.AlarmManager;
 import android.app.AlertDialog;
 import android.app.DatePickerDialog;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.app.ProgressDialog;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
@@ -17,6 +21,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.MediaStore;
+import android.provider.Settings;
 import android.text.InputType;
 import android.util.Log;
 import android.view.Gravity;
@@ -38,6 +43,7 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.NotificationManagerCompat;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -49,6 +55,7 @@ import com.android.billingclient.api.QueryPurchasesParams;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
+import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -80,6 +87,7 @@ import medichine.mediacationalert.mytherapy.utils.AlarmReceiver;
 import medichine.mediacationalert.mytherapy.utils.Fun;
 import medichine.mediacationalert.mytherapy.utils.ItemClickListener;
 import medichine.mediacationalert.mytherapy.utils.MedicineIconFactory;
+import medichine.mediacationalert.mytherapy.utils.MyTherapyBackupManager;
 import medichine.mediacationalert.mytherapy.utils.MyTherapyArchiveImporter;
 import medichine.mediacationalert.mytherapy.utils.Prefs;
 import medichine.mediacationalert.mytherapy.utils.Reminder;
@@ -90,6 +98,10 @@ import medichine.mediacationalert.mytherapy.view.LabTrendChartView;
 
 public class MainActivity extends AppCompatActivity implements ItemClickListener {
     private static final int REQUEST_POST_NOTIFICATIONS = 1001;
+    private static final String PREF_NOTIFICATION_PERMISSION_REQUESTED = "notification_permission_requested";
+    private static final String PREF_NOTIFICATION_SETTINGS_HANDLED = "notification_settings_handled";
+    private static final String PREF_NOTIFICATION_CHANNEL_SETTINGS_HANDLED = "notification_channel_settings_handled";
+    private static final String PREF_EXACT_ALARM_SETTINGS_HANDLED = "exact_alarm_settings_handled";
     private static final int PAGE_TODAY = 0;
     private static final int PAGE_LAB = 1;
     private static final int PAGE_COURSE = 2;
@@ -123,6 +135,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     private ReminderDatabase rb;
     private AlarmReceiver mAlarmReceiver;
     private CourseIconEditState mCourseIconEditState;
+    private boolean mExportFullBackup;
 
     private static class CourseIconEditState {
         String iconType;
@@ -141,6 +154,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     private final Handler mUiHandler = new Handler(Looper.getMainLooper());
     private Runnable mAccountLongPressRunnable;
     private boolean mAccountLongPressHandled;
+    private boolean mReminderSettingsDialogShowing;
 
     private List<ReminderItem> medicineList = new ArrayList<>();
     private List<SummaryItem> summaryList = new ArrayList<>();
@@ -150,7 +164,6 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         super.onCreate(savedInstanceState);
 
         setContentView(R.layout.activity_main);
-        requestNotificationPermission();
 
         ActionBar actionBar = getSupportActionBar();
         if (actionBar != null) {
@@ -159,6 +172,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
 
         rb = new ReminderDatabase(getApplicationContext());
         prefs = new Prefs(this);
+        requestNotificationPermission();
         new Fun(this);
 
         if (BuildConfig.ADS_ENABLED && Fun.checkInternet()) {
@@ -263,8 +277,85 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
 
     private void requestNotificationPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
-                && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+                && !prefs.getBoolean(PREF_NOTIFICATION_PERMISSION_REQUESTED, false)) {
+            prefs.setBoolean(PREF_NOTIFICATION_PERMISSION_REQUESTED, true);
             requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, REQUEST_POST_NOTIFICATIONS);
+        }
+    }
+
+    private void checkReminderSystemSettings() {
+        if (mReminderSettingsDialogShowing || prefs == null) {
+            return;
+        }
+
+        if (!NotificationManagerCompat.from(this).areNotificationsEnabled()) {
+            if (!prefs.getBoolean(PREF_NOTIFICATION_SETTINGS_HANDLED, false)) {
+                Intent intent = new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                        .putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName());
+                showReminderSettingsDialog(
+                        R.string.reminder_settings_title,
+                        R.string.notification_permission_required_message,
+                        PREF_NOTIFICATION_SETTINGS_HANDLED,
+                        intent);
+            }
+            return;
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+                && !prefs.getBoolean(PREF_NOTIFICATION_CHANNEL_SETTINGS_HANDLED, false)) {
+            NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+            NotificationChannel channel = notificationManager == null ? null
+                    : notificationManager.getNotificationChannel(AlarmReceiver.CHANNEL_ID);
+            if (channel != null && channel.getImportance() == NotificationManager.IMPORTANCE_NONE) {
+                Intent intent = new Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+                        .putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName())
+                        .putExtra(Settings.EXTRA_CHANNEL_ID, AlarmReceiver.CHANNEL_ID);
+                showReminderSettingsDialog(
+                        R.string.reminder_settings_title,
+                        R.string.notification_channel_blocked_message,
+                        PREF_NOTIFICATION_CHANNEL_SETTINGS_HANDLED,
+                        intent);
+                return;
+            }
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+                && !prefs.getBoolean(PREF_EXACT_ALARM_SETTINGS_HANDLED, false)) {
+            AlarmManager alarmManager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+            if (alarmManager != null && !alarmManager.canScheduleExactAlarms()) {
+                Intent intent = new Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM)
+                        .setData(Uri.parse("package:" + getPackageName()));
+                showReminderSettingsDialog(
+                        R.string.reminder_settings_title,
+                        R.string.exact_alarm_permission_message,
+                        PREF_EXACT_ALARM_SETTINGS_HANDLED,
+                        intent);
+            }
+        }
+    }
+
+    private void showReminderSettingsDialog(int titleRes, int messageRes, String handledPrefKey, Intent settingsIntent) {
+        mReminderSettingsDialogShowing = true;
+        new AlertDialog.Builder(this)
+                .setTitle(titleRes)
+                .setMessage(messageRes)
+                .setPositiveButton(R.string.open_settings, (dialog, which) -> {
+                    prefs.setBoolean(handledPrefKey, true);
+                    openSettings(settingsIntent);
+                })
+                .setNegativeButton(R.string.cancel, null)
+                .setOnDismissListener(dialog -> mReminderSettingsDialogShowing = false)
+                .show();
+    }
+
+    private void openSettings(Intent settingsIntent) {
+        try {
+            startActivity(settingsIntent);
+        } catch (Exception e) {
+            Intent fallback = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                    .setData(Uri.parse("package:" + getPackageName()));
+            startActivity(fallback);
         }
     }
 
@@ -473,27 +564,42 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 "text/csv",
                 "text/comma-separated-values",
                 "text/plain",
+                "application/zip",
+                "application/octet-stream",
                 "application/vnd.ms-excel"
         });
         startActivityForResult(intent, REQUEST_IMPORT_ARCHIVE);
     }
 
     private void openArchiveExport() {
+        String[] labels = new String[]{
+                getString(R.string.export_format_csv),
+                getString(R.string.export_format_backup)
+        };
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.export_data)
+                .setItems(labels, (dialog, which) -> openArchiveExportDocument(which == 1))
+                .setNegativeButton(R.string.cancel, null)
+                .show();
+    }
+
+    private void openArchiveExportDocument(boolean fullBackup) {
+        mExportFullBackup = fullBackup;
         Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
-        intent.setType("text/csv");
-        intent.putExtra(Intent.EXTRA_TITLE, exportFileName());
+        intent.setType(fullBackup ? "application/zip" : "text/csv");
+        intent.putExtra(Intent.EXTRA_TITLE, exportFileName(fullBackup));
         startActivityForResult(intent, REQUEST_EXPORT_ARCHIVE);
     }
 
-    private String exportFileName() {
+    private String exportFileName(boolean fullBackup) {
         String accountName = rb.getCurrentAccountName();
         String safeName = accountName == null ? "" : accountName.replaceAll("[\\\\/:*?\"<>|]+", "_").trim();
         if (safeName.length() == 0) {
             safeName = getString(R.string.app_name);
         }
         String timestamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Calendar.getInstance().getTime());
-        return safeName + "-" + timestamp + ".csv";
+        return safeName + "-" + timestamp + (fullBackup ? ".mtbackup" : ".csv");
     }
 
     @Override
@@ -566,11 +672,23 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 Toast.makeText(this, R.string.export_failed, Toast.LENGTH_SHORT).show();
                 return;
             }
-            OutputStreamWriter writer = new OutputStreamWriter(outputStream, StandardCharsets.UTF_8);
-            writer.write(rb.exportCurrentAccountArchiveCsv());
-            writer.flush();
+            if (mExportFullBackup) {
+                if (rb != null) {
+                    rb.close();
+                    rb = null;
+                }
+                new MyTherapyBackupManager().exportFullBackup(this, outputStream);
+                rb = new ReminderDatabase(getApplicationContext());
+            } else {
+                OutputStreamWriter writer = new OutputStreamWriter(outputStream, StandardCharsets.UTF_8);
+                writer.write(rb.exportCompleteCsv());
+                writer.flush();
+            }
             Toast.makeText(this, R.string.export_success, Toast.LENGTH_SHORT).show();
         } catch (IOException | RuntimeException e) {
+            if (rb == null) {
+                rb = new ReminderDatabase(getApplicationContext());
+            }
             Toast.makeText(this, R.string.export_failed, Toast.LENGTH_SHORT).show();
         }
     }
@@ -583,17 +701,76 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         progressDialog.show();
 
         new Thread(() -> {
-            try (InputStream inputStream = getContentResolver().openInputStream(uri)) {
-                if (inputStream == null) {
+            try (InputStream rawInputStream = getContentResolver().openInputStream(uri)) {
+                if (rawInputStream == null) {
                     runOnUiThread(() -> finishArchiveImport(progressDialog, null));
+                    return;
+                }
+                BufferedInputStream inputStream = new BufferedInputStream(rawInputStream);
+                if (isZipFile(inputStream)) {
+                    if (rb != null) {
+                        rb.close();
+                        rb = null;
+                    }
+                    int files = new MyTherapyBackupManager().restoreFullBackup(this, inputStream);
+                    rb = new ReminderDatabase(getApplicationContext());
+                    prefs = new Prefs(this);
+                    rescheduleCurrentAccountReminders();
+                    runOnUiThread(() -> finishSimpleImport(progressDialog,
+                            getString(R.string.import_backup_success, files)));
+                    return;
+                }
+                if (isCompleteCsv(inputStream)) {
+                    int rows = rb.importCompleteCsv(inputStream);
+                    rb.close();
+                    rb = new ReminderDatabase(getApplicationContext());
+                    rescheduleCurrentAccountReminders();
+                    runOnUiThread(() -> finishSimpleImport(progressDialog,
+                            getString(R.string.import_complete_csv_success, rows)));
                     return;
                 }
                 MyTherapyArchiveImporter.Result result = new MyTherapyArchiveImporter().importArchive(this, inputStream);
                 runOnUiThread(() -> finishArchiveImport(progressDialog, result));
             } catch (IOException | RuntimeException e) {
+                if (rb == null) {
+                    rb = new ReminderDatabase(getApplicationContext());
+                }
                 runOnUiThread(() -> finishArchiveImport(progressDialog, null));
             }
         }).start();
+    }
+
+    private boolean isZipFile(BufferedInputStream inputStream) throws IOException {
+        inputStream.mark(4);
+        int first = inputStream.read();
+        int second = inputStream.read();
+        inputStream.reset();
+        return first == 'P' && second == 'K';
+    }
+
+    private boolean isCompleteCsv(BufferedInputStream inputStream) throws IOException {
+        inputStream.mark(256);
+        StringBuilder builder = new StringBuilder();
+        int value;
+        while ((value = inputStream.read()) != -1 && value != '\n' && builder.length() < 128) {
+            if (value != '\r') {
+                builder.append((char) value);
+            }
+        }
+        inputStream.reset();
+        String firstLine = builder.toString();
+        if (firstLine.startsWith("\uFEFF")) {
+            firstLine = firstLine.substring(1);
+        }
+        return ReminderDatabase.COMPLETE_CSV_MARKER.equals(firstLine);
+    }
+
+    private void finishSimpleImport(ProgressDialog progressDialog, String message) {
+        if (!isFinishing() && progressDialog.isShowing()) {
+            progressDialog.dismiss();
+        }
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+        loadCurrentPage();
     }
 
     private void finishArchiveImport(ProgressDialog progressDialog, MyTherapyArchiveImporter.Result result) {
@@ -954,7 +1131,11 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     @Override
     public void onResume() {
         super.onResume();
+        if (rb != null) {
+            rescheduleCurrentAccountReminders();
+        }
         loadCurrentPage();
+        checkReminderSystemSettings();
     }
 
     private void loadCurrentPage() {

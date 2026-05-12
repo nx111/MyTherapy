@@ -6,6 +6,11 @@ import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -23,7 +28,9 @@ import medichine.mediacationalert.mytherapy.R;
 
 public class ReminderDatabase extends SQLiteOpenHelper {
     private static final int DATABASE_VERSION = 8;
-    private static final String DATABASE_NAME = "MedicationDbTab";
+    public static final String DATABASE_NAME = "MedicationDbTab";
+    public static final String COMPLETE_CSV_MARKER = "MYTHERAPY_CSV_V2";
+    private static final String CSV_NULL = "__MYTHERAPY_NULL__";
     private static final int DEFAULT_ACCOUNT_ID = 1;
     private static final String PREF_ACTIVE_ACCOUNT_ID = "active_account_id";
 
@@ -693,6 +700,90 @@ public class ReminderDatabase extends SQLiteOpenHelper {
         return builder.toString();
     }
 
+    public String exportCompleteCsv() {
+        StringBuilder builder = new StringBuilder();
+        builder.append(COMPLETE_CSV_MARKER).append('\n');
+        SQLiteDatabase db = getReadableDatabase();
+        for (String table : backupTables()) {
+            appendCsvRow(builder, "# table", table);
+            Cursor cursor = db.query(table, null, null, null, null, null, null);
+            try {
+                String[] columns = cursor.getColumnNames();
+                appendCsvRow(builder, columns);
+                while (cursor.moveToNext()) {
+                    String[] values = new String[columns.length];
+                    for (int i = 0; i < columns.length; i++) {
+                        values[i] = cursor.isNull(i) ? CSV_NULL : cursor.getString(i);
+                    }
+                    appendCsvRow(builder, values);
+                }
+            } finally {
+                cursor.close();
+            }
+        }
+        return builder.toString();
+    }
+
+    public int importCompleteCsv(InputStream inputStream) throws IOException {
+        BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8));
+        String firstLine = reader.readLine();
+        if (!COMPLETE_CSV_MARKER.equals(firstLine)) {
+            throw new IOException("Invalid MyTherapy complete CSV");
+        }
+
+        SQLiteDatabase db = getWritableDatabase();
+        db.beginTransaction();
+        int importedRows = 0;
+        try {
+            for (String table : reversedBackupTables()) {
+                db.delete(table, null, null);
+            }
+
+            String currentTable = "";
+            List<String> columns = null;
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (line.trim().length() == 0) {
+                    continue;
+                }
+                List<String> fields = parseCsvLine(line);
+                if (fields.size() >= 2 && "# table".equals(fields.get(0))) {
+                    String table = fields.get(1);
+                    currentTable = isBackupTable(table) ? table : "";
+                    columns = null;
+                    continue;
+                }
+                if (currentTable.length() == 0) {
+                    continue;
+                }
+                if (columns == null) {
+                    columns = fields;
+                    continue;
+                }
+
+                ContentValues values = new ContentValues();
+                int count = Math.min(columns.size(), fields.size());
+                for (int i = 0; i < count; i++) {
+                    String value = fields.get(i);
+                    if (CSV_NULL.equals(value)) {
+                        values.putNull(columns.get(i));
+                    } else {
+                        values.put(columns.get(i), value);
+                    }
+                }
+                if (values.size() > 0) {
+                    db.insertWithOnConflict(currentTable, null, values, SQLiteDatabase.CONFLICT_REPLACE);
+                    importedRows++;
+                }
+            }
+
+            db.setTransactionSuccessful();
+        } finally {
+            db.endTransaction();
+        }
+        return importedRows;
+    }
+
     private Set<String> appendIntakeLogExportRows(StringBuilder builder) {
         Set<String> exportedLogs = new HashSet<>();
         SQLiteDatabase db = this.getReadableDatabase();
@@ -1292,6 +1383,61 @@ public class ReminderDatabase extends SQLiteOpenHelper {
             return "\"" + value.replace("\"", "\"\"") + "\"";
         }
         return value;
+    }
+
+    private String[] backupTables() {
+        return new String[]{
+                TABLE_ACCOUNTS,
+                TABLE_REMINDERS,
+                TABLE_STOCK_BATCHES,
+                TABLE_INTAKE_LOGS,
+                TABLE_HEALTH_ENTRIES,
+                TABLE_LAB_ITEMS,
+                TABLE_LAB_RESULTS
+        };
+    }
+
+    private String[] reversedBackupTables() {
+        String[] tables = backupTables();
+        for (int i = 0; i < tables.length / 2; i++) {
+            String tmp = tables[i];
+            tables[i] = tables[tables.length - i - 1];
+            tables[tables.length - i - 1] = tmp;
+        }
+        return tables;
+    }
+
+    private boolean isBackupTable(String table) {
+        for (String backupTable : backupTables()) {
+            if (backupTable.equals(table)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private List<String> parseCsvLine(String line) {
+        ArrayList<String> fields = new ArrayList<>();
+        StringBuilder field = new StringBuilder();
+        boolean quoted = false;
+        for (int i = 0; i < line.length(); i++) {
+            char c = line.charAt(i);
+            if (c == '"') {
+                if (quoted && i + 1 < line.length() && line.charAt(i + 1) == '"') {
+                    field.append('"');
+                    i++;
+                } else {
+                    quoted = !quoted;
+                }
+            } else if (c == ',' && !quoted) {
+                fields.add(field.toString());
+                field.setLength(0);
+            } else {
+                field.append(c);
+            }
+        }
+        fields.add(field.toString());
+        return fields;
     }
 
     private boolean hasMatchingDoseTime(Reminder left, Reminder right) {

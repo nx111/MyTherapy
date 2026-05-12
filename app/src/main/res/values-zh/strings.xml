@@ -101,6 +101,11 @@
     <string name="notification_delay">延迟</string>
     <string name="notification_delay_options">延迟</string>
     <string name="notification_delay_minutes">%1$d 分钟</string>
+    <string name="reminder_settings_title">提醒设置</string>
+    <string name="notification_permission_required_message">系统通知已关闭，开启通知后用药提醒才能正常弹出。</string>
+    <string name="notification_channel_blocked_message">提醒通知渠道已关闭，请开启该渠道以便用药提醒正常弹出。</string>
+    <string name="exact_alarm_permission_message">精确闹钟未允许，开启后用药提醒才能按计划时间唤醒。</string>
+    <string name="open_settings">打开设置</string>
     <string name="remove_ads">移除广告</string>
     <string name="subscribe_now">立即订阅</string>
     <string name="monthly">每月</string>
@@ -136,6 +141,8 @@
     <string name="rename_account">修改账户名称</string>
     <string name="import_data">导入数据</string>
     <string name="export_data">导出数据</string>
+    <string name="export_format_csv">CSV（给其它应用使用）</string>
+    <string name="export_format_backup">完整应用备份</string>
     <string name="export_success">数据已导出</string>
     <string name="export_failed">导出失败</string>
     <string name="account_name_hint">账户名称</string>
@@ -174,6 +181,8 @@
     <string name="import_archive">导入归档</string>
     <string name="importing_archive">正在导入归档...</string>
     <string name="import_archive_success">已导入 %1$d 个提醒和 %2$d 条历史记录。%3$d 条拒绝记录保留为未服药。</string>
+    <string name="import_complete_csv_success">已导入 %1$d 行 CSV 数据</string>
+    <string name="import_backup_success">已恢复完整备份（%1$d 个文件）</string>
     <string name="import_failed">导入失败</string>
     <string name="nav_journal">健康日记</string>
     <string name="nav_report">报告</string>

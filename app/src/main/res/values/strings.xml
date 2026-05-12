@@ -117,6 +117,11 @@
     <string name="notification_delay">Delay</string>
     <string name="notification_delay_options">Delay</string>
     <string name="notification_delay_minutes">%1$d min</string>
+    <string name="reminder_settings_title">Reminder settings</string>
+    <string name="notification_permission_required_message">System notifications are off. Medication reminders cannot alert you until notifications are allowed.</string>
+    <string name="notification_channel_blocked_message">The reminder notification channel is off. Turn it on so medication reminders can alert you.</string>
+    <string name="exact_alarm_permission_message">Exact alarms are not allowed. Allow exact alarms so medication reminders can wake up on time.</string>
+    <string name="open_settings">Open settings</string>
     <string name="remove_ads">Remove Ads</string>
     <string name="subscribe_now">Subscribe Right Now</string>
     <string name="monthly">Monthly</string>
@@ -156,6 +161,8 @@
     <string name="rename_account">Rename Account</string>
     <string name="import_data">Import Data</string>
     <string name="export_data">Export Data</string>
+    <string name="export_format_csv">CSV for other apps</string>
+    <string name="export_format_backup">Full app backup</string>
     <string name="export_success">Data exported</string>
     <string name="export_failed">Export failed</string>
     <string name="account_name_hint">Account name</string>
@@ -194,6 +201,8 @@
     <string name="import_archive">Import Archive</string>
     <string name="importing_archive">Importing archive...</string>
     <string name="import_archive_success">Imported %1$d reminders and %2$d history records. %3$d rejected records kept as not taken.</string>
+    <string name="import_complete_csv_success">Imported %1$d CSV rows</string>
+    <string name="import_backup_success">Restored backup with %1$d files</string>
     <string name="import_failed">Import failed</string>
     <string name="add_health_entry">Add Health Entry</string>
     <string name="entry_measurement">Measurement</string>
