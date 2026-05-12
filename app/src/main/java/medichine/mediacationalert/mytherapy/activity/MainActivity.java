@@ -15,6 +15,8 @@ import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.media.Ringtone;
+import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -112,6 +114,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     private static final int REQUEST_EXPORT_ARCHIVE = 3002;
     private static final int REQUEST_PICK_COURSE_ICON_IMAGE = 3003;
     private static final int REQUEST_CAPTURE_COURSE_ICON_IMAGE = 3004;
+    private static final int REQUEST_PICK_RINGTONE = 3005;
     private static final String COURSE_PLAN_SEPARATOR = "    ";
 
     private BillingClient billingClient;
@@ -392,12 +395,25 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         int padding = dp(20);
         content.setPadding(padding, dp(8), padding, 0);
 
+        LinearLayout header = new LinearLayout(this);
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+
         TextView accountName = new TextView(this);
         accountName.setText(rb.getCurrentAccountName());
         accountName.setTextColor(getResources().getColor(R.color.text_primary));
         accountName.setTextSize(18);
         accountName.setTypeface(Typeface.DEFAULT_BOLD);
-        content.addView(accountName, new LinearLayout.LayoutParams(
+        header.addView(accountName, new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+
+        ImageButton settingsButton = new ImageButton(this);
+        settingsButton.setImageResource(R.drawable.baseline_settings_24);
+        settingsButton.setColorFilter(getResources().getColor(R.color.text_primary));
+        settingsButton.setBackgroundResource(android.R.drawable.list_selector_background);
+        settingsButton.setContentDescription(getString(R.string.settings));
+        header.addView(settingsButton, new LinearLayout.LayoutParams(dp(44), dp(44)));
+        content.addView(header, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
         LinearLayout actions = new LinearLayout(this);
@@ -432,6 +448,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
             dialog.dismiss();
             showRenameAccountDialog();
         });
+        settingsButton.setOnClickListener(v -> showAppSettingsDialog());
         dialog.show();
     }
 
@@ -451,6 +468,89 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         params.rightMargin = dp(4);
         button.setLayoutParams(params);
         return button;
+    }
+
+    private void showAppSettingsDialog() {
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        int padding = dp(20);
+        content.setPadding(padding, dp(8), padding, dp(4));
+
+        TextView ringtone = settingsRow(
+                getString(R.string.reminder_ringtone),
+                currentReminderRingtoneTitle(),
+                true);
+        content.addView(ringtone);
+
+        TextView version = settingsRow(
+                getString(R.string.app_version),
+                getString(R.string.app_version_format, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE),
+                false);
+        LinearLayout.LayoutParams versionParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        versionParams.topMargin = dp(8);
+        content.addView(version, versionParams);
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(R.string.settings)
+                .setView(content)
+                .setNegativeButton(R.string.cancel, null)
+                .create();
+        ringtone.setOnClickListener(v -> {
+            dialog.dismiss();
+            openRingtonePicker();
+        });
+        dialog.show();
+    }
+
+    private TextView settingsRow(String title, String value, boolean clickable) {
+        TextView row = new TextView(this);
+        row.setText(title + "\n" + value);
+        row.setTextColor(getResources().getColor(R.color.text_primary));
+        row.setTextSize(16);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(dp(12), dp(10), dp(12), dp(10));
+        row.setMinHeight(dp(56));
+        row.setClickable(clickable);
+        if (clickable) {
+            row.setBackgroundResource(android.R.drawable.list_selector_background);
+        }
+        return row;
+    }
+
+    private String currentReminderRingtoneTitle() {
+        String saved = prefs.getString(AlarmReceiver.PREF_REMINDER_RINGTONE_URI, null);
+        if (saved != null && saved.length() == 0) {
+            return getString(R.string.silent);
+        }
+        Uri soundUri = AlarmReceiver.getReminderSoundUri(this);
+        if (soundUri == null) {
+            return getString(R.string.silent);
+        }
+        Ringtone ringtone = RingtoneManager.getRingtone(this, soundUri);
+        String title = ringtone == null ? "" : ringtone.getTitle(this);
+        if (title == null || title.trim().length() == 0) {
+            title = getString(R.string.default_ringtone);
+        }
+        return saved == null ? getString(R.string.default_ringtone_format, title) : title;
+    }
+
+    private void openRingtonePicker() {
+        Intent intent = new Intent(RingtoneManager.ACTION_RINGTONE_PICKER);
+        intent.putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_NOTIFICATION);
+        intent.putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true);
+        intent.putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, true);
+        intent.putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, AlarmReceiver.getReminderSoundUri(this));
+        startActivityForResult(intent, REQUEST_PICK_RINGTONE);
+    }
+
+    private void saveReminderRingtone(Intent data) {
+        Uri pickedUri = data.getParcelableExtra(RingtoneManager.EXTRA_RINGTONE_PICKED_URI);
+        prefs.setString(AlarmReceiver.PREF_REMINDER_RINGTONE_URI,
+                pickedUri == null ? "" : pickedUri.toString());
+        AlarmReceiver.recreateNotificationChannel(this);
+        Toast.makeText(this, R.string.ringtone_saved, Toast.LENGTH_SHORT).show();
     }
 
     private void showAccountDialog() {
@@ -606,6 +706,11 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (resultCode != RESULT_OK || data == null) {
+            return;
+        }
+
+        if (requestCode == REQUEST_PICK_RINGTONE) {
+            saveReminderRingtone(data);
             return;
         }
 

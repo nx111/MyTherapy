@@ -156,6 +156,14 @@
     <string name="duplicate_reminder_plan">A plan with the same medicine, time, and dose already exists</string>
     <string name="default_account">Default account</string>
     <string name="account_info">Account Info</string>
+    <string name="settings">Settings</string>
+    <string name="reminder_ringtone">Reminder ringtone</string>
+    <string name="default_ringtone">Default ringtone</string>
+    <string name="default_ringtone_format">Default: %1$s</string>
+    <string name="silent">Silent</string>
+    <string name="ringtone_saved">Ringtone saved</string>
+    <string name="app_version">Version</string>
+    <string name="app_version_format">%1$s (%2$d)</string>
     <string name="switch_account">Switch Account</string>
     <string name="add_account">Add Account</string>
     <string name="rename_account">Rename Account</string>

@@ -15,7 +15,9 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
+import android.media.AudioAttributes;
 import android.media.RingtoneManager;
+import android.net.Uri;
 import android.os.Build;
 import android.os.SystemClock;
 
@@ -38,6 +40,7 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
     NotificationManager manager;
     Notification myNotication2;
     public static final String CHANNEL_ID = "Channel_id";
+    public static final String PREF_REMINDER_RINGTONE_URI = "reminder_ringtone_uri";
     private static final String CHANNEL_NAME = "Notification";
     private static final String ACTION_TAKE_GROUP = "medichine.mediacationalert.mytherapy.ACTION_TAKE_GROUP";
     private static final String ACTION_SKIP_GROUP = "medichine.mediacationalert.mytherapy.ACTION_SKIP_GROUP";
@@ -129,7 +132,7 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
             scheduleGroupNextAfter(context, group, nextSearchAfter(scheduledAt));
             notificationManager.cancel(CHANNEL_ID, notificationId);
         } else {
-            createNotificationChannel(notificationManager);
+            createNotificationChannel(context, notificationManager);
             NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
                     .setSmallIcon(R.drawable.baseline_access_alarm_24)
                     .setContentTitle(context.getString(R.string.medication_not_confirmed))
@@ -210,7 +213,7 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
                 .setVibrate(new long[]{0, 500, 1000})
                 .setContentText(contentText)
                 .setStyle(new NotificationCompat.BigTextStyle().bigText(contentText))
-                .setSound(RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION))
+                .setSound(getReminderSoundUri(context))
                 .setContentIntent(mClick)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setCategory(NotificationCompat.CATEGORY_ALARM)
@@ -221,7 +224,7 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
                 .addAction(R.drawable.baseline_replay_circle_filled_24, context.getString(R.string.notification_delay), delayClick);
 
         this.manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
-        createNotificationChannel(this.manager);
+        createNotificationChannel(context, this.manager);
         myNotication2 = mBuilder.build();
 
         this.manager.notify(CHANNEL_ID, notificationIdFor(scheduledAt), mBuilder.build());
@@ -256,7 +259,7 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
         }
 
         NotificationManager notificationManager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
-        createNotificationChannel(notificationManager);
+        createNotificationChannel(context, notificationManager);
         notificationManager.notify(CHANNEL_ID, notificationIdFor(scheduledAt), builder.build());
     }
 
@@ -271,13 +274,43 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
         return builder.toString();
     }
 
-    private void createNotificationChannel(NotificationManager notificationManager) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+    public static Uri getReminderSoundUri(Context context) {
+        String value = new Prefs(context).getString(PREF_REMINDER_RINGTONE_URI, null);
+        if (value != null) {
+            return value.length() == 0 ? null : Uri.parse(value);
+        }
+        return RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
+    }
+
+    public static void recreateNotificationChannel(Context context) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            return;
+        }
+        NotificationManager notificationManager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
+        if (notificationManager == null) {
+            return;
+        }
+        notificationManager.deleteNotificationChannel(CHANNEL_ID);
+        createNotificationChannel(context, notificationManager);
+    }
+
+    private static void createNotificationChannel(Context context, NotificationManager notificationManager) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && notificationManager != null) {
             NotificationChannel channel = new NotificationChannel(CHANNEL_ID, CHANNEL_NAME, NotificationManager.IMPORTANCE_HIGH);
             channel.enableVibration(true);
             channel.setLightColor(Color.BLUE);
             channel.enableLights(true);
             channel.setShowBadge(true);
+            Uri soundUri = getReminderSoundUri(context);
+            if (soundUri == null) {
+                channel.setSound(null, null);
+            } else {
+                AudioAttributes audioAttributes = new AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_ALARM)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build();
+                channel.setSound(soundUri, audioAttributes);
+            }
             notificationManager.createNotificationChannel(channel);
         }
     }
