@@ -2124,7 +2124,18 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
 
     @Override
     public boolean longClickListener(int pos) {
-        if (mCurrentPage != PAGE_HISTORY || pos < 0 || pos >= summaryList.size()) {
+        if (pos < 0 || pos >= summaryList.size()) {
+            return false;
+        }
+        if (mCurrentPage == PAGE_LAB && labItemMap.containsKey(pos)) {
+            LabTestItem item = rb.getLabTestItem(labItemMap.get(pos));
+            if (item == null) {
+                return false;
+            }
+            showLabTestItemForm(item);
+            return true;
+        }
+        if (mCurrentPage != PAGE_HISTORY) {
             return false;
         }
         SummaryItem item = summaryList.get(pos);
