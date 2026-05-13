@@ -19,6 +19,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.provider.MediaStore;
 import android.text.InputType;
+import android.text.TextUtils;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.MotionEvent;
@@ -1122,6 +1123,22 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         int padding = dp(18);
         content.setPadding(padding, dp(8), padding, 0);
 
+        LinearLayout topRow = new LinearLayout(this);
+        topRow.setGravity(Gravity.CENTER_VERTICAL);
+        topRow.setOrientation(LinearLayout.HORIZONTAL);
+        TextView reference = new TextView(this);
+        reference.setText(getString(R.string.lab_reference_range,
+                formatQuantity(item.mReferenceMin),
+                formatQuantity(item.mReferenceMax),
+                item.mUnit));
+        reference.setTextColor(getResources().getColor(R.color.text_secondary));
+        reference.setTextSize(13);
+        reference.setSingleLine(true);
+        reference.setEllipsize(TextUtils.TruncateAt.END);
+        topRow.addView(reference, new LinearLayout.LayoutParams(
+                0,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                1));
         LinearLayout modeRow = new LinearLayout(this);
         modeRow.setGravity(Gravity.RIGHT);
         modeRow.setOrientation(LinearLayout.HORIZONTAL);
@@ -1132,22 +1149,12 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         modeRow.addView(trendMode);
         modeRow.addView(separator);
         modeRow.addView(listMode);
-        content.addView(modeRow, new LinearLayout.LayoutParams(
+        topRow.addView(modeRow, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+        content.addView(topRow, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT));
-
-        TextView reference = new TextView(this);
-        reference.setText(getString(R.string.lab_reference_range,
-                formatQuantity(item.mReferenceMin),
-                formatQuantity(item.mReferenceMax),
-                item.mUnit));
-        reference.setTextColor(getResources().getColor(R.color.text_secondary));
-        reference.setTextSize(13);
-        LinearLayout.LayoutParams referenceParams = new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT);
-        referenceParams.topMargin = dp(4);
-        content.addView(reference, referenceParams);
 
         ScrollView listView = createLabResultListView(results);
         listView.setVisibility(View.GONE);
@@ -1170,22 +1177,27 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         trendMode.setOnClickListener(v -> updateLabDetailMode(trendMode, listMode, chart, listView, true));
         listMode.setOnClickListener(v -> updateLabDetailMode(trendMode, listMode, chart, listView, false));
 
-        TextView count = new TextView(this);
-        count.setText(results.isEmpty()
+        String countText = results.isEmpty()
                 ? getString(R.string.lab_no_result)
-                : getString(R.string.lab_history_count, results.size()));
-        count.setTextColor(getResources().getColor(R.color.text_secondary));
-        count.setTextSize(13);
-        content.addView(count, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT));
+                : getString(R.string.lab_history_count, results.size());
 
-        new AlertDialog.Builder(this)
+        AlertDialog labDialog = new AlertDialog.Builder(this)
                 .setTitle(item.mName)
                 .setView(content)
-                .setPositiveButton(R.string.add_lab_result, (dialog, which) -> showLabResultForm(item))
+                .setPositiveButton(R.string.add_lab_result, (buttonDialog, which) -> showLabResultForm(item))
                 .setNegativeButton(R.string.cancel, null)
-                .show();
+                .setNeutralButton(countText, null)
+                .create();
+        labDialog.setOnShowListener(d -> {
+            Button countButton = labDialog.getButton(AlertDialog.BUTTON_NEUTRAL);
+            if (countButton != null) {
+                countButton.setAllCaps(false);
+                countButton.setClickable(false);
+                countButton.setFocusable(false);
+                countButton.setTextColor(getResources().getColor(R.color.text_secondary));
+            }
+        });
+        labDialog.show();
     }
 
     private TextView createLabDetailModeText(int textRes) {
