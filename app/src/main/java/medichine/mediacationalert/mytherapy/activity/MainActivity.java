@@ -23,6 +23,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.PowerManager;
 import android.provider.MediaStore;
 import android.provider.Settings;
 import android.text.InputType;
@@ -105,6 +106,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     private static final String PREF_NOTIFICATION_SETTINGS_HANDLED = "notification_settings_handled";
     private static final String PREF_NOTIFICATION_CHANNEL_SETTINGS_HANDLED = "notification_channel_settings_handled";
     private static final String PREF_EXACT_ALARM_SETTINGS_HANDLED = "exact_alarm_settings_handled";
+    private static final String PREF_BATTERY_OPTIMIZATION_HANDLED = "battery_optimization_handled";
     private static final int PAGE_TODAY = 0;
     private static final int PAGE_LAB = 1;
     private static final int PAGE_COURSE = 2;
@@ -335,6 +337,21 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                         R.string.reminder_settings_title,
                         R.string.exact_alarm_permission_message,
                         PREF_EXACT_ALARM_SETTINGS_HANDLED,
+                        intent);
+                return;
+            }
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+                && !prefs.getBoolean(PREF_BATTERY_OPTIMIZATION_HANDLED, false)) {
+            PowerManager powerManager = (PowerManager) getSystemService(Context.POWER_SERVICE);
+            if (powerManager != null && !powerManager.isIgnoringBatteryOptimizations(getPackageName())) {
+                Intent intent = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+                        .setData(Uri.parse("package:" + getPackageName()));
+                showReminderSettingsDialog(
+                        R.string.reminder_settings_title,
+                        R.string.battery_optimization_message,
+                        PREF_BATTERY_OPTIMIZATION_HANDLED,
                         intent);
             }
         }

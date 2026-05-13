@@ -121,6 +121,7 @@
     <string name="notification_permission_required_message">System notifications are off. Medication reminders cannot alert you until notifications are allowed.</string>
     <string name="notification_channel_blocked_message">The reminder notification channel is off. Turn it on so medication reminders can alert you.</string>
     <string name="exact_alarm_permission_message">Exact alarms are not allowed. Allow exact alarms so medication reminders can wake up on time.</string>
+    <string name="battery_optimization_message">Battery optimization may put the app to sleep and block scheduled reminders. Allow this app to ignore battery optimization for more reliable alarms. This may slightly increase battery use.</string>
     <string name="open_settings">Open settings</string>
     <string name="remove_ads">Remove Ads</string>
     <string name="subscribe_now">Subscribe Right Now</string>

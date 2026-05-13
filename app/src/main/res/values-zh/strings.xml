@@ -105,6 +105,7 @@
     <string name="notification_permission_required_message">系统通知已关闭，开启通知后用药提醒才能正常弹出。</string>
     <string name="notification_channel_blocked_message">提醒通知渠道已关闭，请开启该渠道以便用药提醒正常弹出。</string>
     <string name="exact_alarm_permission_message">精确闹钟未允许，开启后用药提醒才能按计划时间唤醒。</string>
+    <string name="battery_optimization_message">系统电池优化可能使应用休眠，导致定时提醒无法唤醒。允许本应用忽略电池优化可提高闹钟可靠性，但可能会略微增加耗电。</string>
     <string name="open_settings">打开设置</string>
     <string name="remove_ads">移除广告</string>
     <string name="subscribe_now">立即订阅</string>
