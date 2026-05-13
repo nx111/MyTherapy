@@ -127,6 +127,9 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     private static final int REQUEST_CAPTURE_COURSE_ICON_IMAGE = 3004;
     private static final int REQUEST_PICK_RINGTONE = 3005;
     private static final String COURSE_PLAN_SEPARATOR = "    ";
+    private static final String STATE_CURRENT_PAGE = "current_page";
+    private static final String STATE_SELECTED_DATE = "selected_date";
+    private static final String STATE_COURSE_SHOW_ALL = "course_show_all";
 
     private BillingClient billingClient;
     private Prefs prefs;
@@ -212,6 +215,15 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         mBottomNavigation = findViewById(R.id.bottom_nav);
         mSelectedDate = Calendar.getInstance();
         normalizeDate(mSelectedDate);
+        if (savedInstanceState != null) {
+            mCurrentPage = savedInstanceState.getInt(STATE_CURRENT_PAGE, PAGE_TODAY);
+            long selectedDate = savedInstanceState.getLong(STATE_SELECTED_DATE, -1L);
+            if (selectedDate > 0) {
+                mSelectedDate.setTimeInMillis(selectedDate);
+                normalizeDate(mSelectedDate);
+            }
+            mCourseShowAll.setChecked(savedInstanceState.getBoolean(STATE_COURSE_SHOW_ALL, false));
+        }
 
         mList.setLayoutManager(new LinearLayoutManager(this));
         setupLabItemDragSorting();
@@ -248,7 +260,43 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
 
         mAlarmReceiver = new AlarmReceiver();
         updateCalendarHeader();
+        showRestoredPage();
+    }
+
+    @Override
+    protected void onSaveInstanceState(@NonNull Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putInt(STATE_CURRENT_PAGE, mCurrentPage);
+        if (mSelectedDate != null) {
+            outState.putLong(STATE_SELECTED_DATE, mSelectedDate.getTimeInMillis());
+        }
+        if (mCourseShowAll != null) {
+            outState.putBoolean(STATE_COURSE_SHOW_ALL, mCourseShowAll.isChecked());
+        }
+    }
+
+    private void showRestoredPage() {
+        int navItemId = navigationItemForPage(mCurrentPage);
+        if (navItemId != 0 && mBottomNavigation.getSelectedItemId() != navItemId) {
+            mBottomNavigation.setSelectedItemId(navItemId);
+            return;
+        }
         loadCurrentPage();
+    }
+
+    private int navigationItemForPage(int page) {
+        if (page == PAGE_LAB) {
+            return R.id.nav_lab;
+        } else if (page == PAGE_COURSE) {
+            return R.id.nav_course;
+        } else if (page == PAGE_JOURNAL) {
+            return R.id.nav_journal;
+        } else if (page == PAGE_REPORT) {
+            return R.id.nav_report;
+        } else if (page == PAGE_TODAY) {
+            return R.id.nav_today;
+        }
+        return 0;
     }
 
     private void setupLabItemDragSorting() {
