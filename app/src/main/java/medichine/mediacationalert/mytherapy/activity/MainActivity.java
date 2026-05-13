@@ -1847,9 +1847,8 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 LinearLayout.LayoutParams.WRAP_CONTENT, 1));
 
         TextView date = new TextView(this);
-        String time = formatHealthEntryTime(result.mCreatedAt);
         String dateText = formatHealthEntryDate(result.mCreatedAt);
-        date.setText(time.length() == 0 ? dateText : dateText + " " + time);
+        date.setText(dateText);
         date.setTextColor(getResources().getColor(R.color.text_primary));
         date.setTextSize(14);
         textGroup.addView(date, new LinearLayout.LayoutParams(
