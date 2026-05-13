@@ -1918,7 +1918,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 LinearLayout.LayoutParams.WRAP_CONTENT, 1));
 
         TextView date = new TextView(this);
-        String dateText = formatHealthEntryDate(result.mCreatedAt);
+        String dateText = formatLabResultListDate(result.mCreatedAt);
         date.setText(dateText);
         date.setTextColor(getResources().getColor(R.color.text_primary));
         date.setTextSize(14);
@@ -2298,9 +2298,10 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
 
         String[] resultDate = new String[]{ReminderSchedule.formatDate(Calendar.getInstance())};
         TextView resultDateText = dateSelectorText(R.string.lab_result_date, resultDate[0]);
+        resultDateText.setText(labResultDateSelectorLabel(resultDate[0]));
         resultDateText.setOnClickListener(v -> showLabResultDatePicker(resultDate[0], date -> {
                     resultDate[0] = date;
-                    resultDateText.setText(dateSelectorLabel(R.string.lab_result_date, resultDate[0]));
+                    resultDateText.setText(labResultDateSelectorLabel(resultDate[0]));
                 }));
         form.addView(resultDateText);
 
@@ -2553,7 +2554,45 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         if (createdAt == null || createdAt.length() == 0) {
             return "";
         }
+        Calendar calendar = parseLabResultDate(createdAt);
+        if (calendar != null) {
+            return new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(calendar.getTime());
+        }
         return createdAt.length() >= 10 ? createdAt.substring(0, 10) : createdAt;
+    }
+
+    private String labResultDateSelectorLabel(String date) {
+        return getString(R.string.lab_result_date) + ": " + formatLabResultDateValue(date);
+    }
+
+    private String formatLabResultDateValue(String date) {
+        Calendar calendar = parseLabResultDate(date);
+        if (calendar == null) {
+            return date == null ? "" : date;
+        }
+        return new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(calendar.getTime());
+    }
+
+    private Calendar parseLabResultDate(String value) {
+        String text = value == null ? "" : value.trim();
+        if (text.length() == 0) {
+            return null;
+        }
+        String[] patterns = new String[]{"yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd"};
+        for (String pattern : patterns) {
+            try {
+                SimpleDateFormat format = new SimpleDateFormat(pattern, Locale.US);
+                format.setLenient(false);
+                Calendar calendar = Calendar.getInstance();
+                calendar.setTime(format.parse(text.length() > pattern.length()
+                        ? text.substring(0, pattern.length())
+                        : text));
+                normalizeDate(calendar);
+                return calendar;
+            } catch (ParseException ignored) {
+            }
+        }
+        return parseCourseDate(text);
     }
 
     private String entryTypeLabel(String type) {
