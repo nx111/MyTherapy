@@ -308,12 +308,13 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
                 && !prefs.getBoolean(PREF_NOTIFICATION_CHANNEL_SETTINGS_HANDLED, false)) {
             NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+            String reminderChannelId = AlarmReceiver.getReminderChannelId(this);
             NotificationChannel channel = notificationManager == null ? null
-                    : notificationManager.getNotificationChannel(AlarmReceiver.CHANNEL_ID);
+                    : notificationManager.getNotificationChannel(reminderChannelId);
             if (channel != null && channel.getImportance() == NotificationManager.IMPORTANCE_NONE) {
                 Intent intent = new Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
                         .putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName())
-                        .putExtra(Settings.EXTRA_CHANNEL_ID, AlarmReceiver.CHANNEL_ID);
+                        .putExtra(Settings.EXTRA_CHANNEL_ID, reminderChannelId);
                 showReminderSettingsDialog(
                         R.string.reminder_settings_title,
                         R.string.notification_channel_blocked_message,
@@ -545,7 +546,9 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
 
     private void openRingtonePicker() {
         Intent intent = new Intent(RingtoneManager.ACTION_RINGTONE_PICKER);
-        intent.putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_NOTIFICATION);
+        intent.putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_ALARM);
+        intent.putExtra(RingtoneManager.EXTRA_RINGTONE_DEFAULT_URI,
+                RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM));
         intent.putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true);
         intent.putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, true);
         intent.putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, AlarmReceiver.getReminderSoundUri(this));
@@ -553,10 +556,11 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     }
 
     private void saveReminderRingtone(Intent data) {
+        String oldChannelId = AlarmReceiver.getReminderChannelId(this);
         Uri pickedUri = data.getParcelableExtra(RingtoneManager.EXTRA_RINGTONE_PICKED_URI);
         prefs.setString(AlarmReceiver.PREF_REMINDER_RINGTONE_URI,
                 pickedUri == null ? "" : pickedUri.toString());
-        AlarmReceiver.recreateNotificationChannel(this);
+        AlarmReceiver.recreateNotificationChannel(this, oldChannelId);
         Toast.makeText(this, R.string.ringtone_saved, Toast.LENGTH_SHORT).show();
     }
 

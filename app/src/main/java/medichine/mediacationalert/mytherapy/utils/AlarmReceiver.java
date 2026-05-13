@@ -41,6 +41,7 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
     Notification myNotication2;
     public static final String CHANNEL_ID = "Channel_id";
     public static final String PREF_REMINDER_RINGTONE_URI = "reminder_ringtone_uri";
+    private static final String CHANNEL_ID_PREFIX = CHANNEL_ID + "_sound_";
     private static final String CHANNEL_NAME = "Notification";
     private static final String ACTION_TAKE_GROUP = "medichine.mediacationalert.mytherapy.ACTION_TAKE_GROUP";
     private static final String ACTION_SKIP_GROUP = "medichine.mediacationalert.mytherapy.ACTION_SKIP_GROUP";
@@ -133,7 +134,7 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
             notificationManager.cancel(CHANNEL_ID, notificationId);
         } else {
             createNotificationChannel(context, notificationManager);
-            NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
+            NotificationCompat.Builder builder = new NotificationCompat.Builder(context, getReminderChannelId(context))
                     .setSmallIcon(R.drawable.baseline_access_alarm_24)
                     .setContentTitle(context.getString(R.string.medication_not_confirmed))
                     .setContentText(result.message)
@@ -205,7 +206,7 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
                 : context.getString(R.string.time_to_take_medication);
 
         // Create Notification
-        NotificationCompat.Builder mBuilder = new NotificationCompat.Builder(context, CHANNEL_ID)
+        NotificationCompat.Builder mBuilder = new NotificationCompat.Builder(context, getReminderChannelId(context))
                 .setLargeIcon(BitmapFactory.decodeResource(context.getResources(), R.drawable.pill_reminder_icon))
                 .setSmallIcon(R.drawable.baseline_access_alarm_24)
                 .setContentTitle(title)
@@ -232,7 +233,7 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
 
     private void showDelayOptionsNotification(Context context, List<Reminder> group, String scheduledAt) {
         String contentText = buildGroupText(context, group);
-        NotificationCompat.Builder builder = new NotificationCompat.Builder(context, CHANNEL_ID)
+        NotificationCompat.Builder builder = new NotificationCompat.Builder(context, getReminderChannelId(context))
                 .setLargeIcon(BitmapFactory.decodeResource(context.getResources(), R.drawable.pill_reminder_icon))
                 .setSmallIcon(R.drawable.baseline_access_alarm_24)
                 .setContentTitle(context.getString(R.string.notification_delay_options))
@@ -279,10 +280,16 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
         if (value != null) {
             return value.length() == 0 ? null : Uri.parse(value);
         }
-        return RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
+        return RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM);
     }
 
-    public static void recreateNotificationChannel(Context context) {
+    public static String getReminderChannelId(Context context) {
+        String value = new Prefs(context).getString(PREF_REMINDER_RINGTONE_URI, null);
+        String soundKey = value == null ? "default_alarm" : value;
+        return CHANNEL_ID_PREFIX + Integer.toHexString(soundKey.hashCode());
+    }
+
+    public static void recreateNotificationChannel(Context context, String oldChannelId) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
             return;
         }
@@ -290,13 +297,20 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
         if (notificationManager == null) {
             return;
         }
+        if (oldChannelId != null && oldChannelId.length() > 0) {
+            notificationManager.deleteNotificationChannel(oldChannelId);
+        }
         notificationManager.deleteNotificationChannel(CHANNEL_ID);
+        notificationManager.deleteNotificationChannel(getReminderChannelId(context));
         createNotificationChannel(context, notificationManager);
     }
 
     private static void createNotificationChannel(Context context, NotificationManager notificationManager) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && notificationManager != null) {
-            NotificationChannel channel = new NotificationChannel(CHANNEL_ID, CHANNEL_NAME, NotificationManager.IMPORTANCE_HIGH);
+            NotificationChannel channel = new NotificationChannel(
+                    getReminderChannelId(context),
+                    CHANNEL_NAME,
+                    NotificationManager.IMPORTANCE_HIGH);
             channel.enableVibration(true);
             channel.setLightColor(Color.BLUE);
             channel.enableLights(true);
