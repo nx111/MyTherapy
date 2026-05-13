@@ -1708,6 +1708,10 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     }
 
     private void showLabTrendDialog(int itemId) {
+        showLabTrendDialog(itemId, true);
+    }
+
+    private void showLabTrendDialog(int itemId, boolean showTrend) {
         LabTestItem item = rb.getLabTestItem(itemId);
         if (item == null) {
             return;
@@ -1768,9 +1772,16 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.MATCH_PARENT));
 
-        updateLabDetailMode(trendMode, listMode, chart, resultList, true);
-        trendMode.setOnClickListener(v -> updateLabDetailMode(trendMode, listMode, chart, resultList, true));
-        listMode.setOnClickListener(v -> updateLabDetailMode(trendMode, listMode, chart, resultList, false));
+        boolean[] detailShowsTrend = new boolean[]{showTrend};
+        updateLabDetailMode(trendMode, listMode, chart, resultList, detailShowsTrend[0]);
+        trendMode.setOnClickListener(v -> {
+            detailShowsTrend[0] = true;
+            updateLabDetailMode(trendMode, listMode, chart, resultList, true);
+        });
+        listMode.setOnClickListener(v -> {
+            detailShowsTrend[0] = false;
+            updateLabDetailMode(trendMode, listMode, chart, resultList, false);
+        });
 
         String countText = results.isEmpty()
                 ? getString(R.string.lab_no_result)
@@ -1780,7 +1791,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 .setTitle(item.mName)
                 .setView(content)
                 .setPositiveButton(R.string.cancel, null)
-                .setNegativeButton("", (buttonDialog, which) -> showLabResultForm(item))
+                .setNegativeButton("", null)
                 .setNeutralButton(countText, null)
                 .create();
         labDialog.setOnShowListener(d -> {
@@ -1797,6 +1808,10 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 addButton.setMinWidth(dp(48));
                 addButton.setContentDescription(getString(R.string.add_lab_result));
                 addButton.setCompoundDrawablesWithIntrinsicBounds(R.drawable.baseline_add_dialog_24, 0, 0, 0);
+                addButton.setOnClickListener(v -> {
+                    labDialog.dismiss();
+                    showLabResultForm(item, true, detailShowsTrend[0]);
+                });
             }
         });
         labDialog.show();
@@ -2266,6 +2281,10 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     }
 
     private void showLabResultForm(LabTestItem item) {
+        showLabResultForm(item, false, true);
+    }
+
+    private void showLabResultForm(LabTestItem item, boolean returnToDetail, boolean showTrend) {
         LinearLayout form = new LinearLayout(this);
         form.setOrientation(LinearLayout.VERTICAL);
         int padding = dp(20);
@@ -2296,22 +2315,36 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 .setPositiveButton(R.string.saved, null)
                 .setNegativeButton(R.string.cancel, null)
                 .create();
-        dialog.setOnShowListener(d -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
-            Double resultValue = parseNumber(value);
-            if (resultValue == null) {
-                value.setError(getString(R.string.lab_result_required));
-                return;
-            }
-            long id = rb.addLabResult(new LabResult(item.mId, resultValue, labResultCreatedAt(resultDate[0])));
-            if (id == -1) {
-                Toast.makeText(this, R.string.could_not_save_lab_result, Toast.LENGTH_SHORT).show();
-                return;
-            }
-            Toast.makeText(this, R.string.saved, Toast.LENGTH_SHORT).show();
-            dialog.dismiss();
-            loadCurrentPage();
-        }));
+        dialog.setOnShowListener(d -> {
+            dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setOnClickListener(v -> {
+                dialog.dismiss();
+                reopenLabDetailIfNeeded(returnToDetail, item.mId, showTrend);
+            });
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+                Double resultValue = parseNumber(value);
+                if (resultValue == null) {
+                    value.setError(getString(R.string.lab_result_required));
+                    return;
+                }
+                long id = rb.addLabResult(new LabResult(item.mId, resultValue, labResultCreatedAt(resultDate[0])));
+                if (id == -1) {
+                    Toast.makeText(this, R.string.could_not_save_lab_result, Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                Toast.makeText(this, R.string.saved, Toast.LENGTH_SHORT).show();
+                dialog.dismiss();
+                loadCurrentPage();
+                reopenLabDetailIfNeeded(returnToDetail, item.mId, showTrend);
+            });
+        });
         dialog.show();
+    }
+
+    private void reopenLabDetailIfNeeded(boolean returnToDetail, int itemId, boolean showTrend) {
+        if (!returnToDetail) {
+            return;
+        }
+        mUiHandler.post(() -> showLabTrendDialog(itemId, showTrend));
     }
 
     private String labResultCreatedAt(String resultDate) {
