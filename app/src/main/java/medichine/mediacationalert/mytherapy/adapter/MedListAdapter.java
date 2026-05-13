@@ -51,7 +51,7 @@ public class MedListAdapter extends RecyclerView.Adapter<MedListAdapter.SimpleHo
         holder.setActiveImage(item.mActive);
         holder.setIcon(item.mIconType, item.mIconUri);
         holder.setMedicineLines(item.mMedicineLines);
-        holder.setTakenState(item.mTaken, "true".equals(item.mActive));
+        holder.setTakenState(item.mTaken, "true".equals(item.mActive), item.mShowConfirmButton);
 
         holder.itemView.setOnClickListener(v -> listener.clickListener(position));
         holder.takenButton.setOnClickListener(v -> listener.confirmListener(position));
@@ -105,8 +105,9 @@ public class MedListAdapter extends RecyclerView.Adapter<MedListAdapter.SimpleHo
             }
         }
 
-        public void setTakenState(boolean taken, boolean active) {
-            takenButton.setEnabled(active && !taken);
+        public void setTakenState(boolean taken, boolean active, boolean showConfirmButton) {
+            takenButton.setVisibility(showConfirmButton ? View.VISIBLE : View.GONE);
+            takenButton.setEnabled(showConfirmButton && active && !taken);
             takenButton.setText(activity.getString(R.string.confirm_all));
         }
 

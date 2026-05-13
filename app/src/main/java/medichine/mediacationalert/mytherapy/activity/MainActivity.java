@@ -1196,11 +1196,12 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         ArrayList<ScheduledReminder> scheduledReminders = new ArrayList<>();
         long start = startOfTodayMillis();
         long end = endOfTodayMillis();
+        boolean historyMode = isSelectedDateBeforeToday();
 
         for (Reminder reminder : rb.getAllReminders()) {
             for (ScheduledReminder scheduled : collectOccurrences(reminder, start, end)) {
                 boolean taken = rb.isReminderTaken(reminder.getID(), scheduled.scheduledAt);
-                if (!taken && shouldShowScheduledOccurrence(reminder)) {
+                if (shouldShowScheduledOccurrence(reminder) && (historyMode || !taken)) {
                     scheduledReminders.add(new ScheduledReminder(reminder, scheduled.scheduledAt, scheduled.timeMillis, taken));
                 }
             }
@@ -1238,7 +1239,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
 
             for (ScheduledReminder scheduled : group) {
                 Reminder reminder = scheduled.reminder;
-                if (!scheduled.taken) {
+                if (!historyMode && !scheduled.taken) {
                     reminderIds.add(reminder.getID());
                 }
                 double stock = rb.getTotalStock(reminder.getTitle());
@@ -1275,7 +1276,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                     firstReminder.getIconUri(),
                     reminderIds.isEmpty(),
                     reminderIds,
-                    medicineLines));
+                    medicineLines).withConfirmButton(!historyMode));
             IDmap.put(position, firstReminder.getID());
             position++;
         }
@@ -1284,6 +1285,14 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
 
     private boolean shouldShowScheduledOccurrence(Reminder reminder) {
         return "true".equals(reminder.getActive());
+    }
+
+    private boolean isSelectedDateBeforeToday() {
+        Calendar today = Calendar.getInstance();
+        normalizeDate(today);
+        Calendar selected = (Calendar) mSelectedDate.clone();
+        normalizeDate(selected);
+        return selected.getTimeInMillis() < today.getTimeInMillis();
     }
 
     private List<SummaryItem> generateHistoryData() {

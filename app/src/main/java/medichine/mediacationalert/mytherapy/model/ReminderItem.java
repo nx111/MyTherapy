@@ -15,6 +15,7 @@ public class ReminderItem {
     public String mIconType;
     public String mIconUri;
     public boolean mTaken;
+    public boolean mShowConfirmButton;
     public ArrayList<Integer> mReminderIds;
     public ArrayList<MedicineLine> mMedicineLines;
 
@@ -57,6 +58,7 @@ public class ReminderItem {
         this.mIconType = IconType == null || IconType.length() == 0 ? "pill" : IconType;
         this.mIconUri = IconUri == null ? "" : IconUri;
         this.mTaken = Taken;
+        this.mShowConfirmButton = true;
         this.mReminderIds = ReminderIds == null ? new ArrayList<Integer>() : ReminderIds;
         this.mMedicineLines = new ArrayList<>();
     }
@@ -66,6 +68,11 @@ public class ReminderItem {
                         boolean Taken, ArrayList<Integer> ReminderIds, ArrayList<MedicineLine> MedicineLines) {
         this(Title, DateTime, Repeat, RepeatNo, RepeatType, Active, MedicineDetails, StockSummary, ScheduledAt, IconType, IconUri, Taken, ReminderIds);
         this.mMedicineLines = MedicineLines == null ? new ArrayList<MedicineLine>() : MedicineLines;
+    }
+
+    public ReminderItem withConfirmButton(boolean showConfirmButton) {
+        this.mShowConfirmButton = showConfirmButton;
+        return this;
     }
 
     public String getmTitle() {
