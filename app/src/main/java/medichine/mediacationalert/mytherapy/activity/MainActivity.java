@@ -1878,7 +1878,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         TextView value = new TextView(this);
         value.setText(formatLabResultValue(item, result));
         value.setTextColor(getResources().getColor(R.color.text_primary));
-        value.setTextSize(18);
+        value.setTextSize(17);
         value.setTypeface(Typeface.DEFAULT_BOLD);
         row.addView(value, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
