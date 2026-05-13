@@ -2150,6 +2150,9 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         ReminderDatabase.ConfirmResult result = rb.setReminderTakenStatus(item.mReminderId, item.mScheduledAt, taken);
         Toast.makeText(getApplicationContext(), result.message, Toast.LENGTH_SHORT).show();
         if (result.success) {
+            if (taken) {
+                AlarmReceiver.completeConfirmedOccurrence(getApplicationContext(), item.mReminderId, item.mScheduledAt);
+            }
             loadCurrentPage();
         }
     }
@@ -3098,14 +3101,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         ReminderDatabase.ConfirmResult result = rb.confirmReminderGroup(item.mReminderIds, item.mScheduledAt);
         Toast.makeText(getApplicationContext(), result.message, Toast.LENGTH_SHORT).show();
         if (result.success) {
-            long afterMillis = ReminderSchedule.parseScheduledAt(item.mScheduledAt).getTimeInMillis() + 60000L;
-            for (Integer reminderId : item.mReminderIds) {
-                Reminder reminder = rb.getReminder(reminderId);
-                if (reminder != null && "true".equals(reminder.getActive())) {
-                    mAlarmReceiver.cancelAlarm(getApplicationContext(), reminder.getID());
-                    mAlarmReceiver.scheduleReminderAfter(getApplicationContext(), reminder, afterMillis);
-                }
-            }
+            AlarmReceiver.completeConfirmedOccurrence(getApplicationContext(), item.mReminderIds, item.mScheduledAt);
         }
         loadReminderList();
     }

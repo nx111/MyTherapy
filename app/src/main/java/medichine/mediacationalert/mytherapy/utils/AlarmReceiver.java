@@ -329,7 +329,7 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
         }
     }
 
-    private int notificationIdFor(String scheduledAt) {
+    private static int notificationIdFor(String scheduledAt) {
         return Math.abs(scheduledAt.hashCode());
     }
 
@@ -358,9 +358,45 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
         return pending;
     }
 
-    private void cancelNotification(Context context, String scheduledAt) {
+    public static void completeConfirmedOccurrence(Context context, List<Integer> reminderIds, String scheduledAt) {
+        if (reminderIds == null || reminderIds.isEmpty() || scheduledAt == null || scheduledAt.length() == 0) {
+            return;
+        }
+
+        ReminderDatabase rb = new ReminderDatabase(context);
+        AlarmReceiver receiver = new AlarmReceiver();
+        long afterMillis = nextSearchAfter(scheduledAt);
+        for (Integer reminderId : reminderIds) {
+            if (reminderId == null) {
+                continue;
+            }
+            ReminderOccurrenceState.clear(context, reminderId, scheduledAt);
+            receiver.cancelAlarm(context, reminderId);
+            Reminder reminder = rb.getReminder(reminderId);
+            if (reminder != null && "true".equals(reminder.getActive())) {
+                receiver.scheduleReminderAfter(context, reminder, afterMillis);
+            }
+        }
+
+        List<Reminder> pending = receiver.pendingReminders(context, rb, rb.getActiveRemindersAt(scheduledAt), scheduledAt);
+        if (pending.isEmpty()) {
+            cancelNotification(context, scheduledAt);
+        } else {
+            receiver.showReminderNotification(context, pending.get(0), pending, scheduledAt);
+        }
+    }
+
+    public static void completeConfirmedOccurrence(Context context, int reminderId, String scheduledAt) {
+        ArrayList<Integer> reminderIds = new ArrayList<>();
+        reminderIds.add(reminderId);
+        completeConfirmedOccurrence(context, reminderIds, scheduledAt);
+    }
+
+    private static void cancelNotification(Context context, String scheduledAt) {
         NotificationManager notificationManager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
-        notificationManager.cancel(CHANNEL_ID, notificationIdFor(scheduledAt));
+        if (notificationManager != null) {
+            notificationManager.cancel(CHANNEL_ID, notificationIdFor(scheduledAt));
+        }
     }
 
     private void scheduleGroupNextAfter(Context context, List<Reminder> group, long afterMillis) {
@@ -370,7 +406,7 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
         }
     }
 
-    private long nextSearchAfter(String scheduledAt) {
+    private static long nextSearchAfter(String scheduledAt) {
         return ReminderSchedule.parseScheduledAt(scheduledAt).getTimeInMillis() + 60000L;
     }
 
