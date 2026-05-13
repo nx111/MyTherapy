@@ -22,7 +22,7 @@ import medichine.mediacationalert.mytherapy.model.Account;
 import medichine.mediacationalert.mytherapy.R;
 
 public class ReminderDatabase extends SQLiteOpenHelper {
-    private static final int DATABASE_VERSION = 8;
+    private static final int DATABASE_VERSION = 10;
     private static final String DATABASE_NAME = "MedicationDbTab";
     private static final int DEFAULT_ACCOUNT_ID = 1;
     private static final String PREF_ACTIVE_ACCOUNT_ID = "active_account_id";
