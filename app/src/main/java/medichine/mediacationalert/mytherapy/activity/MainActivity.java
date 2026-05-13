@@ -31,6 +31,7 @@ import android.text.InputType;
 import android.text.SpannableString;
 import android.text.Spanned;
 import android.text.TextUtils;
+import android.text.style.AbsoluteSizeSpan;
 import android.text.style.ForegroundColorSpan;
 import android.util.Log;
 import android.view.Gravity;
@@ -1859,7 +1860,6 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         value.setText(formatLabResultValue(item, result));
         value.setTextColor(getResources().getColor(labResultValueColorRes(item, result)));
         value.setTextSize(17);
-        value.setTypeface(Typeface.DEFAULT_BOLD);
         row.addView(value, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT));
@@ -1875,11 +1875,19 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         return divider;
     }
 
-    private String formatLabResultValue(LabTestItem item, LabResult result) {
+    private CharSequence formatLabResultValue(LabTestItem item, LabResult result) {
         String unitText = result.mUnit == null || result.mUnit.length() == 0
                 ? item.mUnit
                 : result.mUnit;
-        return formatQuantity(result.mValue) + (unitText == null || unitText.length() == 0 ? "" : " " + unitText);
+        String valueText = formatQuantity(result.mValue);
+        if (unitText == null || unitText.length() == 0) {
+            return valueText;
+        }
+        String text = valueText + " " + unitText;
+        SpannableString styled = new SpannableString(text);
+        styled.setSpan(new AbsoluteSizeSpan(16, true),
+                valueText.length() + 1, text.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        return styled;
     }
 
     private int labResultValueColorRes(LabTestItem item, LabResult result) {
