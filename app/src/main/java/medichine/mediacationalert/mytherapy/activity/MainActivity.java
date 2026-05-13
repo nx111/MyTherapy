@@ -26,6 +26,7 @@ import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.Window;
 import android.widget.Button;
+import android.widget.DatePicker;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.ImageButton;
@@ -1568,7 +1569,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
 
         String[] resultDate = new String[]{ReminderSchedule.formatDate(Calendar.getInstance())};
         TextView resultDateText = dateSelectorText(R.string.lab_result_date, resultDate[0]);
-        resultDateText.setOnClickListener(v -> showCourseDatePicker(resultDate[0], date -> {
+        resultDateText.setOnClickListener(v -> showLabResultDatePicker(resultDate[0], date -> {
                     resultDate[0] = date;
                     resultDateText.setText(dateSelectorLabel(R.string.lab_result_date, resultDate[0]));
                 }));
@@ -1617,6 +1618,61 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         calendar.set(Calendar.SECOND, now.get(Calendar.SECOND));
         calendar.set(Calendar.MILLISECOND, 0);
         return new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(calendar.getTime());
+    }
+
+    private void showLabResultDatePicker(String currentDate, CourseDateSelectedListener listener) {
+        Calendar calendar = parseCourseDate(currentDate);
+        if (calendar == null) {
+            calendar = Calendar.getInstance();
+        }
+        DatePickerDialog dialog = new DatePickerDialog(
+                this,
+                (view, year, month, dayOfMonth) -> {
+                    Calendar selected = Calendar.getInstance();
+                    selected.set(Calendar.YEAR, year);
+                    selected.set(Calendar.MONTH, month);
+                    selected.set(Calendar.DAY_OF_MONTH, dayOfMonth);
+                    normalizeDate(selected);
+                    listener.onDateSelected(ReminderSchedule.formatDate(selected));
+                },
+                calendar.get(Calendar.YEAR),
+                calendar.get(Calendar.MONTH),
+                calendar.get(Calendar.DAY_OF_MONTH));
+        dialog.setButton(AlertDialog.BUTTON_NEUTRAL, getString(R.string.select_year), (d, which) -> {
+        });
+        dialog.setOnShowListener(d -> dialog.getButton(AlertDialog.BUTTON_NEUTRAL)
+                .setOnClickListener(v -> showLabResultYearPicker(dialog)));
+        dialog.show();
+        Window window = dialog.getWindow();
+        if (window != null) {
+            window.setBackgroundDrawableResource(R.drawable.dialog_panel_bg);
+        }
+    }
+
+    private void showLabResultYearPicker(DatePickerDialog dateDialog) {
+        DatePicker datePicker = dateDialog.getDatePicker();
+        int currentYear = Calendar.getInstance().get(Calendar.YEAR);
+        int minYear = 1900;
+        int maxYear = Math.max(currentYear + 10, datePicker.getYear());
+        String[] years = new String[maxYear - minYear + 1];
+        for (int i = 0; i < years.length; i++) {
+            years[i] = String.valueOf(maxYear - i);
+        }
+        AlertDialog yearDialog = new AlertDialog.Builder(this)
+                .setTitle(R.string.select_year)
+                .setItems(years, (dialog, which) -> datePicker.updateDate(
+                        maxYear - which,
+                        datePicker.getMonth(),
+                        datePicker.getDayOfMonth()))
+                .setNegativeButton(R.string.cancel, null)
+                .create();
+        yearDialog.setOnShowListener(dialog -> yearDialog.getListView()
+                .setSelection(Math.max(0, Math.min(years.length - 1, maxYear - datePicker.getYear()))));
+        yearDialog.show();
+        Window window = yearDialog.getWindow();
+        if (window != null) {
+            window.setBackgroundDrawableResource(R.drawable.dialog_panel_bg);
+        }
     }
 
     private Double parseNumber(EditText editText) {
