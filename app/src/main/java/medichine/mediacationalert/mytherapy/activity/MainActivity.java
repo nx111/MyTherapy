@@ -1731,8 +1731,8 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         AlertDialog labDialog = new AlertDialog.Builder(this)
                 .setTitle(item.mName)
                 .setView(content)
-                .setPositiveButton(R.string.add_lab_result, (buttonDialog, which) -> showLabResultForm(item))
-                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.cancel, null)
+                .setNegativeButton("", (buttonDialog, which) -> showLabResultForm(item))
                 .setNeutralButton(countText, null)
                 .create();
         labDialog.setOnShowListener(d -> {
@@ -1742,6 +1742,13 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 countButton.setClickable(false);
                 countButton.setFocusable(false);
                 countButton.setTextColor(getResources().getColor(R.color.text_secondary));
+            }
+            Button addButton = labDialog.getButton(AlertDialog.BUTTON_NEGATIVE);
+            if (addButton != null) {
+                addButton.setText("");
+                addButton.setMinWidth(dp(48));
+                addButton.setContentDescription(getString(R.string.add_lab_result));
+                addButton.setCompoundDrawablesWithIntrinsicBounds(R.drawable.baseline_add_dialog_24, 0, 0, 0);
             }
         });
         labDialog.show();
