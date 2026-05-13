@@ -14,6 +14,7 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Typeface;
+import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
 import android.media.Ringtone;
 import android.media.RingtoneManager;
@@ -485,12 +486,14 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         content.setPadding(padding, dp(8), padding, dp(4));
 
         TextView ringtone = settingsRow(
+                R.drawable.baseline_access_alarm_24,
                 getString(R.string.reminder_ringtone),
                 currentReminderRingtoneTitle(),
                 true);
         content.addView(ringtone);
 
         TextView version = settingsRow(
+                R.drawable.baseline_info_24,
                 getString(R.string.app_version),
                 getString(R.string.app_version_format, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE),
                 false);
@@ -501,7 +504,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         content.addView(version, versionParams);
 
         AlertDialog dialog = new AlertDialog.Builder(this)
-                .setTitle(R.string.settings)
+                .setCustomTitle(settingsTitleView())
                 .setView(content)
                 .setNegativeButton(R.string.cancel, null)
                 .create();
@@ -512,7 +515,32 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         dialog.show();
     }
 
-    private TextView settingsRow(String title, String value, boolean clickable) {
+    private View settingsTitleView() {
+        LinearLayout titleRow = new LinearLayout(this);
+        titleRow.setOrientation(LinearLayout.HORIZONTAL);
+        titleRow.setGravity(Gravity.CENTER_VERTICAL);
+        titleRow.setPadding(dp(20), dp(14), dp(20), dp(4));
+
+        ImageView icon = new ImageView(this);
+        icon.setImageResource(R.drawable.baseline_settings_24);
+        icon.setColorFilter(getResources().getColor(R.color.text_primary));
+        LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(dp(24), dp(24));
+        titleRow.addView(icon, iconParams);
+
+        TextView title = new TextView(this);
+        title.setText(R.string.settings);
+        title.setTextColor(getResources().getColor(R.color.text_primary));
+        title.setTextSize(20);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        titleParams.leftMargin = dp(12);
+        titleRow.addView(title, titleParams);
+        return titleRow;
+    }
+
+    private TextView settingsRow(int iconRes, String title, String value, boolean clickable) {
         TextView row = new TextView(this);
         row.setText(title + "\n" + value);
         row.setTextColor(getResources().getColor(R.color.text_primary));
@@ -520,11 +548,20 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         row.setGravity(Gravity.CENTER_VERTICAL);
         row.setPadding(dp(12), dp(10), dp(12), dp(10));
         row.setMinHeight(dp(56));
+        row.setCompoundDrawables(settingsIcon(iconRes), null, null, null);
+        row.setCompoundDrawablePadding(dp(12));
         row.setClickable(clickable);
         if (clickable) {
             row.setBackgroundResource(android.R.drawable.list_selector_background);
         }
         return row;
+    }
+
+    private Drawable settingsIcon(int iconRes) {
+        Drawable icon = getResources().getDrawable(iconRes, getTheme()).mutate();
+        icon.setTint(getResources().getColor(R.color.text_primary));
+        icon.setBounds(0, 0, dp(24), dp(24));
+        return icon;
     }
 
     private String currentReminderRingtoneTitle() {
