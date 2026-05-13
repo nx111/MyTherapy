@@ -1667,7 +1667,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                     formatLabReferenceRange(item),
                     details,
                     "",
-                    "liquid",
+                    "lab",
                     "",
                     "false",
                     false)

@@ -164,6 +164,12 @@ public class MedicineIconFactory {
 
     public static void apply(ImageView imageView, String iconType, String iconUri) {
         imageView.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        imageView.clearColorFilter();
+        if ("lab".equals(iconType)) {
+            imageView.setImageResource(R.drawable.ic_lab_24);
+            imageView.setColorFilter(imageView.getResources().getColor(R.color.nav_selected));
+            return;
+        }
         if (iconUri != null && iconUri.length() > 0) {
             imageView.setScaleType(ImageView.ScaleType.CENTER_CROP);
             imageView.setImageURI(Uri.parse(iconUri));
