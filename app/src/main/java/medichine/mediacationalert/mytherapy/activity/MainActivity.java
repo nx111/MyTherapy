@@ -28,7 +28,10 @@ import android.os.PowerManager;
 import android.provider.MediaStore;
 import android.provider.Settings;
 import android.text.InputType;
+import android.text.SpannableString;
+import android.text.Spanned;
 import android.text.TextUtils;
+import android.text.style.ForegroundColorSpan;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.MotionEvent;
@@ -1596,28 +1599,17 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
             boolean hasResult = latest != null;
             boolean belowRange = hasResult && item.mReferenceMin != null && latest.mValue < item.mReferenceMin;
             boolean aboveRange = hasResult && item.mReferenceMax != null && latest.mValue > item.mReferenceMax;
-            boolean hasReference = item.mReferenceMin != null || item.mReferenceMax != null;
-            boolean inRange = hasResult && hasReference && !belowRange && !aboveRange;
-            boolean outOfRange = belowRange || aboveRange;
             String unitText = item.mUnit == null ? "" : item.mUnit;
-            String details = hasResult
+            String valueText = hasResult ? formatQuantity(latest.mValue) : "";
+            String detailsText = hasResult
                     ? getString(R.string.lab_latest_result,
-                    formatQuantity(latest.mValue),
+                    valueText,
                     unitText,
                     formatLabResultListDate(latest.mCreatedAt)).trim()
                     : "";
-            String status;
-            if (!hasResult) {
-                status = "";
-            } else if (belowRange) {
-                status = getString(R.string.lab_low);
-            } else if (aboveRange) {
-                status = getString(R.string.lab_high);
-            } else if (hasReference) {
-                status = getString(R.string.lab_normal);
-            } else {
-                status = "";
-            }
+            CharSequence details = hasResult
+                    ? styleLabResultValue(detailsText, valueText, labResultValueColorRes(item, latest))
+                    : "";
 
             labItemMap.put(items.size(), item.mId);
             labItemOrder.add(item.mId);
@@ -1625,14 +1617,13 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                     item.mName,
                     formatLabReferenceRange(item),
                     details,
-                    status,
+                    "",
                     "liquid",
                     "",
-                    outOfRange ? "true" : "false",
-                    inRange)
+                    "false",
+                    false)
                     .withTitleTextSize(19)
-                    .withDetailsTextSize(13)
-                    .withStatusTextSize(13));
+                    .withDetailsTextSize(13));
         }
         return items;
     }
@@ -1865,19 +1856,9 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT));
 
-        String statusText = labResultStatusText(item, result);
-        TextView status = new TextView(this);
-        status.setText(statusText);
-        status.setTextColor(labResultStatusColor(item, result));
-        status.setTextSize(13);
-        status.setVisibility(statusText.length() == 0 ? View.GONE : View.VISIBLE);
-        textGroup.addView(status, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT));
-
         TextView value = new TextView(this);
         value.setText(formatLabResultValue(item, result));
-        value.setTextColor(getResources().getColor(R.color.text_primary));
+        value.setTextColor(getResources().getColor(labResultValueColorRes(item, result)));
         value.setTextSize(17);
         value.setTypeface(Typeface.DEFAULT_BOLD);
         row.addView(value, new LinearLayout.LayoutParams(
@@ -1902,24 +1883,28 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         return formatQuantity(result.mValue) + (unitText == null || unitText.length() == 0 ? "" : " " + unitText);
     }
 
-    private String labResultStatusText(LabTestItem item, LabResult result) {
-        if (item.mReferenceMin != null && result.mValue < item.mReferenceMin) {
-            return getString(R.string.lab_low);
-        }
+    private int labResultValueColorRes(LabTestItem item, LabResult result) {
         if (item.mReferenceMax != null && result.mValue > item.mReferenceMax) {
-            return getString(R.string.lab_high);
+            return R.color.lab_high_value;
         }
-        return item.mReferenceMin != null || item.mReferenceMax != null ? getString(R.string.lab_normal) : "";
+        if (item.mReferenceMin != null && result.mValue < item.mReferenceMin) {
+            return R.color.lab_low_value;
+        }
+        return R.color.text_primary;
     }
 
-    private int labResultStatusColor(LabTestItem item, LabResult result) {
-        if (item.mReferenceMin != null && result.mValue < item.mReferenceMin) {
-            return getResources().getColor(R.color.history_missed);
+    private CharSequence styleLabResultValue(String text, String valueText, int colorResId) {
+        if (colorResId == R.color.text_primary || text.length() == 0 || valueText.length() == 0) {
+            return text;
         }
-        if (item.mReferenceMax != null && result.mValue > item.mReferenceMax) {
-            return getResources().getColor(R.color.history_missed);
+        int start = text.lastIndexOf(valueText);
+        if (start < 0) {
+            return text;
         }
-        return getResources().getColor(R.color.history_taken);
+        SpannableString styled = new SpannableString(text);
+        styled.setSpan(new ForegroundColorSpan(getResources().getColor(colorResId)),
+                start, text.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        return styled;
     }
 
     private List<SummaryItem> generateReportData() {

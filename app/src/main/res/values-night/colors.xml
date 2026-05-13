@@ -19,6 +19,8 @@
     <color name="nav_unselected">#B5C1C9</color>
     <color name="history_taken">#63D297</color>
     <color name="history_missed">#FFB07A</color>
+    <color name="lab_high_value">#FF8A80</color>
+    <color name="lab_low_value">#82B1FF</color>
     <color name="history_row_divider">#30424D</color>
     <color name="gray_color">#101820</color>
     <color name="line_color">#344B58</color>
