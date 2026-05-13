@@ -1286,7 +1286,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         if (item.mReferenceMax != null) {
             return getString(R.string.lab_reference_max_only, formatQuantity(item.mReferenceMax), unitText);
         }
-        return getString(R.string.lab_reference_empty);
+        return "";
     }
 
     private String formatDoseQuantity(Reminder reminder) {
@@ -1453,7 +1453,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                     : "";
             String status;
             if (!hasResult) {
-                status = getString(R.string.lab_no_result);
+                status = "";
             } else if (belowRange) {
                 status = getString(R.string.lab_low);
             } else if (aboveRange) {
@@ -1461,7 +1461,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
             } else if (hasReference) {
                 status = getString(R.string.lab_normal);
             } else {
-                status = getString(R.string.lab_reference_empty);
+                status = "";
             }
 
             labItemMap.put(items.size(), item.mId);
