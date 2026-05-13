@@ -1820,9 +1820,13 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         });
         bottomRow.addView(addButton, new LinearLayout.LayoutParams(dp(48), dp(48)));
 
-        Button closeButton = new Button(this);
+        TextView closeButton = new TextView(this);
         closeButton.setText(R.string.cancel);
-        closeButton.setAllCaps(false);
+        closeButton.setTextColor(getResources().getColor(R.color.nav_selected));
+        closeButton.setTextSize(14);
+        closeButton.setGravity(Gravity.CENTER);
+        closeButton.setPadding(dp(12), 0, 0, 0);
+        closeButton.setMinHeight(dp(48));
         closeButton.setOnClickListener(v -> {
             if (labDialog[0] != null) {
                 labDialog[0].dismiss();
