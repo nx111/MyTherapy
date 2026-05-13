@@ -9,6 +9,7 @@ import android.app.ProgressDialog;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
+import android.graphics.Paint;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
@@ -1117,6 +1118,20 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         int padding = dp(18);
         content.setPadding(padding, dp(8), padding, 0);
 
+        LinearLayout modeRow = new LinearLayout(this);
+        modeRow.setGravity(Gravity.RIGHT);
+        modeRow.setOrientation(LinearLayout.HORIZONTAL);
+        TextView trendMode = createLabDetailModeText(R.string.lab_view_trend);
+        TextView separator = createLabDetailModeText(0);
+        separator.setText("/");
+        TextView listMode = createLabDetailModeText(R.string.lab_view_list);
+        modeRow.addView(trendMode);
+        modeRow.addView(separator);
+        modeRow.addView(listMode);
+        content.addView(modeRow, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+
         TextView reference = new TextView(this);
         reference.setText(getString(R.string.lab_reference_range,
                 formatQuantity(item.mReferenceMin),
@@ -1124,9 +1139,14 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 item.mUnit));
         reference.setTextColor(getResources().getColor(R.color.text_secondary));
         reference.setTextSize(13);
-        content.addView(reference, new LinearLayout.LayoutParams(
+        LinearLayout.LayoutParams referenceParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT));
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        referenceParams.topMargin = dp(4);
+        content.addView(reference, referenceParams);
+
+        ScrollView listView = createLabResultListView(results);
+        listView.setVisibility(View.GONE);
 
         LabTrendChartView chart = new LabTrendChartView(this);
         chart.setData(item, results);
@@ -1135,6 +1155,16 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 dp(260));
         chartParams.topMargin = dp(8);
         content.addView(chart, chartParams);
+
+        LinearLayout.LayoutParams listParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(260));
+        listParams.topMargin = dp(8);
+        content.addView(listView, listParams);
+
+        updateLabDetailMode(trendMode, listMode, chart, listView, true);
+        trendMode.setOnClickListener(v -> updateLabDetailMode(trendMode, listMode, chart, listView, true));
+        listMode.setOnClickListener(v -> updateLabDetailMode(trendMode, listMode, chart, listView, false));
 
         TextView count = new TextView(this);
         count.setText(results.isEmpty()
@@ -1147,11 +1177,85 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 LinearLayout.LayoutParams.WRAP_CONTENT));
 
         new AlertDialog.Builder(this)
-                .setTitle(getString(R.string.lab_trend_title, item.mName))
+                .setTitle(item.mName)
                 .setView(content)
                 .setPositiveButton(R.string.add_lab_result, (dialog, which) -> showLabResultForm(item))
                 .setNegativeButton(R.string.cancel, null)
                 .show();
+    }
+
+    private TextView createLabDetailModeText(int textRes) {
+        TextView textView = new TextView(this);
+        if (textRes != 0) {
+            textView.setText(textRes);
+        }
+        textView.setTextSize(14);
+        textView.setTypeface(Typeface.DEFAULT, Typeface.NORMAL);
+        textView.setTextColor(getResources().getColor(R.color.text_secondary));
+        textView.setPadding(dp(4), 0, dp(4), dp(2));
+        return textView;
+    }
+
+    private ScrollView createLabResultListView(List<LabResult> results) {
+        ScrollView scrollView = new ScrollView(this);
+        LinearLayout rows = new LinearLayout(this);
+        rows.setOrientation(LinearLayout.VERTICAL);
+        scrollView.addView(rows, new ScrollView.LayoutParams(
+                ScrollView.LayoutParams.MATCH_PARENT,
+                ScrollView.LayoutParams.WRAP_CONTENT));
+        if (results.isEmpty()) {
+            TextView empty = new TextView(this);
+            empty.setText(R.string.lab_no_result);
+            empty.setTextColor(getResources().getColor(R.color.text_secondary));
+            empty.setTextSize(14);
+            rows.addView(empty, new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT));
+            return scrollView;
+        }
+        for (int i = results.size() - 1; i >= 0; i--) {
+            LabResult result = results.get(i);
+            TextView row = new TextView(this);
+            row.setText(getString(R.string.lab_latest_result,
+                    formatQuantity(result.mValue),
+                    result.mUnit == null ? "" : result.mUnit,
+                    formatLabResultListDate(result.mCreatedAt)).trim());
+            row.setTextColor(getResources().getColor(R.color.text_primary));
+            row.setTextSize(14);
+            row.setTypeface(Typeface.DEFAULT, Typeface.NORMAL);
+            row.setPadding(0, dp(8), 0, dp(8));
+            rows.addView(row, new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT));
+            if (i > 0) {
+                View divider = new View(this);
+                divider.setBackgroundColor(getResources().getColor(R.color.history_row_divider));
+                rows.addView(divider, new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        dp(1)));
+            }
+        }
+        return scrollView;
+    }
+
+    private void updateLabDetailMode(TextView trendMode, TextView listMode,
+                                     View chart, View listView, boolean showTrend) {
+        chart.setVisibility(showTrend ? View.VISIBLE : View.GONE);
+        listView.setVisibility(showTrend ? View.GONE : View.VISIBLE);
+        updateLabDetailModeText(trendMode, showTrend);
+        updateLabDetailModeText(listMode, !showTrend);
+    }
+
+    private void updateLabDetailModeText(TextView textView, boolean selected) {
+        int flags = textView.getPaintFlags();
+        if (selected) {
+            flags |= Paint.UNDERLINE_TEXT_FLAG;
+        } else {
+            flags &= ~Paint.UNDERLINE_TEXT_FLAG;
+        }
+        textView.setPaintFlags(flags);
+        textView.setTextColor(getResources().getColor(
+                selected ? R.color.text_primary : R.color.text_secondary));
     }
 
     private List<SummaryItem> generateReportData() {

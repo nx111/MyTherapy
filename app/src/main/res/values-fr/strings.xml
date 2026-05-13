@@ -154,6 +154,8 @@
     <string name="lab_reference_range">Référence %1$s-%2$s %3$s</string>
     <string name="lab_latest_result">%3$s %1$s %2$s</string>
     <string name="lab_no_result">Aucun résultat</string>
+    <string name="lab_view_trend">Tendance</string>
+    <string name="lab_view_list">Liste</string>
     <string name="lab_normal">Normal</string>
     <string name="lab_low">Bas</string>
     <string name="lab_high">Haut</string>

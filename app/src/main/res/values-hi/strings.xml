@@ -154,6 +154,8 @@
     <string name="lab_reference_range">संदर्भ %1$s-%2$s %3$s</string>
     <string name="lab_latest_result">%3$s %1$s %2$s</string>
     <string name="lab_no_result">कोई परिणाम नहीं</string>
+    <string name="lab_view_trend">रुझान</string>
+    <string name="lab_view_list">सूची</string>
     <string name="lab_normal">सामान्य</string>
     <string name="lab_low">कम</string>
     <string name="lab_high">अधिक</string>

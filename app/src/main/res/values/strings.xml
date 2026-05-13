@@ -232,6 +232,8 @@
     <string name="lab_no_result">No result</string>
     <string name="lab_trend_title">%1$s Trend</string>
     <string name="lab_history_count">%1$d result(s)</string>
+    <string name="lab_view_trend">Trend</string>
+    <string name="lab_view_list">List</string>
     <string name="lab_normal">Normal</string>
     <string name="lab_low">Low</string>
     <string name="lab_high">High</string>

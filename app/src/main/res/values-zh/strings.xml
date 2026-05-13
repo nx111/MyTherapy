@@ -216,6 +216,8 @@
     <string name="lab_no_result">暂无结果</string>
     <string name="lab_trend_title">%1$s趋势</string>
     <string name="lab_history_count">%1$d 条结果</string>
+    <string name="lab_view_trend">趋势</string>
+    <string name="lab_view_list">列表</string>
     <string name="lab_normal">正常</string>
     <string name="lab_low">偏低</string>
     <string name="lab_high">偏高</string>
