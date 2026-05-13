@@ -27,7 +27,7 @@ import medichine.mediacationalert.mytherapy.model.Account;
 import medichine.mediacationalert.mytherapy.R;
 
 public class ReminderDatabase extends SQLiteOpenHelper {
-    private static final int DATABASE_VERSION = 9;
+    private static final int DATABASE_VERSION = 10;
     public static final String DATABASE_NAME = "MedicationDbTab";
     public static final String COMPLETE_CSV_MARKER = "MYTHERAPY_CSV_V2";
     private static final String CSV_NULL = "__MYTHERAPY_NULL__";
@@ -90,6 +90,7 @@ public class ReminderDatabase extends SQLiteOpenHelper {
     private static final String LAB_ITEM_REF_MIN = "reference_min";
     private static final String LAB_ITEM_REF_MAX = "reference_max";
     private static final String LAB_ITEM_UNIT = "unit";
+    private static final String LAB_ITEM_SORT_ORDER = "sort_order";
 
     private static final String TABLE_LAB_RESULTS = "LabResults";
     private static final String LAB_RESULT_ID = "id";
@@ -183,6 +184,9 @@ public class ReminderDatabase extends SQLiteOpenHelper {
         }
         if (oldVersion < 9) {
             migrateNullableLabReferences(db);
+        }
+        if (oldVersion < 10) {
+            migrateLabItemSortOrder(db);
         }
     }
 
@@ -334,7 +338,8 @@ public class ReminderDatabase extends SQLiteOpenHelper {
                 + LAB_ITEM_NAME + " TEXT NOT NULL,"
                 + LAB_ITEM_REF_MIN + " REAL,"
                 + LAB_ITEM_REF_MAX + " REAL,"
-                + LAB_ITEM_UNIT + " TEXT DEFAULT ''"
+                + LAB_ITEM_UNIT + " TEXT DEFAULT '',"
+                + LAB_ITEM_SORT_ORDER + " INTEGER NOT NULL DEFAULT 0"
                 + ")";
         db.execSQL(itemsSql);
 
@@ -364,6 +369,24 @@ public class ReminderDatabase extends SQLiteOpenHelper {
                 + LAB_ITEM_REF_MAX + "," + LAB_ITEM_UNIT + " FROM " + TABLE_LAB_ITEMS);
         db.execSQL("DROP TABLE " + TABLE_LAB_ITEMS);
         db.execSQL("ALTER TABLE " + tempTable + " RENAME TO " + TABLE_LAB_ITEMS);
+    }
+
+    private void migrateLabItemSortOrder(SQLiteDatabase db) {
+        addColumnIfMissing(db, TABLE_LAB_ITEMS, LAB_ITEM_SORT_ORDER,
+                LAB_ITEM_SORT_ORDER + " INTEGER NOT NULL DEFAULT 0");
+        Cursor cursor = db.query(TABLE_LAB_ITEMS, new String[]{LAB_ITEM_ID}, null, null,
+                null, null, LAB_ITEM_NAME + " COLLATE NOCASE ASC, " + LAB_ITEM_ID + " ASC");
+        try {
+            int sortOrder = 0;
+            while (cursor.moveToNext()) {
+                ContentValues values = new ContentValues();
+                values.put(LAB_ITEM_SORT_ORDER, sortOrder++);
+                db.update(TABLE_LAB_ITEMS, values, LAB_ITEM_ID + "=?",
+                        new String[]{String.valueOf(cursor.getInt(0))});
+            }
+        } finally {
+            cursor.close();
+        }
     }
 
     public int addReminder(Reminder reminder) {
@@ -896,6 +919,7 @@ public class ReminderDatabase extends SQLiteOpenHelper {
     public long addLabTestItem(LabTestItem item) {
         SQLiteDatabase db = this.getWritableDatabase();
         ContentValues values = toLabTestItemValues(item);
+        values.put(LAB_ITEM_SORT_ORDER, nextLabItemSortOrder(db));
         long id = db.insert(TABLE_LAB_ITEMS, null, values);
         db.close();
         return id;
@@ -924,7 +948,7 @@ public class ReminderDatabase extends SQLiteOpenHelper {
         List<LabTestItem> items = new ArrayList<>();
         SQLiteDatabase db = this.getReadableDatabase();
         Cursor cursor = db.query(TABLE_LAB_ITEMS, labItemColumns(), null, null,
-                null, null, LAB_ITEM_NAME + " COLLATE NOCASE ASC");
+                null, null, LAB_ITEM_SORT_ORDER + " ASC, " + LAB_ITEM_NAME + " COLLATE NOCASE ASC, " + LAB_ITEM_ID + " ASC");
         if (cursor.moveToFirst()) {
             do {
                 items.add(readLabTestItem(cursor));
@@ -932,6 +956,29 @@ public class ReminderDatabase extends SQLiteOpenHelper {
         }
         cursor.close();
         return items;
+    }
+
+    public void updateLabTestItemOrder(List<Integer> orderedIds) {
+        if (orderedIds == null || orderedIds.isEmpty()) {
+            return;
+        }
+        SQLiteDatabase db = this.getWritableDatabase();
+        db.beginTransaction();
+        try {
+            for (int i = 0; i < orderedIds.size(); i++) {
+                Integer itemId = orderedIds.get(i);
+                if (itemId == null) {
+                    continue;
+                }
+                ContentValues values = new ContentValues();
+                values.put(LAB_ITEM_SORT_ORDER, i);
+                db.update(TABLE_LAB_ITEMS, values, LAB_ITEM_ID + "=?",
+                        new String[]{String.valueOf(itemId)});
+            }
+            db.setTransactionSuccessful();
+        } finally {
+            db.endTransaction();
+        }
     }
 
     public long addLabResult(LabResult result) {
@@ -1265,6 +1312,18 @@ public class ReminderDatabase extends SQLiteOpenHelper {
         return values;
     }
 
+    private int nextLabItemSortOrder(SQLiteDatabase db) {
+        Cursor cursor = db.rawQuery("SELECT MAX(" + LAB_ITEM_SORT_ORDER + ") FROM " + TABLE_LAB_ITEMS, null);
+        try {
+            if (cursor.moveToFirst() && !cursor.isNull(0)) {
+                return cursor.getInt(0) + 1;
+            }
+            return 0;
+        } finally {
+            cursor.close();
+        }
+    }
+
     private LabTestItem readLabTestItem(Cursor cursor) {
         int referenceMinIndex = cursor.getColumnIndexOrThrow(LAB_ITEM_REF_MIN);
         int referenceMaxIndex = cursor.getColumnIndexOrThrow(LAB_ITEM_REF_MAX);
@@ -1273,7 +1332,8 @@ public class ReminderDatabase extends SQLiteOpenHelper {
                 cursor.getString(cursor.getColumnIndexOrThrow(LAB_ITEM_NAME)),
                 cursor.isNull(referenceMinIndex) ? null : cursor.getDouble(referenceMinIndex),
                 cursor.isNull(referenceMaxIndex) ? null : cursor.getDouble(referenceMaxIndex),
-                cursor.getString(cursor.getColumnIndexOrThrow(LAB_ITEM_UNIT)));
+                cursor.getString(cursor.getColumnIndexOrThrow(LAB_ITEM_UNIT)),
+                cursor.getInt(cursor.getColumnIndexOrThrow(LAB_ITEM_SORT_ORDER)));
     }
 
     private LabResult readLabResult(Cursor cursor) {
@@ -1334,7 +1394,8 @@ public class ReminderDatabase extends SQLiteOpenHelper {
                 LAB_ITEM_NAME,
                 LAB_ITEM_REF_MIN,
                 LAB_ITEM_REF_MAX,
-                LAB_ITEM_UNIT
+                LAB_ITEM_UNIT,
+                LAB_ITEM_SORT_ORDER
         };
     }
 

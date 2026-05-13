@@ -48,6 +48,7 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.NotificationManagerCompat;
+import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -137,9 +138,11 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     private final LinkedHashMap<Integer, Integer> IDmap = new LinkedHashMap<>();
     private final LinkedHashMap<Integer, Integer> summaryIDmap = new LinkedHashMap<>();
     private final LinkedHashMap<Integer, Integer> labItemMap = new LinkedHashMap<>();
+    private final ArrayList<Integer> labItemOrder = new ArrayList<>();
     private final LinkedHashMap<Integer, List<Reminder>> courseReminderMap = new LinkedHashMap<>();
     private ReminderDatabase rb;
     private AlarmReceiver mAlarmReceiver;
+    private ItemTouchHelper mLabItemTouchHelper;
     private CourseIconEditState mCourseIconEditState;
     private boolean mExportFullBackup;
 
@@ -161,6 +164,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     private Runnable mAccountLongPressRunnable;
     private boolean mAccountLongPressHandled;
     private boolean mReminderSettingsDialogShowing;
+    private boolean mLabOrderChanged;
 
     private List<ReminderItem> medicineList = new ArrayList<>();
     private List<SummaryItem> summaryList = new ArrayList<>();
@@ -203,6 +207,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         normalizeDate(mSelectedDate);
 
         mList.setLayoutManager(new LinearLayoutManager(this));
+        setupLabItemDragSorting();
         registerForContextMenu(mList);
         mBottomNavigation.setOnItemSelectedListener(item -> {
             if (item.getItemId() == R.id.nav_lab) {
@@ -237,6 +242,51 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         mAlarmReceiver = new AlarmReceiver();
         updateCalendarHeader();
         loadCurrentPage();
+    }
+
+    private void setupLabItemDragSorting() {
+        mLabItemTouchHelper = new ItemTouchHelper(new ItemTouchHelper.SimpleCallback(
+                ItemTouchHelper.UP | ItemTouchHelper.DOWN, 0) {
+            @Override
+            public boolean isLongPressDragEnabled() {
+                return mCurrentPage == PAGE_LAB;
+            }
+
+            @Override
+            public boolean isItemViewSwipeEnabled() {
+                return false;
+            }
+
+            @Override
+            public int getMovementFlags(@NonNull RecyclerView recyclerView,
+                                        @NonNull RecyclerView.ViewHolder viewHolder) {
+                if (mCurrentPage != PAGE_LAB || viewHolder.getAdapterPosition() == RecyclerView.NO_POSITION) {
+                    return 0;
+                }
+                return makeMovementFlags(ItemTouchHelper.UP | ItemTouchHelper.DOWN, 0);
+            }
+
+            @Override
+            public boolean onMove(@NonNull RecyclerView recyclerView,
+                                  @NonNull RecyclerView.ViewHolder viewHolder,
+                                  @NonNull RecyclerView.ViewHolder target) {
+                return moveLabItem(viewHolder.getAdapterPosition(), target.getAdapterPosition());
+            }
+
+            @Override
+            public void onSwiped(@NonNull RecyclerView.ViewHolder viewHolder, int direction) {
+            }
+
+            @Override
+            public void clearView(@NonNull RecyclerView recyclerView, @NonNull RecyclerView.ViewHolder viewHolder) {
+                super.clearView(recyclerView, viewHolder);
+                if (mCurrentPage == PAGE_LAB && mLabOrderChanged) {
+                    rb.updateLabTestItemOrder(labItemOrder);
+                    mLabOrderChanged = false;
+                }
+            }
+        });
+        mLabItemTouchHelper.attachToRecyclerView(mList);
     }
 
     private void bindAccountButtonActions() {
@@ -1427,7 +1477,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
             updateEmptyState(summaryList.isEmpty(), R.string.no_history_records);
         } else if (mCurrentPage == PAGE_LAB) {
             summaryList = generateLabData();
-            mSummaryAdapter = new SummaryListAdapter(summaryList, this, this, false, true);
+            mSummaryAdapter = new SummaryListAdapter(summaryList, this, this, false, true, false);
             mList.setAdapter(mSummaryAdapter);
             updateEmptyState(summaryList.isEmpty(), R.string.no_lab_records);
         } else if (mCurrentPage == PAGE_COURSE) {
@@ -1480,7 +1530,20 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         } else {
             mAddReminderButton.setVisibility(View.GONE);
         }
-        mCalendarButton.setVisibility(mCurrentPage == PAGE_TODAY ? View.VISIBLE : View.GONE);
+        if (mCurrentPage == PAGE_TODAY) {
+            mCalendarButton.setVisibility(View.VISIBLE);
+            mCalendarButton.setImageResource(R.drawable.baseline_calendar_month_24);
+            mCalendarButton.setContentDescription(getString(R.string.date));
+            mCalendarButton.setOnClickListener(v -> showSelectedDatePicker());
+        } else if (mCurrentPage == PAGE_LAB) {
+            mCalendarButton.setVisibility(View.VISIBLE);
+            mCalendarButton.setImageResource(R.drawable.baseline_edit_24);
+            mCalendarButton.setContentDescription(getString(R.string.manage_lab_items));
+            mCalendarButton.setOnClickListener(v -> showManageLabItemsDialog());
+        } else {
+            mCalendarButton.setVisibility(View.GONE);
+            mCalendarButton.setOnClickListener(null);
+        }
     }
 
     private void updateEmptyState(boolean isEmpty, int emptyTextRes) {
@@ -1524,6 +1587,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     private List<SummaryItem> generateLabData() {
         ArrayList<SummaryItem> items = new ArrayList<>();
         labItemMap.clear();
+        labItemOrder.clear();
         for (LabTestItem item : rb.getLabTestItems()) {
             LabResult latest = rb.getLatestLabResult(item.mId);
             boolean hasResult = latest != null;
@@ -1553,6 +1617,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
             }
 
             labItemMap.put(items.size(), item.mId);
+            labItemOrder.add(item.mId);
             items.add(new SummaryItem(
                     item.mName,
                     formatLabReferenceRange(item),
@@ -1564,6 +1629,36 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                     inRange));
         }
         return items;
+    }
+
+    private boolean moveLabItem(int fromPosition, int toPosition) {
+        if (mCurrentPage != PAGE_LAB
+                || fromPosition == toPosition
+                || fromPosition < 0
+                || toPosition < 0
+                || fromPosition >= summaryList.size()
+                || toPosition >= summaryList.size()
+                || fromPosition >= labItemOrder.size()
+                || toPosition >= labItemOrder.size()) {
+            return false;
+        }
+        SummaryItem movedItem = summaryList.remove(fromPosition);
+        summaryList.add(toPosition, movedItem);
+        Integer movedId = labItemOrder.remove(fromPosition);
+        labItemOrder.add(toPosition, movedId);
+        rebuildLabItemMap();
+        mLabOrderChanged = true;
+        if (mSummaryAdapter != null) {
+            mSummaryAdapter.notifyItemMoved(fromPosition, toPosition);
+        }
+        return true;
+    }
+
+    private void rebuildLabItemMap() {
+        labItemMap.clear();
+        for (int i = 0; i < labItemOrder.size(); i++) {
+            labItemMap.put(i, labItemOrder.get(i));
+        }
     }
 
     private void showLabTrendDialog(int itemId) {
@@ -1604,7 +1699,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 LinearLayout.LayoutParams.WRAP_CONTENT));
 
         new AlertDialog.Builder(this)
-                .setTitle(getString(R.string.lab_trend_title, item.mName))
+                .setTitle(item.mName)
                 .setView(content)
                 .setPositiveButton(R.string.add_lab_result, (dialog, which) -> showLabResultForm(item))
                 .setNegativeButton(R.string.cancel, null)
@@ -2268,14 +2363,6 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     public boolean longClickListener(int pos) {
         if (pos < 0 || pos >= summaryList.size()) {
             return false;
-        }
-        if (mCurrentPage == PAGE_LAB && labItemMap.containsKey(pos)) {
-            LabTestItem item = rb.getLabTestItem(labItemMap.get(pos));
-            if (item == null) {
-                return false;
-            }
-            showLabTestItemForm(item);
-            return true;
         }
         if (mCurrentPage != PAGE_HISTORY) {
             return false;

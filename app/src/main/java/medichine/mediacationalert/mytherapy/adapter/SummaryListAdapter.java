@@ -28,19 +28,27 @@ public class SummaryListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHo
     private final ItemClickListener mListener;
     private final boolean mCardMode;
     private final boolean mClickEnabled;
+    private final boolean mLongClickEnabled;
 
     public SummaryListAdapter(List<SummaryItem> items, Activity activity,
                               ItemClickListener listener, boolean clickable) {
-        this(items, activity, listener, clickable, clickable);
+        this(items, activity, listener, clickable, clickable, true);
     }
 
     public SummaryListAdapter(List<SummaryItem> items, Activity activity,
                               ItemClickListener listener, boolean cardMode, boolean clickEnabled) {
+        this(items, activity, listener, cardMode, clickEnabled, true);
+    }
+
+    public SummaryListAdapter(List<SummaryItem> items, Activity activity,
+                              ItemClickListener listener, boolean cardMode, boolean clickEnabled,
+                              boolean longClickEnabled) {
         mItems = items;
         mActivity = activity;
         mListener = listener;
         mCardMode = cardMode;
         mClickEnabled = clickEnabled;
+        mLongClickEnabled = longClickEnabled;
     }
 
     @NonNull
@@ -76,9 +84,18 @@ public class SummaryListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHo
                 : R.drawable.baseline_notifications_off_24);
         holder.setIcon(item.mIconType, item.mIconUri);
         holder.bindMode(item, mCardMode);
-        holder.itemView.setOnClickListener(mClickEnabled ? v -> mListener.clickListener(position) : null);
+        holder.itemView.setOnClickListener(mClickEnabled ? v -> {
+            int adapterPosition = holder.getAdapterPosition();
+            if (adapterPosition != RecyclerView.NO_POSITION) {
+                mListener.clickListener(adapterPosition);
+            }
+        } : null);
         holder.itemView.setClickable(mClickEnabled);
-        holder.itemView.setOnLongClickListener(v -> mListener.longClickListener(position));
+        holder.itemView.setOnLongClickListener(mLongClickEnabled ? v -> {
+            int adapterPosition = holder.getAdapterPosition();
+            return adapterPosition != RecyclerView.NO_POSITION && mListener.longClickListener(adapterPosition);
+        } : null);
+        holder.itemView.setLongClickable(mLongClickEnabled);
     }
 
     @Override
