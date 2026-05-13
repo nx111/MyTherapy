@@ -15,7 +15,6 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
-import android.media.AudioAttributes;
 import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Build;
@@ -41,14 +40,14 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
     Notification myNotication2;
     public static final String CHANNEL_ID = "Channel_id";
     public static final String PREF_REMINDER_RINGTONE_URI = "reminder_ringtone_uri";
-    private static final String CHANNEL_ID_PREFIX = CHANNEL_ID + "_sound_";
+    private static final String REMINDER_CHANNEL_ID = CHANNEL_ID + "_alarm_display";
     private static final String CHANNEL_NAME = "Notification";
-    private static final String ACTION_TAKE_GROUP = "medichine.mediacationalert.mytherapy.ACTION_TAKE_GROUP";
-    private static final String ACTION_SKIP_GROUP = "medichine.mediacationalert.mytherapy.ACTION_SKIP_GROUP";
-    private static final String ACTION_DELAY_OPTIONS = "medichine.mediacationalert.mytherapy.ACTION_DELAY_OPTIONS";
-    private static final String ACTION_DELAY_MINUTES = "medichine.mediacationalert.mytherapy.ACTION_DELAY_MINUTES";
-    private static final String EXTRA_SCHEDULED_AT = "scheduled_at";
-    private static final String EXTRA_DELAY_MINUTES = "delay_minutes";
+    static final String ACTION_TAKE_GROUP = "medichine.mediacationalert.mytherapy.ACTION_TAKE_GROUP";
+    static final String ACTION_SKIP_GROUP = "medichine.mediacationalert.mytherapy.ACTION_SKIP_GROUP";
+    static final String ACTION_DELAY_OPTIONS = "medichine.mediacationalert.mytherapy.ACTION_DELAY_OPTIONS";
+    static final String ACTION_DELAY_MINUTES = "medichine.mediacationalert.mytherapy.ACTION_DELAY_MINUTES";
+    static final String EXTRA_SCHEDULED_AT = "scheduled_at";
+    static final String EXTRA_DELAY_MINUTES = "delay_minutes";
     private static final long REMINDER_RETRY_MILLIS = 5L * 60000L;
     private static final int[] DELAY_MINUTES = new int[]{10, 20, 30, 60};
 
@@ -131,13 +130,14 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
                 ReminderOccurrenceState.clear(context, reminder.getID(), scheduledAt);
             }
             scheduleGroupNextAfter(context, group, nextSearchAfter(scheduledAt));
-            notificationManager.cancel(CHANNEL_ID, notificationId);
+            cancelNotification(context, scheduledAt);
         } else {
             createNotificationChannel(context, notificationManager);
             NotificationCompat.Builder builder = new NotificationCompat.Builder(context, getReminderChannelId(context))
                     .setSmallIcon(R.drawable.baseline_access_alarm_24)
                     .setContentTitle(context.getString(R.string.medication_not_confirmed))
                     .setContentText(result.message)
+                    .setSilent(true)
                     .setAutoCancel(true);
             notificationManager.notify(notificationId, builder.build());
         }
@@ -171,6 +171,7 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
             cancelNotification(context, scheduledAt);
             return;
         }
+        ReminderRingService.stop(context);
         showDelayOptionsNotification(context, group, scheduledAt);
     }
 
@@ -192,43 +193,13 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
     }
 
     private void showReminderNotification(Context context, Reminder reminder, List<Reminder> group, String scheduledAt) {
-        // Create intent to open ReminderEditActivity on notification click
-        Intent mainIntent = new Intent(context, MainActivity.class);
-        PendingIntent mClick = PendingIntent.getActivity(context, notificationIdFor(scheduledAt), mainIntent, AppUtils.Companion.getFlag());
-
-        PendingIntent takenClick = groupAction(context, scheduledAt, ACTION_TAKE_GROUP, 1);
-        PendingIntent skipClick = groupAction(context, scheduledAt, ACTION_SKIP_GROUP, 2);
-        PendingIntent delayClick = groupAction(context, scheduledAt, ACTION_DELAY_OPTIONS, 3);
-
-        String contentText = buildGroupText(context, group);
-        String title = group.size() > 1
-                ? context.getString(R.string.medication_time_count, group.size())
-                : context.getString(R.string.time_to_take_medication);
-
-        // Create Notification
-        NotificationCompat.Builder mBuilder = new NotificationCompat.Builder(context, getReminderChannelId(context))
-                .setLargeIcon(BitmapFactory.decodeResource(context.getResources(), R.drawable.pill_reminder_icon))
-                .setSmallIcon(R.drawable.baseline_access_alarm_24)
-                .setContentTitle(title)
-                .setTicker(contentText)
-                .setVibrate(new long[]{0, 500, 1000})
-                .setContentText(contentText)
-                .setStyle(new NotificationCompat.BigTextStyle().bigText(contentText))
-                .setSound(getReminderSoundUri(context))
-                .setContentIntent(mClick)
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setCategory(NotificationCompat.CATEGORY_ALARM)
-                .setAutoCancel(true)
-                .setOnlyAlertOnce(false)
-                .addAction(R.drawable.baseline_check_24, context.getString(R.string.notification_taken), takenClick)
-                .addAction(R.drawable.baseline_notifications_off_24, context.getString(R.string.notification_skip), skipClick)
-                .addAction(R.drawable.baseline_replay_circle_filled_24, context.getString(R.string.notification_delay), delayClick);
-
         this.manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
         createNotificationChannel(context, this.manager);
-        myNotication2 = mBuilder.build();
+        myNotication2 = buildReminderNotification(context, group, scheduledAt);
 
-        this.manager.notify(CHANNEL_ID, notificationIdFor(scheduledAt), mBuilder.build());
+        this.manager.cancel(CHANNEL_ID, notificationIdFor(scheduledAt));
+        this.manager.notify(notificationIdFor(scheduledAt), myNotication2);
+        ReminderRingService.start(context, scheduledAt);
     }
 
     private void showDelayOptionsNotification(Context context, List<Reminder> group, String scheduledAt) {
@@ -241,6 +212,7 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
                 .setStyle(new NotificationCompat.BigTextStyle().bigText(contentText))
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setCategory(NotificationCompat.CATEGORY_ALARM)
+                .setSilent(true)
                 .setAutoCancel(true)
                 .setOnlyAlertOnce(true);
 
@@ -264,7 +236,41 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
         notificationManager.notify(CHANNEL_ID, notificationIdFor(scheduledAt), builder.build());
     }
 
-    private String buildGroupText(Context context, List<Reminder> group) {
+    static Notification buildReminderNotification(Context context, List<Reminder> group, String scheduledAt) {
+        Intent mainIntent = new Intent(context, MainActivity.class);
+        PendingIntent mClick = PendingIntent.getActivity(context, notificationIdFor(scheduledAt), mainIntent, AppUtils.Companion.getFlag());
+
+        PendingIntent takenClick = groupAction(context, scheduledAt, ACTION_TAKE_GROUP, 1);
+        PendingIntent skipClick = groupAction(context, scheduledAt, ACTION_SKIP_GROUP, 2);
+        PendingIntent delayClick = groupAction(context, scheduledAt, ACTION_DELAY_OPTIONS, 3);
+
+        String contentText = buildGroupText(context, group);
+        String title = group.size() > 1
+                ? context.getString(R.string.medication_time_count, group.size())
+                : context.getString(R.string.time_to_take_medication);
+
+        return new NotificationCompat.Builder(context, getReminderChannelId(context))
+                .setLargeIcon(BitmapFactory.decodeResource(context.getResources(), R.drawable.pill_reminder_icon))
+                .setSmallIcon(R.drawable.baseline_access_alarm_24)
+                .setContentTitle(title)
+                .setTicker(contentText)
+                .setVibrate(new long[]{0, 500, 1000})
+                .setContentText(contentText)
+                .setStyle(new NotificationCompat.BigTextStyle().bigText(contentText))
+                .setSound(null)
+                .setSilent(true)
+                .setContentIntent(mClick)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setCategory(NotificationCompat.CATEGORY_ALARM)
+                .setAutoCancel(true)
+                .setOnlyAlertOnce(false)
+                .addAction(R.drawable.baseline_check_24, context.getString(R.string.notification_taken), takenClick)
+                .addAction(R.drawable.baseline_notifications_off_24, context.getString(R.string.notification_skip), skipClick)
+                .addAction(R.drawable.baseline_replay_circle_filled_24, context.getString(R.string.notification_delay), delayClick)
+                .build();
+    }
+
+    private static String buildGroupText(Context context, List<Reminder> group) {
         StringBuilder builder = new StringBuilder();
         for (Reminder reminder : group) {
             if (builder.length() > 0) {
@@ -284,9 +290,7 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
     }
 
     public static String getReminderChannelId(Context context) {
-        String value = new Prefs(context).getString(PREF_REMINDER_RINGTONE_URI, null);
-        String soundKey = value == null ? "default_alarm" : value;
-        return CHANNEL_ID_PREFIX + Integer.toHexString(soundKey.hashCode());
+        return REMINDER_CHANNEL_ID;
     }
 
     public static void recreateNotificationChannel(Context context, String oldChannelId) {
@@ -305,7 +309,7 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
         createNotificationChannel(context, notificationManager);
     }
 
-    private static void createNotificationChannel(Context context, NotificationManager notificationManager) {
+    static void createNotificationChannel(Context context, NotificationManager notificationManager) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && notificationManager != null) {
             NotificationChannel channel = new NotificationChannel(
                     getReminderChannelId(context),
@@ -315,29 +319,20 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
             channel.setLightColor(Color.BLUE);
             channel.enableLights(true);
             channel.setShowBadge(true);
-            Uri soundUri = getReminderSoundUri(context);
-            if (soundUri == null) {
-                channel.setSound(null, null);
-            } else {
-                AudioAttributes audioAttributes = new AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_ALARM)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                        .build();
-                channel.setSound(soundUri, audioAttributes);
-            }
+            channel.setSound(null, null);
             notificationManager.createNotificationChannel(channel);
         }
     }
 
-    private static int notificationIdFor(String scheduledAt) {
+    static int notificationIdFor(String scheduledAt) {
         return Math.abs(scheduledAt.hashCode());
     }
 
-    private int requestCodeFor(String scheduledAt, int salt) {
+    private static int requestCodeFor(String scheduledAt, int salt) {
         return Math.abs((scheduledAt + "|" + salt).hashCode());
     }
 
-    private PendingIntent groupAction(Context context, String scheduledAt, String action, int salt) {
+    private static PendingIntent groupAction(Context context, String scheduledAt, String action, int salt) {
         Intent intent = new Intent(context, AlarmReceiver.class);
         intent.setAction(action);
         intent.putExtra(EXTRA_SCHEDULED_AT, scheduledAt);
@@ -348,7 +343,7 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
                 AppUtils.Companion.getFlag());
     }
 
-    private List<Reminder> pendingReminders(Context context, ReminderDatabase rb, List<Reminder> group, String scheduledAt) {
+    List<Reminder> pendingReminders(Context context, ReminderDatabase rb, List<Reminder> group, String scheduledAt) {
         ArrayList<Reminder> pending = new ArrayList<>();
         for (Reminder reminder : group) {
             if (ReminderOccurrenceState.isPendingNow(context, rb, reminder, scheduledAt)) {
@@ -393,9 +388,11 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
     }
 
     private static void cancelNotification(Context context, String scheduledAt) {
+        ReminderRingService.stop(context);
         NotificationManager notificationManager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
         if (notificationManager != null) {
             notificationManager.cancel(CHANNEL_ID, notificationIdFor(scheduledAt));
+            notificationManager.cancel(notificationIdFor(scheduledAt));
         }
     }
 
@@ -427,14 +424,14 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
         setBootReceiverEnabled(context, true);
     }
 
-    private String formatQuantity(double value) {
+    private static String formatQuantity(double value) {
         if (Math.abs(value - Math.round(value)) < 0.000001) {
             return String.valueOf((long) Math.round(value));
         }
         return String.format(java.util.Locale.US, "%.2f", value);
     }
 
-    private String formatDoseQuantity(Context context, Reminder reminder) {
+    private static String formatDoseQuantity(Context context, Reminder reminder) {
         String quantity = formatQuantity(reminder.getDose());
         String iconType = reminder.getIconType();
         if (iconType == null || iconType.length() == 0
