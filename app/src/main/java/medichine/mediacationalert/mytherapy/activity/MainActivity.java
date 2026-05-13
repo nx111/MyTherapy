@@ -1680,13 +1680,42 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT));
 
-        LabTrendChartView chart = new LabTrendChartView(this);
-        chart.setData(item, results);
-        LinearLayout.LayoutParams chartParams = new LinearLayout.LayoutParams(
+        LinearLayout modeRow = new LinearLayout(this);
+        modeRow.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout.LayoutParams modeParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        modeParams.topMargin = dp(10);
+        content.addView(modeRow, modeParams);
+
+        Button chartButton = createLabDetailModeButton(R.string.lab_detail_chart);
+        Button listButton = createLabDetailModeButton(R.string.lab_detail_list);
+        LinearLayout.LayoutParams buttonParams = new LinearLayout.LayoutParams(0, dp(42), 1);
+        modeRow.addView(chartButton, buttonParams);
+        LinearLayout.LayoutParams listButtonParams = new LinearLayout.LayoutParams(0, dp(42), 1);
+        listButtonParams.leftMargin = dp(8);
+        modeRow.addView(listButton, listButtonParams);
+
+        FrameLayout detailFrame = new FrameLayout(this);
+        LinearLayout.LayoutParams frameParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 dp(260));
-        chartParams.topMargin = dp(8);
-        content.addView(chart, chartParams);
+        frameParams.topMargin = dp(8);
+        content.addView(detailFrame, frameParams);
+
+        LabTrendChartView chart = new LabTrendChartView(this);
+        chart.setData(item, results);
+        detailFrame.addView(chart, new FrameLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.MATCH_PARENT));
+
+        ScrollView resultList = createLabResultListView(item, results);
+        detailFrame.addView(resultList, new FrameLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.MATCH_PARENT));
+        chartButton.setOnClickListener(v -> setLabDetailMode(chart, resultList, chartButton, listButton, true));
+        listButton.setOnClickListener(v -> setLabDetailMode(chart, resultList, chartButton, listButton, false));
+        setLabDetailMode(chart, resultList, chartButton, listButton, true);
 
         TextView count = new TextView(this);
         count.setText(results.isEmpty()
@@ -1704,6 +1733,141 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 .setPositiveButton(R.string.add_lab_result, (dialog, which) -> showLabResultForm(item))
                 .setNegativeButton(R.string.cancel, null)
                 .show();
+    }
+
+    private Button createLabDetailModeButton(int textRes) {
+        Button button = new Button(this);
+        button.setText(textRes);
+        button.setTextSize(14);
+        button.setAllCaps(false);
+        button.setMinHeight(0);
+        button.setMinimumHeight(0);
+        button.setPadding(dp(8), 0, dp(8), 0);
+        return button;
+    }
+
+    private void setLabDetailMode(View chart, View resultList, Button chartButton, Button listButton, boolean showChart) {
+        chart.setVisibility(showChart ? View.VISIBLE : View.GONE);
+        resultList.setVisibility(showChart ? View.GONE : View.VISIBLE);
+        styleLabDetailModeButton(chartButton, showChart);
+        styleLabDetailModeButton(listButton, !showChart);
+    }
+
+    private void styleLabDetailModeButton(Button button, boolean selected) {
+        GradientDrawable background = new GradientDrawable();
+        background.setShape(GradientDrawable.RECTANGLE);
+        background.setCornerRadius(dp(8));
+        background.setColor(getResources().getColor(selected ? R.color.nav_selected : R.color.surface_variant));
+        background.setStroke(dp(1), getResources().getColor(selected ? R.color.nav_selected : R.color.outline));
+        button.setBackground(background);
+        button.setTextColor(getResources().getColor(selected ? R.color.on_accent : R.color.text_primary));
+    }
+
+    private ScrollView createLabResultListView(LabTestItem item, List<LabResult> results) {
+        ScrollView scrollView = new ScrollView(this);
+        scrollView.setFillViewport(true);
+        LinearLayout list = new LinearLayout(this);
+        list.setOrientation(LinearLayout.VERTICAL);
+        scrollView.addView(list, new ScrollView.LayoutParams(
+                ScrollView.LayoutParams.MATCH_PARENT,
+                ScrollView.LayoutParams.WRAP_CONTENT));
+        if (results.isEmpty()) {
+            TextView empty = new TextView(this);
+            empty.setText(R.string.lab_no_result);
+            empty.setGravity(Gravity.CENTER);
+            empty.setTextColor(getResources().getColor(R.color.text_secondary));
+            empty.setTextSize(14);
+            list.addView(empty, new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    dp(240)));
+            return scrollView;
+        }
+        for (int i = results.size() - 1; i >= 0; i--) {
+            list.addView(createLabResultRow(item, results.get(i)));
+            if (i > 0) {
+                list.addView(createDividerView());
+            }
+        }
+        return scrollView;
+    }
+
+    private View createLabResultRow(LabTestItem item, LabResult result) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setMinimumHeight(dp(58));
+        row.setPadding(0, dp(8), 0, dp(8));
+
+        LinearLayout textGroup = new LinearLayout(this);
+        textGroup.setOrientation(LinearLayout.VERTICAL);
+        row.addView(textGroup, new LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+
+        TextView date = new TextView(this);
+        String time = formatHealthEntryTime(result.mCreatedAt);
+        String dateText = formatHealthEntryDate(result.mCreatedAt);
+        date.setText(time.length() == 0 ? dateText : dateText + " " + time);
+        date.setTextColor(getResources().getColor(R.color.text_primary));
+        date.setTextSize(14);
+        textGroup.addView(date, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        String statusText = labResultStatusText(item, result);
+        TextView status = new TextView(this);
+        status.setText(statusText);
+        status.setTextColor(labResultStatusColor(item, result));
+        status.setTextSize(13);
+        status.setVisibility(statusText.length() == 0 ? View.GONE : View.VISIBLE);
+        textGroup.addView(status, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        TextView value = new TextView(this);
+        value.setText(formatLabResultValue(item, result));
+        value.setTextColor(getResources().getColor(R.color.text_primary));
+        value.setTextSize(18);
+        value.setTypeface(Typeface.DEFAULT_BOLD);
+        row.addView(value, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+        return row;
+    }
+
+    private View createDividerView() {
+        View divider = new View(this);
+        divider.setBackgroundColor(getResources().getColor(R.color.history_row_divider));
+        divider.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(1)));
+        return divider;
+    }
+
+    private String formatLabResultValue(LabTestItem item, LabResult result) {
+        String unitText = result.mUnit == null || result.mUnit.length() == 0
+                ? item.mUnit
+                : result.mUnit;
+        return formatQuantity(result.mValue) + (unitText == null || unitText.length() == 0 ? "" : " " + unitText);
+    }
+
+    private String labResultStatusText(LabTestItem item, LabResult result) {
+        if (item.mReferenceMin != null && result.mValue < item.mReferenceMin) {
+            return getString(R.string.lab_low);
+        }
+        if (item.mReferenceMax != null && result.mValue > item.mReferenceMax) {
+            return getString(R.string.lab_high);
+        }
+        return item.mReferenceMin != null || item.mReferenceMax != null ? getString(R.string.lab_normal) : "";
+    }
+
+    private int labResultStatusColor(LabTestItem item, LabResult result) {
+        if (item.mReferenceMin != null && result.mValue < item.mReferenceMin) {
+            return getResources().getColor(R.color.history_missed);
+        }
+        if (item.mReferenceMax != null && result.mValue > item.mReferenceMax) {
+            return getResources().getColor(R.color.history_missed);
+        }
+        return getResources().getColor(R.color.history_taken);
     }
 
     private List<SummaryItem> generateReportData() {
