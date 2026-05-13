@@ -103,7 +103,8 @@ public class LabTrendChartView extends View {
     }
 
     private void drawReferenceRange(Canvas canvas, double min, double span) {
-        if (item == null || item.mReferenceMax < item.mReferenceMin) {
+        if (item == null || item.mReferenceMin == null || item.mReferenceMax == null
+                || item.mReferenceMax < item.mReferenceMin) {
             return;
         }
         float top = yFor(item.mReferenceMax, min, span);
@@ -175,8 +176,12 @@ public class LabTrendChartView extends View {
             min = Math.min(min, result.mValue);
         }
         if (item != null) {
-            min = Math.min(min, item.mReferenceMin);
-            min = Math.min(min, item.mReferenceMax);
+            if (item.mReferenceMin != null) {
+                min = Math.min(min, item.mReferenceMin);
+            }
+            if (item.mReferenceMax != null) {
+                min = Math.min(min, item.mReferenceMax);
+            }
         }
         return min - paddingForRange();
     }
@@ -187,8 +192,12 @@ public class LabTrendChartView extends View {
             max = Math.max(max, result.mValue);
         }
         if (item != null) {
-            max = Math.max(max, item.mReferenceMin);
-            max = Math.max(max, item.mReferenceMax);
+            if (item.mReferenceMin != null) {
+                max = Math.max(max, item.mReferenceMin);
+            }
+            if (item.mReferenceMax != null) {
+                max = Math.max(max, item.mReferenceMax);
+            }
         }
         return max + paddingForRange();
     }
@@ -201,8 +210,14 @@ public class LabTrendChartView extends View {
             max = Math.max(max, result.mValue);
         }
         if (item != null) {
-            min = Math.min(min, Math.min(item.mReferenceMin, item.mReferenceMax));
-            max = Math.max(max, Math.max(item.mReferenceMin, item.mReferenceMax));
+            if (item.mReferenceMin != null) {
+                min = Math.min(min, item.mReferenceMin);
+                max = Math.max(max, item.mReferenceMin);
+            }
+            if (item.mReferenceMax != null) {
+                min = Math.min(min, item.mReferenceMax);
+                max = Math.max(max, item.mReferenceMax);
+            }
         }
         double span = max - min;
         return span <= 0.000001 ? 1 : span * 0.12;

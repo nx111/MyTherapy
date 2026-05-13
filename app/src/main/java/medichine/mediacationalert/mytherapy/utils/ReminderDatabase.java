@@ -6,6 +6,11 @@ import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -23,7 +28,9 @@ import medichine.mediacationalert.mytherapy.R;
 
 public class ReminderDatabase extends SQLiteOpenHelper {
     private static final int DATABASE_VERSION = 10;
-    private static final String DATABASE_NAME = "MedicationDbTab";
+    public static final String DATABASE_NAME = "MedicationDbTab";
+    public static final String COMPLETE_CSV_MARKER = "MYTHERAPY_CSV_V2";
+    private static final String CSV_NULL = "__MYTHERAPY_NULL__";
     private static final int DEFAULT_ACCOUNT_ID = 1;
     private static final String PREF_ACTIVE_ACCOUNT_ID = "active_account_id";
 
@@ -83,6 +90,7 @@ public class ReminderDatabase extends SQLiteOpenHelper {
     private static final String LAB_ITEM_REF_MIN = "reference_min";
     private static final String LAB_ITEM_REF_MAX = "reference_max";
     private static final String LAB_ITEM_UNIT = "unit";
+    private static final String LAB_ITEM_SORT_ORDER = "sort_order";
 
     private static final String TABLE_LAB_RESULTS = "LabResults";
     private static final String LAB_RESULT_ID = "id";
@@ -173,6 +181,12 @@ public class ReminderDatabase extends SQLiteOpenHelper {
         if (oldVersion < 8) {
             addColumnIfMissing(db, TABLE_REMINDERS, KEY_STOCK_ALERT_THRESHOLD,
                     KEY_STOCK_ALERT_THRESHOLD + " REAL DEFAULT 0");
+        }
+        if (oldVersion < 9) {
+            migrateNullableLabReferences(db);
+        }
+        if (oldVersion < 10) {
+            migrateLabItemSortOrder(db);
         }
     }
 
@@ -322,9 +336,10 @@ public class ReminderDatabase extends SQLiteOpenHelper {
         String itemsSql = "CREATE TABLE IF NOT EXISTS " + TABLE_LAB_ITEMS + "("
                 + LAB_ITEM_ID + " INTEGER PRIMARY KEY AUTOINCREMENT,"
                 + LAB_ITEM_NAME + " TEXT NOT NULL,"
-                + LAB_ITEM_REF_MIN + " REAL NOT NULL,"
-                + LAB_ITEM_REF_MAX + " REAL NOT NULL,"
-                + LAB_ITEM_UNIT + " TEXT DEFAULT ''"
+                + LAB_ITEM_REF_MIN + " REAL,"
+                + LAB_ITEM_REF_MAX + " REAL,"
+                + LAB_ITEM_UNIT + " TEXT DEFAULT '',"
+                + LAB_ITEM_SORT_ORDER + " INTEGER NOT NULL DEFAULT 0"
                 + ")";
         db.execSQL(itemsSql);
 
@@ -335,6 +350,43 @@ public class ReminderDatabase extends SQLiteOpenHelper {
                 + LAB_RESULT_CREATED_AT + " TEXT NOT NULL"
                 + ")";
         db.execSQL(resultsSql);
+    }
+
+    private void migrateNullableLabReferences(SQLiteDatabase db) {
+        String tempTable = TABLE_LAB_ITEMS + "_v9";
+        db.execSQL("DROP TABLE IF EXISTS " + tempTable);
+        db.execSQL("CREATE TABLE " + tempTable + "("
+                + LAB_ITEM_ID + " INTEGER PRIMARY KEY AUTOINCREMENT,"
+                + LAB_ITEM_NAME + " TEXT NOT NULL,"
+                + LAB_ITEM_REF_MIN + " REAL,"
+                + LAB_ITEM_REF_MAX + " REAL,"
+                + LAB_ITEM_UNIT + " TEXT DEFAULT ''"
+                + ")");
+        db.execSQL("INSERT INTO " + tempTable + "("
+                + LAB_ITEM_ID + "," + LAB_ITEM_NAME + "," + LAB_ITEM_REF_MIN + ","
+                + LAB_ITEM_REF_MAX + "," + LAB_ITEM_UNIT + ") SELECT "
+                + LAB_ITEM_ID + "," + LAB_ITEM_NAME + "," + LAB_ITEM_REF_MIN + ","
+                + LAB_ITEM_REF_MAX + "," + LAB_ITEM_UNIT + " FROM " + TABLE_LAB_ITEMS);
+        db.execSQL("DROP TABLE " + TABLE_LAB_ITEMS);
+        db.execSQL("ALTER TABLE " + tempTable + " RENAME TO " + TABLE_LAB_ITEMS);
+    }
+
+    private void migrateLabItemSortOrder(SQLiteDatabase db) {
+        addColumnIfMissing(db, TABLE_LAB_ITEMS, LAB_ITEM_SORT_ORDER,
+                LAB_ITEM_SORT_ORDER + " INTEGER NOT NULL DEFAULT 0");
+        Cursor cursor = db.query(TABLE_LAB_ITEMS, new String[]{LAB_ITEM_ID}, null, null,
+                null, null, LAB_ITEM_NAME + " COLLATE NOCASE ASC, " + LAB_ITEM_ID + " ASC");
+        try {
+            int sortOrder = 0;
+            while (cursor.moveToNext()) {
+                ContentValues values = new ContentValues();
+                values.put(LAB_ITEM_SORT_ORDER, sortOrder++);
+                db.update(TABLE_LAB_ITEMS, values, LAB_ITEM_ID + "=?",
+                        new String[]{String.valueOf(cursor.getInt(0))});
+            }
+        } finally {
+            cursor.close();
+        }
     }
 
     public int addReminder(Reminder reminder) {
@@ -693,6 +745,90 @@ public class ReminderDatabase extends SQLiteOpenHelper {
         return builder.toString();
     }
 
+    public String exportCompleteCsv() {
+        StringBuilder builder = new StringBuilder();
+        builder.append(COMPLETE_CSV_MARKER).append('\n');
+        SQLiteDatabase db = getReadableDatabase();
+        for (String table : backupTables()) {
+            appendCsvRow(builder, "# table", table);
+            Cursor cursor = db.query(table, null, null, null, null, null, null);
+            try {
+                String[] columns = cursor.getColumnNames();
+                appendCsvRow(builder, columns);
+                while (cursor.moveToNext()) {
+                    String[] values = new String[columns.length];
+                    for (int i = 0; i < columns.length; i++) {
+                        values[i] = cursor.isNull(i) ? CSV_NULL : cursor.getString(i);
+                    }
+                    appendCsvRow(builder, values);
+                }
+            } finally {
+                cursor.close();
+            }
+        }
+        return builder.toString();
+    }
+
+    public int importCompleteCsv(InputStream inputStream) throws IOException {
+        BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8));
+        String firstLine = reader.readLine();
+        if (!COMPLETE_CSV_MARKER.equals(firstLine)) {
+            throw new IOException("Invalid MyTherapy complete CSV");
+        }
+
+        SQLiteDatabase db = getWritableDatabase();
+        db.beginTransaction();
+        int importedRows = 0;
+        try {
+            for (String table : reversedBackupTables()) {
+                db.delete(table, null, null);
+            }
+
+            String currentTable = "";
+            List<String> columns = null;
+            String line;
+            while ((line = reader.readLine()) != null) {
+                if (line.trim().length() == 0) {
+                    continue;
+                }
+                List<String> fields = parseCsvLine(line);
+                if (fields.size() >= 2 && "# table".equals(fields.get(0))) {
+                    String table = fields.get(1);
+                    currentTable = isBackupTable(table) ? table : "";
+                    columns = null;
+                    continue;
+                }
+                if (currentTable.length() == 0) {
+                    continue;
+                }
+                if (columns == null) {
+                    columns = fields;
+                    continue;
+                }
+
+                ContentValues values = new ContentValues();
+                int count = Math.min(columns.size(), fields.size());
+                for (int i = 0; i < count; i++) {
+                    String value = fields.get(i);
+                    if (CSV_NULL.equals(value)) {
+                        values.putNull(columns.get(i));
+                    } else {
+                        values.put(columns.get(i), value);
+                    }
+                }
+                if (values.size() > 0) {
+                    db.insertWithOnConflict(currentTable, null, values, SQLiteDatabase.CONFLICT_REPLACE);
+                    importedRows++;
+                }
+            }
+
+            db.setTransactionSuccessful();
+        } finally {
+            db.endTransaction();
+        }
+        return importedRows;
+    }
+
     private Set<String> appendIntakeLogExportRows(StringBuilder builder) {
         Set<String> exportedLogs = new HashSet<>();
         SQLiteDatabase db = this.getReadableDatabase();
@@ -783,6 +919,7 @@ public class ReminderDatabase extends SQLiteOpenHelper {
     public long addLabTestItem(LabTestItem item) {
         SQLiteDatabase db = this.getWritableDatabase();
         ContentValues values = toLabTestItemValues(item);
+        values.put(LAB_ITEM_SORT_ORDER, nextLabItemSortOrder(db));
         long id = db.insert(TABLE_LAB_ITEMS, null, values);
         db.close();
         return id;
@@ -811,7 +948,7 @@ public class ReminderDatabase extends SQLiteOpenHelper {
         List<LabTestItem> items = new ArrayList<>();
         SQLiteDatabase db = this.getReadableDatabase();
         Cursor cursor = db.query(TABLE_LAB_ITEMS, labItemColumns(), null, null,
-                null, null, LAB_ITEM_NAME + " COLLATE NOCASE ASC");
+                null, null, LAB_ITEM_SORT_ORDER + " ASC, " + LAB_ITEM_NAME + " COLLATE NOCASE ASC, " + LAB_ITEM_ID + " ASC");
         if (cursor.moveToFirst()) {
             do {
                 items.add(readLabTestItem(cursor));
@@ -819,6 +956,29 @@ public class ReminderDatabase extends SQLiteOpenHelper {
         }
         cursor.close();
         return items;
+    }
+
+    public void updateLabTestItemOrder(List<Integer> orderedIds) {
+        if (orderedIds == null || orderedIds.isEmpty()) {
+            return;
+        }
+        SQLiteDatabase db = this.getWritableDatabase();
+        db.beginTransaction();
+        try {
+            for (int i = 0; i < orderedIds.size(); i++) {
+                Integer itemId = orderedIds.get(i);
+                if (itemId == null) {
+                    continue;
+                }
+                ContentValues values = new ContentValues();
+                values.put(LAB_ITEM_SORT_ORDER, i);
+                db.update(TABLE_LAB_ITEMS, values, LAB_ITEM_ID + "=?",
+                        new String[]{String.valueOf(itemId)});
+            }
+            db.setTransactionSuccessful();
+        } finally {
+            db.endTransaction();
+        }
     }
 
     public long addLabResult(LabResult result) {
@@ -1138,19 +1298,42 @@ public class ReminderDatabase extends SQLiteOpenHelper {
     private ContentValues toLabTestItemValues(LabTestItem item) {
         ContentValues values = new ContentValues();
         values.put(LAB_ITEM_NAME, normalizeTitle(item.mName));
-        values.put(LAB_ITEM_REF_MIN, item.mReferenceMin);
-        values.put(LAB_ITEM_REF_MAX, item.mReferenceMax);
+        if (item.mReferenceMin == null) {
+            values.putNull(LAB_ITEM_REF_MIN);
+        } else {
+            values.put(LAB_ITEM_REF_MIN, item.mReferenceMin);
+        }
+        if (item.mReferenceMax == null) {
+            values.putNull(LAB_ITEM_REF_MAX);
+        } else {
+            values.put(LAB_ITEM_REF_MAX, item.mReferenceMax);
+        }
         values.put(LAB_ITEM_UNIT, item.mUnit == null ? "" : item.mUnit.trim());
         return values;
     }
 
+    private int nextLabItemSortOrder(SQLiteDatabase db) {
+        Cursor cursor = db.rawQuery("SELECT MAX(" + LAB_ITEM_SORT_ORDER + ") FROM " + TABLE_LAB_ITEMS, null);
+        try {
+            if (cursor.moveToFirst() && !cursor.isNull(0)) {
+                return cursor.getInt(0) + 1;
+            }
+            return 0;
+        } finally {
+            cursor.close();
+        }
+    }
+
     private LabTestItem readLabTestItem(Cursor cursor) {
+        int referenceMinIndex = cursor.getColumnIndexOrThrow(LAB_ITEM_REF_MIN);
+        int referenceMaxIndex = cursor.getColumnIndexOrThrow(LAB_ITEM_REF_MAX);
         return new LabTestItem(
                 cursor.getInt(cursor.getColumnIndexOrThrow(LAB_ITEM_ID)),
                 cursor.getString(cursor.getColumnIndexOrThrow(LAB_ITEM_NAME)),
-                cursor.getDouble(cursor.getColumnIndexOrThrow(LAB_ITEM_REF_MIN)),
-                cursor.getDouble(cursor.getColumnIndexOrThrow(LAB_ITEM_REF_MAX)),
-                cursor.getString(cursor.getColumnIndexOrThrow(LAB_ITEM_UNIT)));
+                cursor.isNull(referenceMinIndex) ? null : cursor.getDouble(referenceMinIndex),
+                cursor.isNull(referenceMaxIndex) ? null : cursor.getDouble(referenceMaxIndex),
+                cursor.getString(cursor.getColumnIndexOrThrow(LAB_ITEM_UNIT)),
+                cursor.getInt(cursor.getColumnIndexOrThrow(LAB_ITEM_SORT_ORDER)));
     }
 
     private LabResult readLabResult(Cursor cursor) {
@@ -1211,7 +1394,8 @@ public class ReminderDatabase extends SQLiteOpenHelper {
                 LAB_ITEM_NAME,
                 LAB_ITEM_REF_MIN,
                 LAB_ITEM_REF_MAX,
-                LAB_ITEM_UNIT
+                LAB_ITEM_UNIT,
+                LAB_ITEM_SORT_ORDER
         };
     }
 
@@ -1292,6 +1476,61 @@ public class ReminderDatabase extends SQLiteOpenHelper {
             return "\"" + value.replace("\"", "\"\"") + "\"";
         }
         return value;
+    }
+
+    private String[] backupTables() {
+        return new String[]{
+                TABLE_ACCOUNTS,
+                TABLE_REMINDERS,
+                TABLE_STOCK_BATCHES,
+                TABLE_INTAKE_LOGS,
+                TABLE_HEALTH_ENTRIES,
+                TABLE_LAB_ITEMS,
+                TABLE_LAB_RESULTS
+        };
+    }
+
+    private String[] reversedBackupTables() {
+        String[] tables = backupTables();
+        for (int i = 0; i < tables.length / 2; i++) {
+            String tmp = tables[i];
+            tables[i] = tables[tables.length - i - 1];
+            tables[tables.length - i - 1] = tmp;
+        }
+        return tables;
+    }
+
+    private boolean isBackupTable(String table) {
+        for (String backupTable : backupTables()) {
+            if (backupTable.equals(table)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private List<String> parseCsvLine(String line) {
+        ArrayList<String> fields = new ArrayList<>();
+        StringBuilder field = new StringBuilder();
+        boolean quoted = false;
+        for (int i = 0; i < line.length(); i++) {
+            char c = line.charAt(i);
+            if (c == '"') {
+                if (quoted && i + 1 < line.length() && line.charAt(i + 1) == '"') {
+                    field.append('"');
+                    i++;
+                } else {
+                    quoted = !quoted;
+                }
+            } else if (c == ',' && !quoted) {
+                fields.add(field.toString());
+                field.setLength(0);
+            } else {
+                field.append(c);
+            }
+        }
+        fields.add(field.toString());
+        return fields;
     }
 
     private boolean hasMatchingDoseTime(Reminder left, Reminder right) {

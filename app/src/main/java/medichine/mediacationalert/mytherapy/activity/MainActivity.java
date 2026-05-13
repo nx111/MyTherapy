@@ -3,21 +3,30 @@ package medichine.mediacationalert.mytherapy.activity;
 import static medichine.mediacationalert.mytherapy.utils.Fun.showBanner;
 
 import android.Manifest;
+import android.app.AlarmManager;
 import android.app.AlertDialog;
 import android.app.DatePickerDialog;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.app.ProgressDialog;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Paint;
 import android.graphics.Typeface;
+import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
+import android.media.Ringtone;
+import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.PowerManager;
 import android.provider.MediaStore;
+import android.provider.Settings;
 import android.text.InputType;
 import android.text.TextUtils;
 import android.util.Log;
@@ -41,6 +50,8 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.NotificationManagerCompat;
+import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -52,6 +63,7 @@ import com.android.billingclient.api.QueryPurchasesParams;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
+import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -83,6 +95,7 @@ import medichine.mediacationalert.mytherapy.utils.AlarmReceiver;
 import medichine.mediacationalert.mytherapy.utils.Fun;
 import medichine.mediacationalert.mytherapy.utils.ItemClickListener;
 import medichine.mediacationalert.mytherapy.utils.MedicineIconFactory;
+import medichine.mediacationalert.mytherapy.utils.MyTherapyBackupManager;
 import medichine.mediacationalert.mytherapy.utils.MyTherapyArchiveImporter;
 import medichine.mediacationalert.mytherapy.utils.Prefs;
 import medichine.mediacationalert.mytherapy.utils.Reminder;
@@ -93,6 +106,11 @@ import medichine.mediacationalert.mytherapy.view.LabTrendChartView;
 
 public class MainActivity extends AppCompatActivity implements ItemClickListener {
     private static final int REQUEST_POST_NOTIFICATIONS = 1001;
+    private static final String PREF_NOTIFICATION_PERMISSION_REQUESTED = "notification_permission_requested";
+    private static final String PREF_NOTIFICATION_SETTINGS_HANDLED = "notification_settings_handled";
+    private static final String PREF_NOTIFICATION_CHANNEL_SETTINGS_HANDLED = "notification_channel_settings_handled";
+    private static final String PREF_EXACT_ALARM_SETTINGS_HANDLED = "exact_alarm_settings_handled";
+    private static final String PREF_BATTERY_OPTIMIZATION_HANDLED = "battery_optimization_handled";
     private static final int PAGE_TODAY = 0;
     private static final int PAGE_LAB = 1;
     private static final int PAGE_COURSE = 2;
@@ -103,6 +121,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     private static final int REQUEST_EXPORT_ARCHIVE = 3002;
     private static final int REQUEST_PICK_COURSE_ICON_IMAGE = 3003;
     private static final int REQUEST_CAPTURE_COURSE_ICON_IMAGE = 3004;
+    private static final int REQUEST_PICK_RINGTONE = 3005;
     private static final String COURSE_PLAN_SEPARATOR = "    ";
 
     private BillingClient billingClient;
@@ -122,10 +141,13 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     private final LinkedHashMap<Integer, Integer> IDmap = new LinkedHashMap<>();
     private final LinkedHashMap<Integer, Integer> summaryIDmap = new LinkedHashMap<>();
     private final LinkedHashMap<Integer, Integer> labItemMap = new LinkedHashMap<>();
+    private final ArrayList<Integer> labItemOrder = new ArrayList<>();
     private final LinkedHashMap<Integer, List<Reminder>> courseReminderMap = new LinkedHashMap<>();
     private ReminderDatabase rb;
     private AlarmReceiver mAlarmReceiver;
+    private ItemTouchHelper mLabItemTouchHelper;
     private CourseIconEditState mCourseIconEditState;
+    private boolean mExportFullBackup;
 
     private static class CourseIconEditState {
         String iconType;
@@ -144,6 +166,8 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     private final Handler mUiHandler = new Handler(Looper.getMainLooper());
     private Runnable mAccountLongPressRunnable;
     private boolean mAccountLongPressHandled;
+    private boolean mReminderSettingsDialogShowing;
+    private boolean mLabOrderChanged;
 
     private List<ReminderItem> medicineList = new ArrayList<>();
     private List<SummaryItem> summaryList = new ArrayList<>();
@@ -153,7 +177,6 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         super.onCreate(savedInstanceState);
 
         setContentView(R.layout.activity_main);
-        requestNotificationPermission();
 
         ActionBar actionBar = getSupportActionBar();
         if (actionBar != null) {
@@ -162,6 +185,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
 
         rb = new ReminderDatabase(getApplicationContext());
         prefs = new Prefs(this);
+        requestNotificationPermission();
         new Fun(this);
 
         if (BuildConfig.ADS_ENABLED && Fun.checkInternet()) {
@@ -186,6 +210,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         normalizeDate(mSelectedDate);
 
         mList.setLayoutManager(new LinearLayoutManager(this));
+        setupLabItemDragSorting();
         registerForContextMenu(mList);
         mBottomNavigation.setOnItemSelectedListener(item -> {
             if (item.getItemId() == R.id.nav_lab) {
@@ -220,6 +245,51 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         mAlarmReceiver = new AlarmReceiver();
         updateCalendarHeader();
         loadCurrentPage();
+    }
+
+    private void setupLabItemDragSorting() {
+        mLabItemTouchHelper = new ItemTouchHelper(new ItemTouchHelper.SimpleCallback(
+                ItemTouchHelper.UP | ItemTouchHelper.DOWN, 0) {
+            @Override
+            public boolean isLongPressDragEnabled() {
+                return mCurrentPage == PAGE_LAB;
+            }
+
+            @Override
+            public boolean isItemViewSwipeEnabled() {
+                return false;
+            }
+
+            @Override
+            public int getMovementFlags(@NonNull RecyclerView recyclerView,
+                                        @NonNull RecyclerView.ViewHolder viewHolder) {
+                if (mCurrentPage != PAGE_LAB || viewHolder.getAdapterPosition() == RecyclerView.NO_POSITION) {
+                    return 0;
+                }
+                return makeMovementFlags(ItemTouchHelper.UP | ItemTouchHelper.DOWN, 0);
+            }
+
+            @Override
+            public boolean onMove(@NonNull RecyclerView recyclerView,
+                                  @NonNull RecyclerView.ViewHolder viewHolder,
+                                  @NonNull RecyclerView.ViewHolder target) {
+                return moveLabItem(viewHolder.getAdapterPosition(), target.getAdapterPosition());
+            }
+
+            @Override
+            public void onSwiped(@NonNull RecyclerView.ViewHolder viewHolder, int direction) {
+            }
+
+            @Override
+            public void clearView(@NonNull RecyclerView recyclerView, @NonNull RecyclerView.ViewHolder viewHolder) {
+                super.clearView(recyclerView, viewHolder);
+                if (mCurrentPage == PAGE_LAB && mLabOrderChanged) {
+                    rb.updateLabTestItemOrder(labItemOrder);
+                    mLabOrderChanged = false;
+                }
+            }
+        });
+        mLabItemTouchHelper.attachToRecyclerView(mList);
     }
 
     private void bindAccountButtonActions() {
@@ -266,8 +336,141 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
 
     private void requestNotificationPermission() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
-                && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+                && !prefs.getBoolean(PREF_NOTIFICATION_PERMISSION_REQUESTED, false)) {
+            prefs.setBoolean(PREF_NOTIFICATION_PERMISSION_REQUESTED, true);
             requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, REQUEST_POST_NOTIFICATIONS);
+        }
+    }
+
+    private void checkReminderSystemSettings() {
+        if (mReminderSettingsDialogShowing || prefs == null) {
+            return;
+        }
+        showNextReminderSystemSettingsDialog(false);
+    }
+
+    private boolean showNextReminderSystemSettingsDialog(boolean force) {
+        if (!NotificationManagerCompat.from(this).areNotificationsEnabled()) {
+            if (force || !prefs.getBoolean(PREF_NOTIFICATION_SETTINGS_HANDLED, false)) {
+                Intent intent = new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                        .putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName());
+                showReminderSettingsDialog(
+                        R.string.reminder_settings_title,
+                        R.string.notification_permission_required_message,
+                        PREF_NOTIFICATION_SETTINGS_HANDLED,
+                        intent);
+                return true;
+            }
+            return false;
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
+                && (force || !prefs.getBoolean(PREF_NOTIFICATION_CHANNEL_SETTINGS_HANDLED, false))) {
+            NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+            String reminderChannelId = AlarmReceiver.getReminderChannelId(this);
+            NotificationChannel channel = notificationManager == null ? null
+                    : notificationManager.getNotificationChannel(reminderChannelId);
+            if (channel != null && channel.getImportance() == NotificationManager.IMPORTANCE_NONE) {
+                Intent intent = new Intent(Settings.ACTION_CHANNEL_NOTIFICATION_SETTINGS)
+                        .putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName())
+                        .putExtra(Settings.EXTRA_CHANNEL_ID, reminderChannelId);
+                showReminderSettingsDialog(
+                        R.string.reminder_settings_title,
+                        R.string.notification_channel_blocked_message,
+                        PREF_NOTIFICATION_CHANNEL_SETTINGS_HANDLED,
+                        intent);
+                return true;
+            }
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+                && (force || !prefs.getBoolean(PREF_EXACT_ALARM_SETTINGS_HANDLED, false))) {
+            AlarmManager alarmManager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+            if (alarmManager != null && !alarmManager.canScheduleExactAlarms()) {
+                Intent intent = new Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM)
+                        .setData(Uri.parse("package:" + getPackageName()));
+                showReminderSettingsDialog(
+                        R.string.reminder_settings_title,
+                        R.string.exact_alarm_permission_message,
+                        PREF_EXACT_ALARM_SETTINGS_HANDLED,
+                        intent);
+                return true;
+            }
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
+                && (force || !prefs.getBoolean(PREF_BATTERY_OPTIMIZATION_HANDLED, false))) {
+            PowerManager powerManager = (PowerManager) getSystemService(Context.POWER_SERVICE);
+            if (powerManager != null && !powerManager.isIgnoringBatteryOptimizations(getPackageName())) {
+                Intent intent = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+                        .setData(Uri.parse("package:" + getPackageName()));
+                showReminderSettingsDialog(
+                        R.string.reminder_settings_title,
+                        R.string.battery_optimization_message,
+                        PREF_BATTERY_OPTIMIZATION_HANDLED,
+                        intent);
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean areReminderSystemSettingsReady() {
+        if (!NotificationManagerCompat.from(this).areNotificationsEnabled()) {
+            return false;
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+            NotificationChannel channel = notificationManager == null ? null
+                    : notificationManager.getNotificationChannel(AlarmReceiver.getReminderChannelId(this));
+            if (channel != null && channel.getImportance() == NotificationManager.IMPORTANCE_NONE) {
+                return false;
+            }
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            AlarmManager alarmManager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+            if (alarmManager != null && !alarmManager.canScheduleExactAlarms()) {
+                return false;
+            }
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            PowerManager powerManager = (PowerManager) getSystemService(Context.POWER_SERVICE);
+            return powerManager == null || powerManager.isIgnoringBatteryOptimizations(getPackageName());
+        }
+        return true;
+    }
+
+    private void startReminderSystemSettingsGuide() {
+        if (mReminderSettingsDialogShowing) {
+            return;
+        }
+        if (!showNextReminderSystemSettingsDialog(true)) {
+            Toast.makeText(this, R.string.system_settings_ready, Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void showReminderSettingsDialog(int titleRes, int messageRes, String handledPrefKey, Intent settingsIntent) {
+        mReminderSettingsDialogShowing = true;
+        new AlertDialog.Builder(this)
+                .setTitle(titleRes)
+                .setMessage(messageRes)
+                .setPositiveButton(R.string.open_settings, (dialog, which) -> {
+                    prefs.setBoolean(handledPrefKey, true);
+                    openSettings(settingsIntent);
+                })
+                .setNegativeButton(R.string.cancel, null)
+                .setOnDismissListener(dialog -> mReminderSettingsDialogShowing = false)
+                .show();
+    }
+
+    private void openSettings(Intent settingsIntent) {
+        try {
+            startActivity(settingsIntent);
+        } catch (Exception e) {
+            Intent fallback = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                    .setData(Uri.parse("package:" + getPackageName()));
+            startActivity(fallback);
         }
     }
 
@@ -304,6 +507,19 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         int padding = dp(20);
         content.setPadding(padding, dp(8), padding, 0);
 
+        LinearLayout titleRow = new LinearLayout(this);
+        titleRow.setOrientation(LinearLayout.HORIZONTAL);
+        titleRow.setGravity(Gravity.CENTER_VERTICAL);
+        titleRow.setPadding(dp(20), dp(10), dp(12), dp(2));
+
+        TextView title = new TextView(this);
+        title.setText(R.string.account_info);
+        title.setTextColor(getResources().getColor(R.color.text_primary));
+        title.setTextSize(20);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        titleRow.addView(title, new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+
         TextView accountName = new TextView(this);
         accountName.setText(rb.getCurrentAccountName());
         accountName.setTextColor(getResources().getColor(R.color.text_primary));
@@ -311,6 +527,13 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         accountName.setTypeface(Typeface.DEFAULT_BOLD);
         content.addView(accountName, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        ImageButton settingsButton = new ImageButton(this);
+        settingsButton.setImageResource(R.drawable.baseline_settings_24);
+        settingsButton.setColorFilter(getResources().getColor(R.color.text_primary));
+        settingsButton.setBackgroundResource(android.R.drawable.list_selector_background);
+        settingsButton.setContentDescription(getString(R.string.settings));
+        titleRow.addView(settingsButton, new LinearLayout.LayoutParams(dp(44), dp(44)));
 
         LinearLayout actions = new LinearLayout(this);
         actions.setOrientation(LinearLayout.HORIZONTAL);
@@ -328,7 +551,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         actions.addView(renameButton);
 
         AlertDialog dialog = new AlertDialog.Builder(this)
-                .setTitle(R.string.account_info)
+                .setCustomTitle(titleRow)
                 .setView(content)
                 .setNegativeButton(R.string.cancel, null)
                 .create();
@@ -344,6 +567,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
             dialog.dismiss();
             showRenameAccountDialog();
         });
+        settingsButton.setOnClickListener(v -> showAppSettingsDialog());
         dialog.show();
     }
 
@@ -363,6 +587,176 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         params.rightMargin = dp(4);
         button.setLayoutParams(params);
         return button;
+    }
+
+    private void showAppSettingsDialog() {
+        LinearLayout content = new LinearLayout(this);
+        content.setOrientation(LinearLayout.VERTICAL);
+        int padding = dp(20);
+        content.setPadding(padding, dp(8), padding, dp(4));
+
+        View systemSettings = systemSettingsRow();
+        content.addView(systemSettings);
+
+        TextView ringtone = settingsRow(
+                R.drawable.baseline_access_alarm_24,
+                getString(R.string.reminder_ringtone),
+                currentReminderRingtoneTitle(),
+                true);
+        LinearLayout.LayoutParams ringtoneParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        ringtoneParams.topMargin = dp(8);
+        content.addView(ringtone, ringtoneParams);
+
+        TextView version = settingsRow(
+                R.drawable.baseline_info_24,
+                getString(R.string.app_version),
+                getString(R.string.app_version_format, BuildConfig.VERSION_NAME, BuildConfig.VERSION_CODE),
+                false);
+        LinearLayout.LayoutParams versionParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        versionParams.topMargin = dp(8);
+        content.addView(version, versionParams);
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setCustomTitle(settingsTitleView())
+                .setView(content)
+                .setNegativeButton(R.string.cancel, null)
+                .create();
+        systemSettings.setOnClickListener(v -> {
+            dialog.dismiss();
+            startReminderSystemSettingsGuide();
+        });
+        ringtone.setOnClickListener(v -> {
+            dialog.dismiss();
+            openRingtonePicker();
+        });
+        dialog.show();
+    }
+
+    private View systemSettingsRow() {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(dp(12), dp(10), dp(12), dp(10));
+        row.setMinimumHeight(dp(56));
+        row.setClickable(true);
+        row.setBackgroundResource(android.R.drawable.list_selector_background);
+
+        ImageView icon = new ImageView(this);
+        icon.setImageResource(R.drawable.baseline_settings_24);
+        icon.setColorFilter(getResources().getColor(R.color.text_primary));
+        row.addView(icon, new LinearLayout.LayoutParams(dp(24), dp(24)));
+
+        TextView title = new TextView(this);
+        title.setText(R.string.system_settings);
+        title.setTextColor(getResources().getColor(R.color.text_primary));
+        title.setTextSize(16);
+        LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(
+                0,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                1);
+        titleParams.leftMargin = dp(12);
+        row.addView(title, titleParams);
+
+        TextView status = new TextView(this);
+        boolean ready = areReminderSystemSettingsReady();
+        status.setText(ready ? "\u2713" : "?");
+        status.setTextColor(getResources().getColor(ready ? R.color.history_taken : R.color.history_missed));
+        status.setTextSize(20);
+        status.setTypeface(Typeface.DEFAULT_BOLD);
+        row.addView(status, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+        return row;
+    }
+
+    private View settingsTitleView() {
+        LinearLayout titleRow = new LinearLayout(this);
+        titleRow.setOrientation(LinearLayout.HORIZONTAL);
+        titleRow.setGravity(Gravity.CENTER_VERTICAL);
+        titleRow.setPadding(dp(20), dp(14), dp(20), dp(4));
+
+        ImageView icon = new ImageView(this);
+        icon.setImageResource(R.drawable.baseline_settings_24);
+        icon.setColorFilter(getResources().getColor(R.color.text_primary));
+        LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(dp(24), dp(24));
+        titleRow.addView(icon, iconParams);
+
+        TextView title = new TextView(this);
+        title.setText(R.string.settings);
+        title.setTextColor(getResources().getColor(R.color.text_primary));
+        title.setTextSize(20);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        titleParams.leftMargin = dp(12);
+        titleRow.addView(title, titleParams);
+        return titleRow;
+    }
+
+    private TextView settingsRow(int iconRes, String title, String value, boolean clickable) {
+        TextView row = new TextView(this);
+        row.setText(title + "\n" + value);
+        row.setTextColor(getResources().getColor(R.color.text_primary));
+        row.setTextSize(16);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(dp(12), dp(10), dp(12), dp(10));
+        row.setMinHeight(dp(56));
+        row.setCompoundDrawables(settingsIcon(iconRes), null, null, null);
+        row.setCompoundDrawablePadding(dp(12));
+        row.setClickable(clickable);
+        if (clickable) {
+            row.setBackgroundResource(android.R.drawable.list_selector_background);
+        }
+        return row;
+    }
+
+    private Drawable settingsIcon(int iconRes) {
+        Drawable icon = getResources().getDrawable(iconRes, getTheme()).mutate();
+        icon.setTint(getResources().getColor(R.color.text_primary));
+        icon.setBounds(0, 0, dp(24), dp(24));
+        return icon;
+    }
+
+    private String currentReminderRingtoneTitle() {
+        String saved = prefs.getString(AlarmReceiver.PREF_REMINDER_RINGTONE_URI, null);
+        if (saved != null && saved.length() == 0) {
+            return getString(R.string.silent);
+        }
+        Uri soundUri = AlarmReceiver.getReminderSoundUri(this);
+        if (soundUri == null) {
+            return getString(R.string.silent);
+        }
+        Ringtone ringtone = RingtoneManager.getRingtone(this, soundUri);
+        String title = ringtone == null ? "" : ringtone.getTitle(this);
+        if (title == null || title.trim().length() == 0) {
+            title = getString(R.string.default_ringtone);
+        }
+        return saved == null ? getString(R.string.default_ringtone_format, title) : title;
+    }
+
+    private void openRingtonePicker() {
+        Intent intent = new Intent(RingtoneManager.ACTION_RINGTONE_PICKER);
+        intent.putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_ALARM);
+        intent.putExtra(RingtoneManager.EXTRA_RINGTONE_DEFAULT_URI,
+                RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM));
+        intent.putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true);
+        intent.putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, true);
+        intent.putExtra(RingtoneManager.EXTRA_RINGTONE_EXISTING_URI, AlarmReceiver.getReminderSoundUri(this));
+        startActivityForResult(intent, REQUEST_PICK_RINGTONE);
+    }
+
+    private void saveReminderRingtone(Intent data) {
+        String oldChannelId = AlarmReceiver.getReminderChannelId(this);
+        Uri pickedUri = data.getParcelableExtra(RingtoneManager.EXTRA_RINGTONE_PICKED_URI);
+        prefs.setString(AlarmReceiver.PREF_REMINDER_RINGTONE_URI,
+                pickedUri == null ? "" : pickedUri.toString());
+        AlarmReceiver.recreateNotificationChannel(this, oldChannelId);
+        Toast.makeText(this, R.string.ringtone_saved, Toast.LENGTH_SHORT).show();
     }
 
     private void showAccountDialog() {
@@ -476,33 +870,53 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 "text/csv",
                 "text/comma-separated-values",
                 "text/plain",
+                "application/zip",
+                "application/octet-stream",
                 "application/vnd.ms-excel"
         });
         startActivityForResult(intent, REQUEST_IMPORT_ARCHIVE);
     }
 
     private void openArchiveExport() {
+        String[] labels = new String[]{
+                getString(R.string.export_format_csv),
+                getString(R.string.export_format_backup)
+        };
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.export_data)
+                .setItems(labels, (dialog, which) -> openArchiveExportDocument(which == 1))
+                .setNegativeButton(R.string.cancel, null)
+                .show();
+    }
+
+    private void openArchiveExportDocument(boolean fullBackup) {
+        mExportFullBackup = fullBackup;
         Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
-        intent.setType("text/csv");
-        intent.putExtra(Intent.EXTRA_TITLE, exportFileName());
+        intent.setType(fullBackup ? "application/zip" : "text/csv");
+        intent.putExtra(Intent.EXTRA_TITLE, exportFileName(fullBackup));
         startActivityForResult(intent, REQUEST_EXPORT_ARCHIVE);
     }
 
-    private String exportFileName() {
+    private String exportFileName(boolean fullBackup) {
         String accountName = rb.getCurrentAccountName();
         String safeName = accountName == null ? "" : accountName.replaceAll("[\\\\/:*?\"<>|]+", "_").trim();
         if (safeName.length() == 0) {
             safeName = getString(R.string.app_name);
         }
         String timestamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Calendar.getInstance().getTime());
-        return safeName + "-" + timestamp + ".csv";
+        return safeName + "-" + timestamp + (fullBackup ? ".mtbackup" : ".csv");
     }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (resultCode != RESULT_OK || data == null) {
+            return;
+        }
+
+        if (requestCode == REQUEST_PICK_RINGTONE) {
+            saveReminderRingtone(data);
             return;
         }
 
@@ -569,11 +983,23 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 Toast.makeText(this, R.string.export_failed, Toast.LENGTH_SHORT).show();
                 return;
             }
-            OutputStreamWriter writer = new OutputStreamWriter(outputStream, StandardCharsets.UTF_8);
-            writer.write(rb.exportCurrentAccountArchiveCsv());
-            writer.flush();
+            if (mExportFullBackup) {
+                if (rb != null) {
+                    rb.close();
+                    rb = null;
+                }
+                new MyTherapyBackupManager().exportFullBackup(this, outputStream);
+                rb = new ReminderDatabase(getApplicationContext());
+            } else {
+                OutputStreamWriter writer = new OutputStreamWriter(outputStream, StandardCharsets.UTF_8);
+                writer.write(rb.exportCompleteCsv());
+                writer.flush();
+            }
             Toast.makeText(this, R.string.export_success, Toast.LENGTH_SHORT).show();
         } catch (IOException | RuntimeException e) {
+            if (rb == null) {
+                rb = new ReminderDatabase(getApplicationContext());
+            }
             Toast.makeText(this, R.string.export_failed, Toast.LENGTH_SHORT).show();
         }
     }
@@ -586,17 +1012,76 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         progressDialog.show();
 
         new Thread(() -> {
-            try (InputStream inputStream = getContentResolver().openInputStream(uri)) {
-                if (inputStream == null) {
+            try (InputStream rawInputStream = getContentResolver().openInputStream(uri)) {
+                if (rawInputStream == null) {
                     runOnUiThread(() -> finishArchiveImport(progressDialog, null));
+                    return;
+                }
+                BufferedInputStream inputStream = new BufferedInputStream(rawInputStream);
+                if (isZipFile(inputStream)) {
+                    if (rb != null) {
+                        rb.close();
+                        rb = null;
+                    }
+                    int files = new MyTherapyBackupManager().restoreFullBackup(this, inputStream);
+                    rb = new ReminderDatabase(getApplicationContext());
+                    prefs = new Prefs(this);
+                    rescheduleCurrentAccountReminders();
+                    runOnUiThread(() -> finishSimpleImport(progressDialog,
+                            getString(R.string.import_backup_success, files)));
+                    return;
+                }
+                if (isCompleteCsv(inputStream)) {
+                    int rows = rb.importCompleteCsv(inputStream);
+                    rb.close();
+                    rb = new ReminderDatabase(getApplicationContext());
+                    rescheduleCurrentAccountReminders();
+                    runOnUiThread(() -> finishSimpleImport(progressDialog,
+                            getString(R.string.import_complete_csv_success, rows)));
                     return;
                 }
                 MyTherapyArchiveImporter.Result result = new MyTherapyArchiveImporter().importArchive(this, inputStream);
                 runOnUiThread(() -> finishArchiveImport(progressDialog, result));
             } catch (IOException | RuntimeException e) {
+                if (rb == null) {
+                    rb = new ReminderDatabase(getApplicationContext());
+                }
                 runOnUiThread(() -> finishArchiveImport(progressDialog, null));
             }
         }).start();
+    }
+
+    private boolean isZipFile(BufferedInputStream inputStream) throws IOException {
+        inputStream.mark(4);
+        int first = inputStream.read();
+        int second = inputStream.read();
+        inputStream.reset();
+        return first == 'P' && second == 'K';
+    }
+
+    private boolean isCompleteCsv(BufferedInputStream inputStream) throws IOException {
+        inputStream.mark(256);
+        StringBuilder builder = new StringBuilder();
+        int value;
+        while ((value = inputStream.read()) != -1 && value != '\n' && builder.length() < 128) {
+            if (value != '\r') {
+                builder.append((char) value);
+            }
+        }
+        inputStream.reset();
+        String firstLine = builder.toString();
+        if (firstLine.startsWith("\uFEFF")) {
+            firstLine = firstLine.substring(1);
+        }
+        return ReminderDatabase.COMPLETE_CSV_MARKER.equals(firstLine);
+    }
+
+    private void finishSimpleImport(ProgressDialog progressDialog, String message) {
+        if (!isFinishing() && progressDialog.isShowing()) {
+            progressDialog.dismiss();
+        }
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show();
+        loadCurrentPage();
     }
 
     private void finishArchiveImport(ProgressDialog progressDialog, MyTherapyArchiveImporter.Result result) {
@@ -924,6 +1409,27 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         return String.format(java.util.Locale.US, "%.2f", value);
     }
 
+    private String formatQuantity(Double value) {
+        return value == null ? "" : formatQuantity(value.doubleValue());
+    }
+
+    private String formatLabReferenceRange(LabTestItem item) {
+        String unitText = item.mUnit == null ? "" : item.mUnit.trim();
+        if (item.mReferenceMin != null && item.mReferenceMax != null) {
+            return getString(R.string.lab_reference_range,
+                    formatQuantity(item.mReferenceMin),
+                    formatQuantity(item.mReferenceMax),
+                    unitText);
+        }
+        if (item.mReferenceMin != null) {
+            return getString(R.string.lab_reference_min_only, formatQuantity(item.mReferenceMin), unitText);
+        }
+        if (item.mReferenceMax != null) {
+            return getString(R.string.lab_reference_max_only, formatQuantity(item.mReferenceMax), unitText);
+        }
+        return "";
+    }
+
     private String formatDoseQuantity(Reminder reminder) {
         return formatDoseQuantity(reminder, reminder.getDose());
     }
@@ -957,7 +1463,11 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     @Override
     public void onResume() {
         super.onResume();
+        if (rb != null) {
+            rescheduleCurrentAccountReminders();
+        }
         loadCurrentPage();
+        checkReminderSystemSettings();
     }
 
     private void loadCurrentPage() {
@@ -970,7 +1480,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
             updateEmptyState(summaryList.isEmpty(), R.string.no_history_records);
         } else if (mCurrentPage == PAGE_LAB) {
             summaryList = generateLabData();
-            mSummaryAdapter = new SummaryListAdapter(summaryList, this, this, false, true);
+            mSummaryAdapter = new SummaryListAdapter(summaryList, this, this, false, true, false);
             mList.setAdapter(mSummaryAdapter);
             updateEmptyState(summaryList.isEmpty(), R.string.no_lab_records);
         } else if (mCurrentPage == PAGE_COURSE) {
@@ -1023,7 +1533,20 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         } else {
             mAddReminderButton.setVisibility(View.GONE);
         }
-        mCalendarButton.setVisibility(mCurrentPage == PAGE_TODAY ? View.VISIBLE : View.GONE);
+        if (mCurrentPage == PAGE_TODAY) {
+            mCalendarButton.setVisibility(View.VISIBLE);
+            mCalendarButton.setImageResource(R.drawable.baseline_calendar_month_24);
+            mCalendarButton.setContentDescription(getString(R.string.date));
+            mCalendarButton.setOnClickListener(v -> showSelectedDatePicker());
+        } else if (mCurrentPage == PAGE_LAB) {
+            mCalendarButton.setVisibility(View.VISIBLE);
+            mCalendarButton.setImageResource(R.drawable.baseline_edit_24);
+            mCalendarButton.setContentDescription(getString(R.string.manage_lab_items));
+            mCalendarButton.setOnClickListener(v -> showManageLabItemsDialog());
+        } else {
+            mCalendarButton.setVisibility(View.GONE);
+            mCalendarButton.setOnClickListener(null);
+        }
     }
 
     private void updateEmptyState(boolean isEmpty, int emptyTextRes) {
@@ -1067,13 +1590,15 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     private List<SummaryItem> generateLabData() {
         ArrayList<SummaryItem> items = new ArrayList<>();
         labItemMap.clear();
+        labItemOrder.clear();
         for (LabTestItem item : rb.getLabTestItems()) {
             LabResult latest = rb.getLatestLabResult(item.mId);
             boolean hasResult = latest != null;
-            boolean inRange = hasResult
-                    && latest.mValue >= item.mReferenceMin
-                    && latest.mValue <= item.mReferenceMax;
-            boolean outOfRange = hasResult && !inRange;
+            boolean belowRange = hasResult && item.mReferenceMin != null && latest.mValue < item.mReferenceMin;
+            boolean aboveRange = hasResult && item.mReferenceMax != null && latest.mValue > item.mReferenceMax;
+            boolean hasReference = item.mReferenceMin != null || item.mReferenceMax != null;
+            boolean inRange = hasResult && hasReference && !belowRange && !aboveRange;
+            boolean outOfRange = belowRange || aboveRange;
             String unitText = item.mUnit == null ? "" : item.mUnit;
             String details = hasResult
                     ? getString(R.string.lab_latest_result,
@@ -1084,21 +1609,21 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
             String status;
             if (!hasResult) {
                 status = "";
-            } else if (latest.mValue < item.mReferenceMin) {
+            } else if (belowRange) {
                 status = getString(R.string.lab_low);
-            } else if (latest.mValue > item.mReferenceMax) {
+            } else if (aboveRange) {
                 status = getString(R.string.lab_high);
-            } else {
+            } else if (hasReference) {
                 status = getString(R.string.lab_normal);
+            } else {
+                status = "";
             }
 
             labItemMap.put(items.size(), item.mId);
+            labItemOrder.add(item.mId);
             items.add(new SummaryItem(
                     item.mName,
-                    getString(R.string.lab_reference_range,
-                            formatQuantity(item.mReferenceMin),
-                            formatQuantity(item.mReferenceMax),
-                            unitText),
+                    formatLabReferenceRange(item),
                     details,
                     status,
                     "liquid",
@@ -1110,6 +1635,36 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                     .withStatusTextSize(13));
         }
         return items;
+    }
+
+    private boolean moveLabItem(int fromPosition, int toPosition) {
+        if (mCurrentPage != PAGE_LAB
+                || fromPosition == toPosition
+                || fromPosition < 0
+                || toPosition < 0
+                || fromPosition >= summaryList.size()
+                || toPosition >= summaryList.size()
+                || fromPosition >= labItemOrder.size()
+                || toPosition >= labItemOrder.size()) {
+            return false;
+        }
+        SummaryItem movedItem = summaryList.remove(fromPosition);
+        summaryList.add(toPosition, movedItem);
+        Integer movedId = labItemOrder.remove(fromPosition);
+        labItemOrder.add(toPosition, movedId);
+        rebuildLabItemMap();
+        mLabOrderChanged = true;
+        if (mSummaryAdapter != null) {
+            mSummaryAdapter.notifyItemMoved(fromPosition, toPosition);
+        }
+        return true;
+    }
+
+    private void rebuildLabItemMap() {
+        labItemMap.clear();
+        for (int i = 0; i < labItemOrder.size(); i++) {
+            labItemMap.put(i, labItemOrder.get(i));
+        }
     }
 
     private void showLabTrendDialog(int itemId) {
@@ -1126,11 +1681,9 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         LinearLayout topRow = new LinearLayout(this);
         topRow.setGravity(Gravity.CENTER_VERTICAL);
         topRow.setOrientation(LinearLayout.HORIZONTAL);
+
         TextView reference = new TextView(this);
-        reference.setText(getString(R.string.lab_reference_range,
-                formatQuantity(item.mReferenceMin),
-                formatQuantity(item.mReferenceMax),
-                item.mUnit));
+        reference.setText(formatLabReferenceRange(item));
         reference.setTextColor(getResources().getColor(R.color.text_secondary));
         reference.setTextSize(13);
         reference.setSingleLine(true);
@@ -1139,6 +1692,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 0,
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 1));
+
         LinearLayout modeRow = new LinearLayout(this);
         modeRow.setGravity(Gravity.RIGHT);
         modeRow.setOrientation(LinearLayout.HORIZONTAL);
@@ -1156,26 +1710,27 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT));
 
-        ScrollView listView = createLabResultListView(results);
-        listView.setVisibility(View.GONE);
+        FrameLayout detailFrame = new FrameLayout(this);
+        LinearLayout.LayoutParams frameParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(260));
+        frameParams.topMargin = dp(8);
+        content.addView(detailFrame, frameParams);
 
         LabTrendChartView chart = new LabTrendChartView(this);
         chart.setData(item, results);
-        LinearLayout.LayoutParams chartParams = new LinearLayout.LayoutParams(
+        detailFrame.addView(chart, new FrameLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(260));
-        chartParams.topMargin = dp(8);
-        content.addView(chart, chartParams);
+                LinearLayout.LayoutParams.MATCH_PARENT));
 
-        LinearLayout.LayoutParams listParams = new LinearLayout.LayoutParams(
+        ScrollView resultList = createLabResultListView(item, results);
+        detailFrame.addView(resultList, new FrameLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(260));
-        listParams.topMargin = dp(8);
-        content.addView(listView, listParams);
+                LinearLayout.LayoutParams.MATCH_PARENT));
 
-        updateLabDetailMode(trendMode, listMode, chart, listView, true);
-        trendMode.setOnClickListener(v -> updateLabDetailMode(trendMode, listMode, chart, listView, true));
-        listMode.setOnClickListener(v -> updateLabDetailMode(trendMode, listMode, chart, listView, false));
+        updateLabDetailMode(trendMode, listMode, chart, resultList, true);
+        trendMode.setOnClickListener(v -> updateLabDetailMode(trendMode, listMode, chart, resultList, true));
+        listMode.setOnClickListener(v -> updateLabDetailMode(trendMode, listMode, chart, resultList, false));
 
         String countText = results.isEmpty()
                 ? getString(R.string.lab_no_result)
@@ -1212,48 +1767,6 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         return textView;
     }
 
-    private ScrollView createLabResultListView(List<LabResult> results) {
-        ScrollView scrollView = new ScrollView(this);
-        LinearLayout rows = new LinearLayout(this);
-        rows.setOrientation(LinearLayout.VERTICAL);
-        scrollView.addView(rows, new ScrollView.LayoutParams(
-                ScrollView.LayoutParams.MATCH_PARENT,
-                ScrollView.LayoutParams.WRAP_CONTENT));
-        if (results.isEmpty()) {
-            TextView empty = new TextView(this);
-            empty.setText(R.string.lab_no_result);
-            empty.setTextColor(getResources().getColor(R.color.text_secondary));
-            empty.setTextSize(14);
-            rows.addView(empty, new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT));
-            return scrollView;
-        }
-        for (int i = results.size() - 1; i >= 0; i--) {
-            LabResult result = results.get(i);
-            TextView row = new TextView(this);
-            row.setText(getString(R.string.lab_latest_result,
-                    formatQuantity(result.mValue),
-                    result.mUnit == null ? "" : result.mUnit,
-                    formatLabResultListDate(result.mCreatedAt)).trim());
-            row.setTextColor(getResources().getColor(R.color.text_primary));
-            row.setTextSize(13);
-            row.setTypeface(Typeface.DEFAULT, Typeface.NORMAL);
-            row.setPadding(0, dp(8), 0, dp(8));
-            rows.addView(row, new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT));
-            if (i > 0) {
-                View divider = new View(this);
-                divider.setBackgroundColor(getResources().getColor(R.color.history_row_divider));
-                rows.addView(divider, new LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT,
-                        dp(1)));
-            }
-        }
-        return scrollView;
-    }
-
     private void updateLabDetailMode(TextView trendMode, TextView listMode,
                                      View chart, View listView, boolean showTrend) {
         chart.setVisibility(showTrend ? View.VISIBLE : View.GONE);
@@ -1272,6 +1785,141 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         textView.setPaintFlags(flags);
         textView.setTextColor(getResources().getColor(
                 selected ? R.color.text_primary : R.color.text_secondary));
+    }
+
+    private Button createLabDetailModeButton(int textRes) {
+        Button button = new Button(this);
+        button.setText(textRes);
+        button.setTextSize(14);
+        button.setAllCaps(false);
+        button.setMinHeight(0);
+        button.setMinimumHeight(0);
+        button.setPadding(dp(8), 0, dp(8), 0);
+        return button;
+    }
+
+    private void setLabDetailMode(View chart, View resultList, Button chartButton, Button listButton, boolean showChart) {
+        chart.setVisibility(showChart ? View.VISIBLE : View.GONE);
+        resultList.setVisibility(showChart ? View.GONE : View.VISIBLE);
+        styleLabDetailModeButton(chartButton, showChart);
+        styleLabDetailModeButton(listButton, !showChart);
+    }
+
+    private void styleLabDetailModeButton(Button button, boolean selected) {
+        GradientDrawable background = new GradientDrawable();
+        background.setShape(GradientDrawable.RECTANGLE);
+        background.setCornerRadius(dp(8));
+        background.setColor(getResources().getColor(selected ? R.color.nav_selected : R.color.surface_variant));
+        background.setStroke(dp(1), getResources().getColor(selected ? R.color.nav_selected : R.color.outline));
+        button.setBackground(background);
+        button.setTextColor(getResources().getColor(selected ? R.color.on_accent : R.color.text_primary));
+    }
+
+    private ScrollView createLabResultListView(LabTestItem item, List<LabResult> results) {
+        ScrollView scrollView = new ScrollView(this);
+        scrollView.setFillViewport(true);
+        LinearLayout list = new LinearLayout(this);
+        list.setOrientation(LinearLayout.VERTICAL);
+        scrollView.addView(list, new ScrollView.LayoutParams(
+                ScrollView.LayoutParams.MATCH_PARENT,
+                ScrollView.LayoutParams.WRAP_CONTENT));
+        if (results.isEmpty()) {
+            TextView empty = new TextView(this);
+            empty.setText(R.string.lab_no_result);
+            empty.setGravity(Gravity.CENTER);
+            empty.setTextColor(getResources().getColor(R.color.text_secondary));
+            empty.setTextSize(14);
+            list.addView(empty, new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    dp(240)));
+            return scrollView;
+        }
+        for (int i = results.size() - 1; i >= 0; i--) {
+            list.addView(createLabResultRow(item, results.get(i)));
+            if (i > 0) {
+                list.addView(createDividerView());
+            }
+        }
+        return scrollView;
+    }
+
+    private View createLabResultRow(LabTestItem item, LabResult result) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setMinimumHeight(dp(58));
+        row.setPadding(0, dp(8), 0, dp(8));
+
+        LinearLayout textGroup = new LinearLayout(this);
+        textGroup.setOrientation(LinearLayout.VERTICAL);
+        row.addView(textGroup, new LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+
+        TextView date = new TextView(this);
+        String time = formatHealthEntryTime(result.mCreatedAt);
+        String dateText = formatHealthEntryDate(result.mCreatedAt);
+        date.setText(time.length() == 0 ? dateText : dateText + " " + time);
+        date.setTextColor(getResources().getColor(R.color.text_primary));
+        date.setTextSize(14);
+        textGroup.addView(date, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        String statusText = labResultStatusText(item, result);
+        TextView status = new TextView(this);
+        status.setText(statusText);
+        status.setTextColor(labResultStatusColor(item, result));
+        status.setTextSize(13);
+        status.setVisibility(statusText.length() == 0 ? View.GONE : View.VISIBLE);
+        textGroup.addView(status, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        TextView value = new TextView(this);
+        value.setText(formatLabResultValue(item, result));
+        value.setTextColor(getResources().getColor(R.color.text_primary));
+        value.setTextSize(18);
+        value.setTypeface(Typeface.DEFAULT_BOLD);
+        row.addView(value, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+        return row;
+    }
+
+    private View createDividerView() {
+        View divider = new View(this);
+        divider.setBackgroundColor(getResources().getColor(R.color.history_row_divider));
+        divider.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(1)));
+        return divider;
+    }
+
+    private String formatLabResultValue(LabTestItem item, LabResult result) {
+        String unitText = result.mUnit == null || result.mUnit.length() == 0
+                ? item.mUnit
+                : result.mUnit;
+        return formatQuantity(result.mValue) + (unitText == null || unitText.length() == 0 ? "" : " " + unitText);
+    }
+
+    private String labResultStatusText(LabTestItem item, LabResult result) {
+        if (item.mReferenceMin != null && result.mValue < item.mReferenceMin) {
+            return getString(R.string.lab_low);
+        }
+        if (item.mReferenceMax != null && result.mValue > item.mReferenceMax) {
+            return getString(R.string.lab_high);
+        }
+        return item.mReferenceMin != null || item.mReferenceMax != null ? getString(R.string.lab_normal) : "";
+    }
+
+    private int labResultStatusColor(LabTestItem item, LabResult result) {
+        if (item.mReferenceMin != null && result.mValue < item.mReferenceMin) {
+            return getResources().getColor(R.color.history_missed);
+        }
+        if (item.mReferenceMax != null && result.mValue > item.mReferenceMax) {
+            return getResources().getColor(R.color.history_missed);
+        }
+        return getResources().getColor(R.color.history_taken);
     }
 
     private List<SummaryItem> generateReportData() {
@@ -1439,9 +2087,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
             String[] labels = new String[items.size()];
             for (int i = 0; i < items.size(); i++) {
                 LabTestItem item = items.get(i);
-                labels[i] = item.mName + "  "
-                        + formatQuantity(item.mReferenceMin) + "-"
-                        + formatQuantity(item.mReferenceMax) + " " + item.mUnit;
+                labels[i] = item.mName + "  " + formatLabReferenceRange(item);
             }
             builder.setItems(labels, (dialog, which) -> showLabTestItemForm(items.get(which), true));
         }
@@ -1512,17 +2158,19 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
             return false;
         }
 
-        Double min = parseNumber(referenceMin);
-        Double max = parseNumber(referenceMax);
-        if (min == null) {
-            referenceMin.setError(getString(R.string.lab_reference_required));
+        String minText = referenceMin.getText().toString().trim();
+        String maxText = referenceMax.getText().toString().trim();
+        Double min = minText.length() == 0 ? null : parseNumber(referenceMin);
+        Double max = maxText.length() == 0 ? null : parseNumber(referenceMax);
+        if (minText.length() > 0 && min == null) {
+            referenceMin.setError(getString(R.string.enter_number));
             return false;
         }
-        if (max == null) {
-            referenceMax.setError(getString(R.string.lab_reference_required));
+        if (maxText.length() > 0 && max == null) {
+            referenceMax.setError(getString(R.string.enter_number));
             return false;
         }
-        if (min > max) {
+        if (min != null && max != null && min > max) {
             referenceMax.setError(getString(R.string.lab_reference_invalid));
             return false;
         }
@@ -1591,10 +2239,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         form.addView(resultDateText);
 
         TextView reference = new TextView(this);
-        reference.setText(getString(R.string.lab_reference_range,
-                formatQuantity(item.mReferenceMin),
-                formatQuantity(item.mReferenceMax),
-                item.mUnit));
+        reference.setText(formatLabReferenceRange(item));
         reference.setTextColor(getResources().getColor(R.color.text_secondary));
         form.addView(reference, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
@@ -1994,7 +2639,10 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
 
     @Override
     public boolean longClickListener(int pos) {
-        if (mCurrentPage != PAGE_HISTORY || pos < 0 || pos >= summaryList.size()) {
+        if (pos < 0 || pos >= summaryList.size()) {
+            return false;
+        }
+        if (mCurrentPage != PAGE_HISTORY) {
             return false;
         }
         SummaryItem item = summaryList.get(pos);
@@ -2020,6 +2668,9 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         ReminderDatabase.ConfirmResult result = rb.setReminderTakenStatus(item.mReminderId, item.mScheduledAt, taken);
         Toast.makeText(getApplicationContext(), result.message, Toast.LENGTH_SHORT).show();
         if (result.success) {
+            if (taken) {
+                AlarmReceiver.completeConfirmedOccurrence(getApplicationContext(), item.mReminderId, item.mScheduledAt);
+            }
             loadCurrentPage();
         }
     }
@@ -2968,14 +3619,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         ReminderDatabase.ConfirmResult result = rb.confirmReminderGroup(item.mReminderIds, item.mScheduledAt);
         Toast.makeText(getApplicationContext(), result.message, Toast.LENGTH_SHORT).show();
         if (result.success) {
-            long afterMillis = ReminderSchedule.parseScheduledAt(item.mScheduledAt).getTimeInMillis() + 60000L;
-            for (Integer reminderId : item.mReminderIds) {
-                Reminder reminder = rb.getReminder(reminderId);
-                if (reminder != null && "true".equals(reminder.getActive())) {
-                    mAlarmReceiver.cancelAlarm(getApplicationContext(), reminder.getID());
-                    mAlarmReceiver.scheduleReminderAfter(getApplicationContext(), reminder, afterMillis);
-                }
-            }
+            AlarmReceiver.completeConfirmedOccurrence(getApplicationContext(), item.mReminderIds, item.mScheduledAt);
         }
         loadReminderList();
     }
