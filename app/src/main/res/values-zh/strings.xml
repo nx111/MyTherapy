@@ -138,6 +138,8 @@
     <string name="default_account">我</string>
     <string name="account_info">账户信息</string>
     <string name="settings">设置</string>
+    <string name="system_settings">系统设置</string>
+    <string name="system_settings_ready">系统设置已符合要求</string>
     <string name="reminder_ringtone">提醒铃声</string>
     <string name="default_ringtone">默认铃声</string>
     <string name="default_ringtone_format">默认：%1$s</string>

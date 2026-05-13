@@ -158,6 +158,8 @@
     <string name="default_account">Default account</string>
     <string name="account_info">Account Info</string>
     <string name="settings">Settings</string>
+    <string name="system_settings">System settings</string>
+    <string name="system_settings_ready">System settings are ready</string>
     <string name="reminder_ringtone">Reminder ringtone</string>
     <string name="default_ringtone">Default ringtone</string>
     <string name="default_ringtone_format">Default: %1$s</string>

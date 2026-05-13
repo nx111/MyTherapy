@@ -294,9 +294,12 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         if (mReminderSettingsDialogShowing || prefs == null) {
             return;
         }
+        showNextReminderSystemSettingsDialog(false);
+    }
 
+    private boolean showNextReminderSystemSettingsDialog(boolean force) {
         if (!NotificationManagerCompat.from(this).areNotificationsEnabled()) {
-            if (!prefs.getBoolean(PREF_NOTIFICATION_SETTINGS_HANDLED, false)) {
+            if (force || !prefs.getBoolean(PREF_NOTIFICATION_SETTINGS_HANDLED, false)) {
                 Intent intent = new Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
                         .putExtra(Settings.EXTRA_APP_PACKAGE, getPackageName());
                 showReminderSettingsDialog(
@@ -304,12 +307,13 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                         R.string.notification_permission_required_message,
                         PREF_NOTIFICATION_SETTINGS_HANDLED,
                         intent);
+                return true;
             }
-            return;
+            return false;
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
-                && !prefs.getBoolean(PREF_NOTIFICATION_CHANNEL_SETTINGS_HANDLED, false)) {
+                && (force || !prefs.getBoolean(PREF_NOTIFICATION_CHANNEL_SETTINGS_HANDLED, false))) {
             NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
             String reminderChannelId = AlarmReceiver.getReminderChannelId(this);
             NotificationChannel channel = notificationManager == null ? null
@@ -323,12 +327,12 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                         R.string.notification_channel_blocked_message,
                         PREF_NOTIFICATION_CHANNEL_SETTINGS_HANDLED,
                         intent);
-                return;
+                return true;
             }
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
-                && !prefs.getBoolean(PREF_EXACT_ALARM_SETTINGS_HANDLED, false)) {
+                && (force || !prefs.getBoolean(PREF_EXACT_ALARM_SETTINGS_HANDLED, false))) {
             AlarmManager alarmManager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
             if (alarmManager != null && !alarmManager.canScheduleExactAlarms()) {
                 Intent intent = new Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM)
@@ -338,12 +342,12 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                         R.string.exact_alarm_permission_message,
                         PREF_EXACT_ALARM_SETTINGS_HANDLED,
                         intent);
-                return;
+                return true;
             }
         }
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
-                && !prefs.getBoolean(PREF_BATTERY_OPTIMIZATION_HANDLED, false)) {
+                && (force || !prefs.getBoolean(PREF_BATTERY_OPTIMIZATION_HANDLED, false))) {
             PowerManager powerManager = (PowerManager) getSystemService(Context.POWER_SERVICE);
             if (powerManager != null && !powerManager.isIgnoringBatteryOptimizations(getPackageName())) {
                 Intent intent = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
@@ -353,7 +357,43 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                         R.string.battery_optimization_message,
                         PREF_BATTERY_OPTIMIZATION_HANDLED,
                         intent);
+                return true;
             }
+        }
+        return false;
+    }
+
+    private boolean areReminderSystemSettingsReady() {
+        if (!NotificationManagerCompat.from(this).areNotificationsEnabled()) {
+            return false;
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+            NotificationChannel channel = notificationManager == null ? null
+                    : notificationManager.getNotificationChannel(AlarmReceiver.getReminderChannelId(this));
+            if (channel != null && channel.getImportance() == NotificationManager.IMPORTANCE_NONE) {
+                return false;
+            }
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            AlarmManager alarmManager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+            if (alarmManager != null && !alarmManager.canScheduleExactAlarms()) {
+                return false;
+            }
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            PowerManager powerManager = (PowerManager) getSystemService(Context.POWER_SERVICE);
+            return powerManager == null || powerManager.isIgnoringBatteryOptimizations(getPackageName());
+        }
+        return true;
+    }
+
+    private void startReminderSystemSettingsGuide() {
+        if (mReminderSettingsDialogShowing) {
+            return;
+        }
+        if (!showNextReminderSystemSettingsDialog(true)) {
+            Toast.makeText(this, R.string.system_settings_ready, Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -502,12 +542,19 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         int padding = dp(20);
         content.setPadding(padding, dp(8), padding, dp(4));
 
+        View systemSettings = systemSettingsRow();
+        content.addView(systemSettings);
+
         TextView ringtone = settingsRow(
                 R.drawable.baseline_access_alarm_24,
                 getString(R.string.reminder_ringtone),
                 currentReminderRingtoneTitle(),
                 true);
-        content.addView(ringtone);
+        LinearLayout.LayoutParams ringtoneParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        ringtoneParams.topMargin = dp(8);
+        content.addView(ringtone, ringtoneParams);
 
         TextView version = settingsRow(
                 R.drawable.baseline_info_24,
@@ -525,11 +572,52 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 .setView(content)
                 .setNegativeButton(R.string.cancel, null)
                 .create();
+        systemSettings.setOnClickListener(v -> {
+            dialog.dismiss();
+            startReminderSystemSettingsGuide();
+        });
         ringtone.setOnClickListener(v -> {
             dialog.dismiss();
             openRingtonePicker();
         });
         dialog.show();
+    }
+
+    private View systemSettingsRow() {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setPadding(dp(12), dp(10), dp(12), dp(10));
+        row.setMinimumHeight(dp(56));
+        row.setClickable(true);
+        row.setBackgroundResource(android.R.drawable.list_selector_background);
+
+        ImageView icon = new ImageView(this);
+        icon.setImageResource(R.drawable.baseline_settings_24);
+        icon.setColorFilter(getResources().getColor(R.color.text_primary));
+        row.addView(icon, new LinearLayout.LayoutParams(dp(24), dp(24)));
+
+        TextView title = new TextView(this);
+        title.setText(R.string.system_settings);
+        title.setTextColor(getResources().getColor(R.color.text_primary));
+        title.setTextSize(16);
+        LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(
+                0,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                1);
+        titleParams.leftMargin = dp(12);
+        row.addView(title, titleParams);
+
+        TextView status = new TextView(this);
+        boolean ready = areReminderSystemSettingsReady();
+        status.setText(ready ? "\u2713" : "?");
+        status.setTextColor(getResources().getColor(ready ? R.color.history_taken : R.color.history_missed));
+        status.setTextSize(20);
+        status.setTypeface(Typeface.DEFAULT_BOLD);
+        row.addView(status, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+        return row;
     }
 
     private View settingsTitleView() {
