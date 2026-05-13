@@ -1197,6 +1197,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         long start = startOfTodayMillis();
         long end = endOfTodayMillis();
         boolean historyMode = isSelectedDateBeforeToday();
+        boolean futureMode = isSelectedDateAfterToday();
 
         for (Reminder reminder : rb.getAllReminders()) {
             for (ScheduledReminder scheduled : collectOccurrences(reminder, start, end)) {
@@ -1276,7 +1277,9 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                     firstReminder.getIconUri(),
                     reminderIds.isEmpty(),
                     reminderIds,
-                    medicineLines).withConfirmButton(!historyMode));
+                    medicineLines)
+                    .withConfirmButton(!historyMode)
+                    .withConfirmEnabled(!futureMode));
             IDmap.put(position, firstReminder.getID());
             position++;
         }
@@ -1293,6 +1296,14 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         Calendar selected = (Calendar) mSelectedDate.clone();
         normalizeDate(selected);
         return selected.getTimeInMillis() < today.getTimeInMillis();
+    }
+
+    private boolean isSelectedDateAfterToday() {
+        Calendar today = Calendar.getInstance();
+        normalizeDate(today);
+        Calendar selected = (Calendar) mSelectedDate.clone();
+        normalizeDate(selected);
+        return selected.getTimeInMillis() > today.getTimeInMillis();
     }
 
     private List<SummaryItem> generateHistoryData() {
@@ -3770,6 +3781,9 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     @Override
     public void confirmListener(int pos) {
         if (mCurrentPage != PAGE_TODAY || pos < 0 || pos >= medicineList.size()) {
+            return;
+        }
+        if (isSelectedDateAfterToday()) {
             return;
         }
         ReminderItem item = medicineList.get(pos);
