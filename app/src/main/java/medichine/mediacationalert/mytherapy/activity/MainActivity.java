@@ -1795,34 +1795,51 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 ? getString(R.string.lab_no_result)
                 : getString(R.string.lab_history_count, results.size());
 
-        AlertDialog labDialog = new AlertDialog.Builder(this)
-                .setTitle(item.mName)
-                .setView(content)
-                .setPositiveButton(R.string.cancel, null)
-                .setNegativeButton("", null)
-                .setNeutralButton(countText, null)
-                .create();
-        labDialog.setOnShowListener(d -> {
-            Button countButton = labDialog.getButton(AlertDialog.BUTTON_NEUTRAL);
-            if (countButton != null) {
-                countButton.setAllCaps(false);
-                countButton.setClickable(false);
-                countButton.setFocusable(false);
-                countButton.setTextColor(getResources().getColor(R.color.text_secondary));
+        AlertDialog[] labDialog = new AlertDialog[1];
+        LinearLayout bottomRow = new LinearLayout(this);
+        bottomRow.setGravity(Gravity.CENTER_VERTICAL);
+        bottomRow.setOrientation(LinearLayout.HORIZONTAL);
+        bottomRow.setPadding(0, dp(8), 0, 0);
+
+        TextView countView = new TextView(this);
+        countView.setText(countText);
+        countView.setTextColor(getResources().getColor(R.color.text_secondary));
+        countView.setTextSize(14);
+        bottomRow.addView(countView, new LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+
+        ImageButton addButton = new ImageButton(this);
+        addButton.setImageResource(R.drawable.baseline_add_dialog_24);
+        addButton.setBackgroundColor(getResources().getColor(R.color.transperent));
+        addButton.setContentDescription(getString(R.string.add_lab_result));
+        addButton.setOnClickListener(v -> {
+            if (labDialog[0] != null) {
+                labDialog[0].dismiss();
             }
-            Button addButton = labDialog.getButton(AlertDialog.BUTTON_NEGATIVE);
-            if (addButton != null) {
-                addButton.setText("");
-                addButton.setMinWidth(dp(48));
-                addButton.setContentDescription(getString(R.string.add_lab_result));
-                addButton.setCompoundDrawablesWithIntrinsicBounds(R.drawable.baseline_add_dialog_24, 0, 0, 0);
-                addButton.setOnClickListener(v -> {
-                    labDialog.dismiss();
-                    showLabResultForm(item, true, detailShowsTrend[0]);
-                });
+            showLabResultForm(item, true, detailShowsTrend[0]);
+        });
+        bottomRow.addView(addButton, new LinearLayout.LayoutParams(dp(48), dp(48)));
+
+        Button closeButton = new Button(this);
+        closeButton.setText(R.string.cancel);
+        closeButton.setAllCaps(false);
+        closeButton.setOnClickListener(v -> {
+            if (labDialog[0] != null) {
+                labDialog[0].dismiss();
             }
         });
-        labDialog.show();
+        bottomRow.addView(closeButton, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+        content.addView(bottomRow, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        labDialog[0] = new AlertDialog.Builder(this)
+                .setTitle(item.mName)
+                .setView(content)
+                .create();
+        labDialog[0].show();
     }
 
     private TextView createLabDetailModeText(int textRes) {
