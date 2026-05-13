@@ -1839,8 +1839,8 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setMinimumHeight(dp(58));
-        row.setPadding(0, dp(8), 0, dp(8));
+        row.setMinimumHeight(dp(29));
+        row.setPadding(0, dp(4), 0, dp(4));
 
         LinearLayout textGroup = new LinearLayout(this);
         textGroup.setOrientation(LinearLayout.VERTICAL);
