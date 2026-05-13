@@ -1076,7 +1076,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                     ? getString(R.string.lab_latest_result,
                     formatQuantity(latest.mValue),
                     unitText,
-                    formatHealthEntryDate(latest.mCreatedAt))
+                    formatLabResultListDate(latest.mCreatedAt)).trim()
                     : "";
             String status;
             if (!hasResult) {
@@ -1647,6 +1647,13 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
             builder.append(entry.mNote);
         }
         return builder.length() == 0 ? getString(R.string.no_note) : builder.toString();
+    }
+
+    private String formatLabResultListDate(String createdAt) {
+        if (createdAt == null || createdAt.length() == 0) {
+            return "";
+        }
+        return createdAt.length() >= 10 ? createdAt.substring(0, 10) : createdAt;
     }
 
     private String entryTypeLabel(String type) {

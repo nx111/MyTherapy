@@ -152,7 +152,7 @@
     <string name="lab_unit_hint">単位</string>
     <string name="lab_result_value_hint">結果値</string>
     <string name="lab_reference_range">基準値 %1$s-%2$s %3$s</string>
-    <string name="lab_latest_result">最新 %1$s %2$s · %3$s</string>
+    <string name="lab_latest_result">%3$s %1$s %2$s</string>
     <string name="lab_no_result">結果なし</string>
     <string name="lab_normal">正常</string>
     <string name="lab_low">低値</string>
