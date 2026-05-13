@@ -1754,11 +1754,19 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT));
 
+        View topDivider = new View(this);
+        topDivider.setBackgroundColor(getResources().getColor(R.color.lab_detail_divider));
+        LinearLayout.LayoutParams dividerParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(1));
+        dividerParams.topMargin = dp(8);
+        content.addView(topDivider, dividerParams);
+
         FrameLayout detailFrame = new FrameLayout(this);
         LinearLayout.LayoutParams frameParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 dp(260));
-        frameParams.topMargin = dp(8);
+        frameParams.topMargin = dp(6);
         content.addView(detailFrame, frameParams);
 
         LabTrendChartView chart = new LabTrendChartView(this);
