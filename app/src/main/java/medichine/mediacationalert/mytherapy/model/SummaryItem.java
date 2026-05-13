@@ -12,7 +12,9 @@ public class SummaryItem {
     public boolean mTaken;
     public int mReminderId;
     public String mScheduledAt;
+    public int mTitleTextSizeSp;
     public int mDetailsTextSizeSp;
+    public int mStatusTextSizeSp;
 
     public SummaryItem(String title, String subtitle, String details, String status,
                        String iconType, String iconUri, String active) {
@@ -37,7 +39,9 @@ public class SummaryItem {
         this.mTaken = taken;
         this.mReminderId = -1;
         this.mScheduledAt = "";
+        this.mTitleTextSizeSp = 0;
         this.mDetailsTextSizeSp = 0;
+        this.mStatusTextSizeSp = 0;
     }
 
     public static SummaryItem header(String title) {
@@ -52,6 +56,16 @@ public class SummaryItem {
 
     public SummaryItem withDetailsTextSize(int textSizeSp) {
         this.mDetailsTextSizeSp = textSizeSp;
+        return this;
+    }
+
+    public SummaryItem withTitleTextSize(int textSizeSp) {
+        this.mTitleTextSizeSp = textSizeSp;
+        return this;
+    }
+
+    public SummaryItem withStatusTextSize(int textSizeSp) {
+        this.mStatusTextSizeSp = textSizeSp;
         return this;
     }
 }

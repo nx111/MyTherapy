@@ -1082,7 +1082,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                     : "";
             String status;
             if (!hasResult) {
-                status = getString(R.string.lab_no_result);
+                status = "";
             } else if (latest.mValue < item.mReferenceMin) {
                 status = getString(R.string.lab_low);
             } else if (latest.mValue > item.mReferenceMax) {
@@ -1103,7 +1103,10 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                     "liquid",
                     "",
                     outOfRange ? "true" : "false",
-                    inRange).withDetailsTextSize(13));
+                    inRange)
+                    .withTitleTextSize(19)
+                    .withDetailsTextSize(13)
+                    .withStatusTextSize(13));
         }
         return items;
     }

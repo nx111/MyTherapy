@@ -120,10 +120,15 @@ public class SummaryListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHo
 
         void bindMode(SummaryItem item, boolean clickable) {
             activeImage.setVisibility(clickable ? View.VISIBLE : View.GONE);
+            title.setTextSize(TypedValue.COMPLEX_UNIT_SP,
+                    item.mTitleTextSizeSp > 0 ? item.mTitleTextSizeSp : (clickable ? 18 : 13.3f));
             subtitle.setVisibility(item.mSubtitle == null || item.mSubtitle.length() == 0 ? View.GONE : View.VISIBLE);
             details.setVisibility(item.mDetails == null || item.mDetails.length() == 0 ? View.GONE : View.VISIBLE);
             details.setTextSize(TypedValue.COMPLEX_UNIT_SP,
                     item.mDetailsTextSizeSp > 0 ? item.mDetailsTextSizeSp : (clickable ? 14 : 18));
+            status.setVisibility(item.mStatus == null || item.mStatus.length() == 0 ? View.GONE : View.VISIBLE);
+            status.setTextSize(TypedValue.COMPLEX_UNIT_SP,
+                    item.mStatusTextSizeSp > 0 ? item.mStatusTextSizeSp : (clickable ? 13 : 20));
             if (clickable) {
                 status.setTextColor(mActivity.getResources().getColor(R.color.text_secondary));
             } else if (item.mTaken) {
