@@ -152,7 +152,7 @@
     <string name="lab_unit_hint">Unidade</string>
     <string name="lab_result_value_hint">Valor do resultado</string>
     <string name="lab_reference_range">Referência %1$s-%2$s %3$s</string>
-    <string name="lab_latest_result">%3$s %1$s %2$s</string>
+    <string name="lab_latest_result">%3$s\u0020\u0020%1$s %2$s</string>
     <string name="lab_no_result">Sem resultado</string>
     <string name="lab_view_trend">Tendência</string>
     <string name="lab_view_list">Lista</string>

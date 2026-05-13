@@ -12,6 +12,7 @@ public class SummaryItem {
     public boolean mTaken;
     public int mReminderId;
     public String mScheduledAt;
+    public int mDetailsTextSizeSp;
 
     public SummaryItem(String title, String subtitle, String details, String status,
                        String iconType, String iconUri, String active) {
@@ -36,6 +37,7 @@ public class SummaryItem {
         this.mTaken = taken;
         this.mReminderId = -1;
         this.mScheduledAt = "";
+        this.mDetailsTextSizeSp = 0;
     }
 
     public static SummaryItem header(String title) {
@@ -45,6 +47,11 @@ public class SummaryItem {
     public SummaryItem withHistoryMeta(int reminderId, String scheduledAt) {
         this.mReminderId = reminderId;
         this.mScheduledAt = scheduledAt == null ? "" : scheduledAt;
+        return this;
+    }
+
+    public SummaryItem withDetailsTextSize(int textSizeSp) {
+        this.mDetailsTextSizeSp = textSizeSp;
         return this;
     }
 }

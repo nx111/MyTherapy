@@ -229,7 +229,7 @@
     <string name="lab_result_date">Test Date</string>
     <string name="select_year">Year</string>
     <string name="lab_reference_range">Reference %1$s-%2$s %3$s</string>
-    <string name="lab_latest_result">%3$s %1$s %2$s</string>
+    <string name="lab_latest_result">%3$s\u0020\u0020%1$s %2$s</string>
     <string name="lab_no_result">No result</string>
     <string name="lab_trend_title">%1$s Trend</string>
     <string name="lab_history_count">%1$d result(s)</string>

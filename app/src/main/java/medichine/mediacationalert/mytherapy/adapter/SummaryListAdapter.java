@@ -2,6 +2,7 @@ package medichine.mediacationalert.mytherapy.adapter;
 
 import android.app.Activity;
 import android.net.Uri;
+import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -121,6 +122,8 @@ public class SummaryListAdapter extends RecyclerView.Adapter<RecyclerView.ViewHo
             activeImage.setVisibility(clickable ? View.VISIBLE : View.GONE);
             subtitle.setVisibility(item.mSubtitle == null || item.mSubtitle.length() == 0 ? View.GONE : View.VISIBLE);
             details.setVisibility(item.mDetails == null || item.mDetails.length() == 0 ? View.GONE : View.VISIBLE);
+            details.setTextSize(TypedValue.COMPLEX_UNIT_SP,
+                    item.mDetailsTextSizeSp > 0 ? item.mDetailsTextSizeSp : (clickable ? 14 : 18));
             if (clickable) {
                 status.setTextColor(mActivity.getResources().getColor(R.color.text_secondary));
             } else if (item.mTaken) {

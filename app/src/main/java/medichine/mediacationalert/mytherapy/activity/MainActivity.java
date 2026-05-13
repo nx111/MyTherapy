@@ -1103,7 +1103,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                     "liquid",
                     "",
                     outOfRange ? "true" : "false",
-                    inRange));
+                    inRange).withDetailsTextSize(13));
         }
         return items;
     }
@@ -1222,7 +1222,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                     result.mUnit == null ? "" : result.mUnit,
                     formatLabResultListDate(result.mCreatedAt)).trim());
             row.setTextColor(getResources().getColor(R.color.text_primary));
-            row.setTextSize(14);
+            row.setTextSize(13);
             row.setTypeface(Typeface.DEFAULT, Typeface.NORMAL);
             row.setPadding(0, dp(8), 0, dp(8));
             rows.addView(row, new LinearLayout.LayoutParams(
