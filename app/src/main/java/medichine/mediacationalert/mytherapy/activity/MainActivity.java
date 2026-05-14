@@ -13,6 +13,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
+import android.graphics.Paint;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
@@ -27,6 +28,11 @@ import android.os.PowerManager;
 import android.provider.MediaStore;
 import android.provider.Settings;
 import android.text.InputType;
+import android.text.SpannableString;
+import android.text.Spanned;
+import android.text.TextUtils;
+import android.text.style.AbsoluteSizeSpan;
+import android.text.style.ForegroundColorSpan;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.MotionEvent;
@@ -34,6 +40,7 @@ import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.Window;
 import android.widget.Button;
+import android.widget.DatePicker;
 import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.ImageButton;
@@ -120,6 +127,9 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     private static final int REQUEST_CAPTURE_COURSE_ICON_IMAGE = 3004;
     private static final int REQUEST_PICK_RINGTONE = 3005;
     private static final String COURSE_PLAN_SEPARATOR = "    ";
+    private static final String STATE_CURRENT_PAGE = "current_page";
+    private static final String STATE_SELECTED_DATE = "selected_date";
+    private static final String STATE_COURSE_SHOW_ALL = "course_show_all";
 
     private BillingClient billingClient;
     private Prefs prefs;
@@ -205,6 +215,15 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         mBottomNavigation = findViewById(R.id.bottom_nav);
         mSelectedDate = Calendar.getInstance();
         normalizeDate(mSelectedDate);
+        if (savedInstanceState != null) {
+            mCurrentPage = savedInstanceState.getInt(STATE_CURRENT_PAGE, PAGE_TODAY);
+            long selectedDate = savedInstanceState.getLong(STATE_SELECTED_DATE, -1L);
+            if (selectedDate > 0) {
+                mSelectedDate.setTimeInMillis(selectedDate);
+                normalizeDate(mSelectedDate);
+            }
+            mCourseShowAll.setChecked(savedInstanceState.getBoolean(STATE_COURSE_SHOW_ALL, false));
+        }
 
         mList.setLayoutManager(new LinearLayoutManager(this));
         setupLabItemDragSorting();
@@ -241,7 +260,43 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
 
         mAlarmReceiver = new AlarmReceiver();
         updateCalendarHeader();
+        showRestoredPage();
+    }
+
+    @Override
+    protected void onSaveInstanceState(@NonNull Bundle outState) {
+        super.onSaveInstanceState(outState);
+        outState.putInt(STATE_CURRENT_PAGE, mCurrentPage);
+        if (mSelectedDate != null) {
+            outState.putLong(STATE_SELECTED_DATE, mSelectedDate.getTimeInMillis());
+        }
+        if (mCourseShowAll != null) {
+            outState.putBoolean(STATE_COURSE_SHOW_ALL, mCourseShowAll.isChecked());
+        }
+    }
+
+    private void showRestoredPage() {
+        int navItemId = navigationItemForPage(mCurrentPage);
+        if (navItemId != 0 && mBottomNavigation.getSelectedItemId() != navItemId) {
+            mBottomNavigation.setSelectedItemId(navItemId);
+            return;
+        }
         loadCurrentPage();
+    }
+
+    private int navigationItemForPage(int page) {
+        if (page == PAGE_LAB) {
+            return R.id.nav_lab;
+        } else if (page == PAGE_COURSE) {
+            return R.id.nav_course;
+        } else if (page == PAGE_JOURNAL) {
+            return R.id.nav_journal;
+        } else if (page == PAGE_REPORT) {
+            return R.id.nav_report;
+        } else if (page == PAGE_TODAY) {
+            return R.id.nav_today;
+        }
+        return 0;
     }
 
     private void setupLabItemDragSorting() {
@@ -1141,6 +1196,8 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         ArrayList<ScheduledReminder> scheduledReminders = new ArrayList<>();
         long start = startOfTodayMillis();
         long end = endOfTodayMillis();
+        boolean historyMode = isSelectedDateBeforeToday();
+        boolean futureMode = isSelectedDateAfterToday();
 
         for (Reminder reminder : rb.getAllReminders()) {
             for (ScheduledReminder scheduled : collectOccurrences(reminder, start, end)) {
@@ -1183,7 +1240,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
 
             for (ScheduledReminder scheduled : group) {
                 Reminder reminder = scheduled.reminder;
-                if (!scheduled.taken) {
+                if (!historyMode && !scheduled.taken) {
                     reminderIds.add(reminder.getID());
                 }
                 double stock = rb.getTotalStock(reminder.getTitle());
@@ -1220,7 +1277,9 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                     firstReminder.getIconUri(),
                     reminderIds.isEmpty(),
                     reminderIds,
-                    medicineLines));
+                    medicineLines)
+                    .withConfirmButton(!historyMode)
+                    .withConfirmEnabled(!futureMode));
             IDmap.put(position, firstReminder.getID());
             position++;
         }
@@ -1229,6 +1288,22 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
 
     private boolean shouldShowScheduledOccurrence(Reminder reminder) {
         return "true".equals(reminder.getActive());
+    }
+
+    private boolean isSelectedDateBeforeToday() {
+        Calendar today = Calendar.getInstance();
+        normalizeDate(today);
+        Calendar selected = (Calendar) mSelectedDate.clone();
+        normalizeDate(selected);
+        return selected.getTimeInMillis() < today.getTimeInMillis();
+    }
+
+    private boolean isSelectedDateAfterToday() {
+        Calendar today = Calendar.getInstance();
+        normalizeDate(today);
+        Calendar selected = (Calendar) mSelectedDate.clone();
+        normalizeDate(selected);
+        return selected.getTimeInMillis() > today.getTimeInMillis();
     }
 
     private List<SummaryItem> generateHistoryData() {
@@ -1604,28 +1679,17 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
             boolean hasResult = latest != null;
             boolean belowRange = hasResult && item.mReferenceMin != null && latest.mValue < item.mReferenceMin;
             boolean aboveRange = hasResult && item.mReferenceMax != null && latest.mValue > item.mReferenceMax;
-            boolean hasReference = item.mReferenceMin != null || item.mReferenceMax != null;
-            boolean inRange = hasResult && hasReference && !belowRange && !aboveRange;
-            boolean outOfRange = belowRange || aboveRange;
             String unitText = item.mUnit == null ? "" : item.mUnit;
-            String details = hasResult
+            String valueText = hasResult ? formatQuantity(latest.mValue) : "";
+            String detailsText = hasResult
                     ? getString(R.string.lab_latest_result,
-                    formatQuantity(latest.mValue),
+                    valueText,
                     unitText,
-                    formatHealthEntryDate(latest.mCreatedAt))
+                    formatLabResultListDate(latest.mCreatedAt)).trim()
                     : "";
-            String status;
-            if (!hasResult) {
-                status = "";
-            } else if (belowRange) {
-                status = getString(R.string.lab_low);
-            } else if (aboveRange) {
-                status = getString(R.string.lab_high);
-            } else if (hasReference) {
-                status = getString(R.string.lab_normal);
-            } else {
-                status = "";
-            }
+            CharSequence details = hasResult
+                    ? styleLabResultValue(detailsText, valueText, labResultValueColorRes(item, latest))
+                    : "";
 
             labItemMap.put(items.size(), item.mId);
             labItemOrder.add(item.mId);
@@ -1633,11 +1697,13 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                     item.mName,
                     formatLabReferenceRange(item),
                     details,
-                    status,
-                    "liquid",
                     "",
-                    outOfRange ? "true" : "false",
-                    inRange));
+                    "lab",
+                    "",
+                    "false",
+                    false)
+                    .withTitleTextSize(19)
+                    .withDetailsTextSize(13));
         }
         return items;
     }
@@ -1673,6 +1739,10 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     }
 
     private void showLabTrendDialog(int itemId) {
+        showLabTrendDialog(itemId, true);
+    }
+
+    private void showLabTrendDialog(int itemId, boolean showTrend) {
         LabTestItem item = rb.getLabTestItem(itemId);
         if (item == null) {
             return;
@@ -1683,35 +1753,51 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         int padding = dp(18);
         content.setPadding(padding, dp(8), padding, 0);
 
+        LinearLayout topRow = new LinearLayout(this);
+        topRow.setGravity(Gravity.CENTER_VERTICAL);
+        topRow.setOrientation(LinearLayout.HORIZONTAL);
+
         TextView reference = new TextView(this);
         reference.setText(formatLabReferenceRange(item));
         reference.setTextColor(getResources().getColor(R.color.text_secondary));
         reference.setTextSize(13);
-        content.addView(reference, new LinearLayout.LayoutParams(
+        reference.setSingleLine(true);
+        reference.setEllipsize(TextUtils.TruncateAt.END);
+        topRow.addView(reference, new LinearLayout.LayoutParams(
+                0,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                1));
+
+        LinearLayout modeRow = new LinearLayout(this);
+        modeRow.setGravity(Gravity.RIGHT);
+        modeRow.setOrientation(LinearLayout.HORIZONTAL);
+        TextView trendMode = createLabDetailModeText(R.string.lab_view_trend);
+        TextView separator = createLabDetailModeText(0);
+        separator.setText("/");
+        TextView listMode = createLabDetailModeText(R.string.lab_view_list);
+        modeRow.addView(trendMode);
+        modeRow.addView(separator);
+        modeRow.addView(listMode);
+        topRow.addView(modeRow, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+        content.addView(topRow, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT));
 
-        LinearLayout modeRow = new LinearLayout(this);
-        modeRow.setOrientation(LinearLayout.HORIZONTAL);
-        LinearLayout.LayoutParams modeParams = new LinearLayout.LayoutParams(
+        View topDivider = new View(this);
+        topDivider.setBackgroundColor(getResources().getColor(R.color.lab_detail_divider));
+        LinearLayout.LayoutParams dividerParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT);
-        modeParams.topMargin = dp(10);
-        content.addView(modeRow, modeParams);
-
-        Button chartButton = createLabDetailModeButton(R.string.lab_detail_chart);
-        Button listButton = createLabDetailModeButton(R.string.lab_detail_list);
-        LinearLayout.LayoutParams buttonParams = new LinearLayout.LayoutParams(0, dp(42), 1);
-        modeRow.addView(chartButton, buttonParams);
-        LinearLayout.LayoutParams listButtonParams = new LinearLayout.LayoutParams(0, dp(42), 1);
-        listButtonParams.leftMargin = dp(8);
-        modeRow.addView(listButton, listButtonParams);
+                dp(1));
+        dividerParams.topMargin = dp(8);
+        content.addView(topDivider, dividerParams);
 
         FrameLayout detailFrame = new FrameLayout(this);
         LinearLayout.LayoutParams frameParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 dp(260));
-        frameParams.topMargin = dp(8);
+        frameParams.topMargin = dp(6);
         content.addView(detailFrame, frameParams);
 
         LabTrendChartView chart = new LabTrendChartView(this);
@@ -1724,26 +1810,103 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         detailFrame.addView(resultList, new FrameLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.MATCH_PARENT));
-        chartButton.setOnClickListener(v -> setLabDetailMode(chart, resultList, chartButton, listButton, true));
-        listButton.setOnClickListener(v -> setLabDetailMode(chart, resultList, chartButton, listButton, false));
-        setLabDetailMode(chart, resultList, chartButton, listButton, true);
 
-        TextView count = new TextView(this);
-        count.setText(results.isEmpty()
+        boolean[] detailShowsTrend = new boolean[]{showTrend};
+        updateLabDetailMode(trendMode, listMode, chart, resultList, detailShowsTrend[0]);
+        trendMode.setOnClickListener(v -> {
+            detailShowsTrend[0] = true;
+            updateLabDetailMode(trendMode, listMode, chart, resultList, true);
+        });
+        listMode.setOnClickListener(v -> {
+            detailShowsTrend[0] = false;
+            updateLabDetailMode(trendMode, listMode, chart, resultList, false);
+        });
+
+        String countText = results.isEmpty()
                 ? getString(R.string.lab_no_result)
-                : getString(R.string.lab_history_count, results.size()));
-        count.setTextColor(getResources().getColor(R.color.text_secondary));
-        count.setTextSize(13);
-        content.addView(count, new LinearLayout.LayoutParams(
+                : getString(R.string.lab_history_count, results.size());
+
+        AlertDialog[] labDialog = new AlertDialog[1];
+        LinearLayout bottomRow = new LinearLayout(this);
+        bottomRow.setGravity(Gravity.CENTER_VERTICAL);
+        bottomRow.setOrientation(LinearLayout.HORIZONTAL);
+        bottomRow.setPadding(0, dp(8), 0, 0);
+
+        TextView countView = new TextView(this);
+        countView.setText(countText);
+        countView.setTextColor(getResources().getColor(R.color.text_secondary));
+        countView.setTextSize(14);
+        bottomRow.addView(countView, new LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+
+        ImageButton addButton = new ImageButton(this);
+        addButton.setImageResource(R.drawable.baseline_add_dialog_24);
+        addButton.setBackgroundColor(getResources().getColor(R.color.transperent));
+        addButton.setContentDescription(getString(R.string.add_lab_result));
+        addButton.setOnClickListener(v -> {
+            if (labDialog[0] != null) {
+                labDialog[0].dismiss();
+            }
+            showLabResultForm(item, true, detailShowsTrend[0]);
+        });
+        bottomRow.addView(addButton, new LinearLayout.LayoutParams(dp(48), dp(48)));
+
+        TextView closeButton = new TextView(this);
+        closeButton.setText(R.string.cancel);
+        closeButton.setTextColor(getResources().getColor(R.color.nav_selected));
+        closeButton.setTextSize(14);
+        closeButton.setGravity(Gravity.CENTER);
+        closeButton.setPadding(dp(12), 0, 0, 0);
+        closeButton.setMinHeight(dp(48));
+        closeButton.setOnClickListener(v -> {
+            if (labDialog[0] != null) {
+                labDialog[0].dismiss();
+            }
+        });
+        bottomRow.addView(closeButton, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+        content.addView(bottomRow, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT));
 
-        new AlertDialog.Builder(this)
+        labDialog[0] = new AlertDialog.Builder(this)
                 .setTitle(item.mName)
                 .setView(content)
-                .setPositiveButton(R.string.add_lab_result, (dialog, which) -> showLabResultForm(item))
-                .setNegativeButton(R.string.cancel, null)
-                .show();
+                .create();
+        labDialog[0].show();
+    }
+
+    private TextView createLabDetailModeText(int textRes) {
+        TextView textView = new TextView(this);
+        if (textRes != 0) {
+            textView.setText(textRes);
+        }
+        textView.setTextSize(14);
+        textView.setTypeface(Typeface.DEFAULT, Typeface.NORMAL);
+        textView.setTextColor(getResources().getColor(R.color.text_secondary));
+        textView.setPadding(dp(4), 0, dp(4), dp(2));
+        return textView;
+    }
+
+    private void updateLabDetailMode(TextView trendMode, TextView listMode,
+                                     View chart, View listView, boolean showTrend) {
+        chart.setVisibility(showTrend ? View.VISIBLE : View.GONE);
+        listView.setVisibility(showTrend ? View.GONE : View.VISIBLE);
+        updateLabDetailModeText(trendMode, showTrend);
+        updateLabDetailModeText(listMode, !showTrend);
+    }
+
+    private void updateLabDetailModeText(TextView textView, boolean selected) {
+        int flags = textView.getPaintFlags();
+        if (selected) {
+            flags |= Paint.UNDERLINE_TEXT_FLAG;
+        } else {
+            flags &= ~Paint.UNDERLINE_TEXT_FLAG;
+        }
+        textView.setPaintFlags(flags);
+        textView.setTextColor(getResources().getColor(
+                selected ? R.color.text_primary : R.color.text_secondary));
     }
 
     private Button createLabDetailModeButton(int textRes) {
@@ -1806,8 +1969,8 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setMinimumHeight(dp(58));
-        row.setPadding(0, dp(8), 0, dp(8));
+        row.setMinimumHeight(dp(29));
+        row.setPadding(0, dp(4), 0, dp(4));
 
         LinearLayout textGroup = new LinearLayout(this);
         textGroup.setOrientation(LinearLayout.VERTICAL);
@@ -1815,30 +1978,18 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 LinearLayout.LayoutParams.WRAP_CONTENT, 1));
 
         TextView date = new TextView(this);
-        String time = formatHealthEntryTime(result.mCreatedAt);
-        String dateText = formatHealthEntryDate(result.mCreatedAt);
-        date.setText(time.length() == 0 ? dateText : dateText + " " + time);
+        String dateText = formatLabResultListDate(result.mCreatedAt);
+        date.setText(dateText);
         date.setTextColor(getResources().getColor(R.color.text_primary));
         date.setTextSize(14);
         textGroup.addView(date, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT));
 
-        String statusText = labResultStatusText(item, result);
-        TextView status = new TextView(this);
-        status.setText(statusText);
-        status.setTextColor(labResultStatusColor(item, result));
-        status.setTextSize(13);
-        status.setVisibility(statusText.length() == 0 ? View.GONE : View.VISIBLE);
-        textGroup.addView(status, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT));
-
         TextView value = new TextView(this);
         value.setText(formatLabResultValue(item, result));
-        value.setTextColor(getResources().getColor(R.color.text_primary));
-        value.setTextSize(18);
-        value.setTypeface(Typeface.DEFAULT_BOLD);
+        value.setTextColor(getResources().getColor(labResultValueColorRes(item, result)));
+        value.setTextSize(17);
         row.addView(value, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT));
@@ -1854,31 +2005,43 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         return divider;
     }
 
-    private String formatLabResultValue(LabTestItem item, LabResult result) {
+    private CharSequence formatLabResultValue(LabTestItem item, LabResult result) {
         String unitText = result.mUnit == null || result.mUnit.length() == 0
                 ? item.mUnit
                 : result.mUnit;
-        return formatQuantity(result.mValue) + (unitText == null || unitText.length() == 0 ? "" : " " + unitText);
+        String valueText = formatQuantity(result.mValue);
+        if (unitText == null || unitText.length() == 0) {
+            return valueText;
+        }
+        String text = valueText + " " + unitText;
+        SpannableString styled = new SpannableString(text);
+        styled.setSpan(new AbsoluteSizeSpan(16, true),
+                valueText.length() + 1, text.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        return styled;
     }
 
-    private String labResultStatusText(LabTestItem item, LabResult result) {
-        if (item.mReferenceMin != null && result.mValue < item.mReferenceMin) {
-            return getString(R.string.lab_low);
-        }
+    private int labResultValueColorRes(LabTestItem item, LabResult result) {
         if (item.mReferenceMax != null && result.mValue > item.mReferenceMax) {
-            return getString(R.string.lab_high);
+            return R.color.lab_high_value;
         }
-        return item.mReferenceMin != null || item.mReferenceMax != null ? getString(R.string.lab_normal) : "";
+        if (item.mReferenceMin != null && result.mValue < item.mReferenceMin) {
+            return R.color.lab_low_value;
+        }
+        return R.color.text_primary;
     }
 
-    private int labResultStatusColor(LabTestItem item, LabResult result) {
-        if (item.mReferenceMin != null && result.mValue < item.mReferenceMin) {
-            return getResources().getColor(R.color.history_missed);
+    private CharSequence styleLabResultValue(String text, String valueText, int colorResId) {
+        if (colorResId == R.color.text_primary || text.length() == 0 || valueText.length() == 0) {
+            return text;
         }
-        if (item.mReferenceMax != null && result.mValue > item.mReferenceMax) {
-            return getResources().getColor(R.color.history_missed);
+        int start = text.lastIndexOf(valueText);
+        if (start < 0) {
+            return text;
         }
-        return getResources().getColor(R.color.history_taken);
+        SpannableString styled = new SpannableString(text);
+        styled.setSpan(new ForegroundColorSpan(getResources().getColor(colorResId)),
+                start, text.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        return styled;
     }
 
     private List<SummaryItem> generateReportData() {
@@ -2178,6 +2341,10 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     }
 
     private void showLabResultForm(LabTestItem item) {
+        showLabResultForm(item, false, true);
+    }
+
+    private void showLabResultForm(LabTestItem item, boolean returnToDetail, boolean showTrend) {
         LinearLayout form = new LinearLayout(this);
         form.setOrientation(LinearLayout.VERTICAL);
         int padding = dp(20);
@@ -2191,9 +2358,10 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
 
         String[] resultDate = new String[]{ReminderSchedule.formatDate(Calendar.getInstance())};
         TextView resultDateText = dateSelectorText(R.string.lab_result_date, resultDate[0]);
-        resultDateText.setOnClickListener(v -> showCourseDatePicker(resultDate[0], date -> {
+        resultDateText.setText(labResultDateSelectorLabel(resultDate[0]));
+        resultDateText.setOnClickListener(v -> showLabResultDatePicker(resultDate[0], date -> {
                     resultDate[0] = date;
-                    resultDateText.setText(dateSelectorLabel(R.string.lab_result_date, resultDate[0]));
+                    resultDateText.setText(labResultDateSelectorLabel(resultDate[0]));
                 }));
         form.addView(resultDateText);
 
@@ -2208,22 +2376,36 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 .setPositiveButton(R.string.saved, null)
                 .setNegativeButton(R.string.cancel, null)
                 .create();
-        dialog.setOnShowListener(d -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
-            Double resultValue = parseNumber(value);
-            if (resultValue == null) {
-                value.setError(getString(R.string.lab_result_required));
-                return;
-            }
-            long id = rb.addLabResult(new LabResult(item.mId, resultValue, labResultCreatedAt(resultDate[0])));
-            if (id == -1) {
-                Toast.makeText(this, R.string.could_not_save_lab_result, Toast.LENGTH_SHORT).show();
-                return;
-            }
-            Toast.makeText(this, R.string.saved, Toast.LENGTH_SHORT).show();
-            dialog.dismiss();
-            loadCurrentPage();
-        }));
+        dialog.setOnShowListener(d -> {
+            dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setOnClickListener(v -> {
+                dialog.dismiss();
+                reopenLabDetailIfNeeded(returnToDetail, item.mId, showTrend);
+            });
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+                Double resultValue = parseNumber(value);
+                if (resultValue == null) {
+                    value.setError(getString(R.string.lab_result_required));
+                    return;
+                }
+                long id = rb.addLabResult(new LabResult(item.mId, resultValue, labResultCreatedAt(resultDate[0])));
+                if (id == -1) {
+                    Toast.makeText(this, R.string.could_not_save_lab_result, Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                Toast.makeText(this, R.string.saved, Toast.LENGTH_SHORT).show();
+                dialog.dismiss();
+                loadCurrentPage();
+                reopenLabDetailIfNeeded(returnToDetail, item.mId, showTrend);
+            });
+        });
         dialog.show();
+    }
+
+    private void reopenLabDetailIfNeeded(boolean returnToDetail, int itemId, boolean showTrend) {
+        if (!returnToDetail) {
+            return;
+        }
+        mUiHandler.post(() -> showLabTrendDialog(itemId, showTrend));
     }
 
     private String labResultCreatedAt(String resultDate) {
@@ -2237,6 +2419,61 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         calendar.set(Calendar.SECOND, now.get(Calendar.SECOND));
         calendar.set(Calendar.MILLISECOND, 0);
         return new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(calendar.getTime());
+    }
+
+    private void showLabResultDatePicker(String currentDate, CourseDateSelectedListener listener) {
+        Calendar calendar = parseCourseDate(currentDate);
+        if (calendar == null) {
+            calendar = Calendar.getInstance();
+        }
+        DatePickerDialog dialog = new DatePickerDialog(
+                this,
+                (view, year, month, dayOfMonth) -> {
+                    Calendar selected = Calendar.getInstance();
+                    selected.set(Calendar.YEAR, year);
+                    selected.set(Calendar.MONTH, month);
+                    selected.set(Calendar.DAY_OF_MONTH, dayOfMonth);
+                    normalizeDate(selected);
+                    listener.onDateSelected(ReminderSchedule.formatDate(selected));
+                },
+                calendar.get(Calendar.YEAR),
+                calendar.get(Calendar.MONTH),
+                calendar.get(Calendar.DAY_OF_MONTH));
+        dialog.setButton(AlertDialog.BUTTON_NEUTRAL, getString(R.string.select_year), (d, which) -> {
+        });
+        dialog.setOnShowListener(d -> dialog.getButton(AlertDialog.BUTTON_NEUTRAL)
+                .setOnClickListener(v -> showLabResultYearPicker(dialog)));
+        dialog.show();
+        Window window = dialog.getWindow();
+        if (window != null) {
+            window.setBackgroundDrawableResource(R.drawable.dialog_panel_bg);
+        }
+    }
+
+    private void showLabResultYearPicker(DatePickerDialog dateDialog) {
+        DatePicker datePicker = dateDialog.getDatePicker();
+        int currentYear = Calendar.getInstance().get(Calendar.YEAR);
+        int minYear = 1900;
+        int maxYear = Math.max(currentYear + 10, datePicker.getYear());
+        String[] years = new String[maxYear - minYear + 1];
+        for (int i = 0; i < years.length; i++) {
+            years[i] = String.valueOf(maxYear - i);
+        }
+        AlertDialog yearDialog = new AlertDialog.Builder(this)
+                .setTitle(R.string.select_year)
+                .setItems(years, (dialog, which) -> datePicker.updateDate(
+                        maxYear - which,
+                        datePicker.getMonth(),
+                        datePicker.getDayOfMonth()))
+                .setNegativeButton(R.string.cancel, null)
+                .create();
+        yearDialog.setOnShowListener(dialog -> yearDialog.getListView()
+                .setSelection(Math.max(0, Math.min(years.length - 1, maxYear - datePicker.getYear()))));
+        yearDialog.show();
+        Window window = yearDialog.getWindow();
+        if (window != null) {
+            window.setBackgroundDrawableResource(R.drawable.dialog_panel_bg);
+        }
     }
 
     private Double parseNumber(EditText editText) {
@@ -2371,6 +2608,51 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
             builder.append(entry.mNote);
         }
         return builder.length() == 0 ? getString(R.string.no_note) : builder.toString();
+    }
+
+    private String formatLabResultListDate(String createdAt) {
+        if (createdAt == null || createdAt.length() == 0) {
+            return "";
+        }
+        Calendar calendar = parseLabResultDate(createdAt);
+        if (calendar != null) {
+            return new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(calendar.getTime());
+        }
+        return createdAt.length() >= 10 ? createdAt.substring(0, 10) : createdAt;
+    }
+
+    private String labResultDateSelectorLabel(String date) {
+        return getString(R.string.lab_result_date) + ": " + formatLabResultDateValue(date);
+    }
+
+    private String formatLabResultDateValue(String date) {
+        Calendar calendar = parseLabResultDate(date);
+        if (calendar == null) {
+            return date == null ? "" : date;
+        }
+        return new SimpleDateFormat("yyyy-MM-dd", Locale.US).format(calendar.getTime());
+    }
+
+    private Calendar parseLabResultDate(String value) {
+        String text = value == null ? "" : value.trim();
+        if (text.length() == 0) {
+            return null;
+        }
+        String[] patterns = new String[]{"yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd"};
+        for (String pattern : patterns) {
+            try {
+                SimpleDateFormat format = new SimpleDateFormat(pattern, Locale.US);
+                format.setLenient(false);
+                Calendar calendar = Calendar.getInstance();
+                calendar.setTime(format.parse(text.length() > pattern.length()
+                        ? text.substring(0, pattern.length())
+                        : text));
+                normalizeDate(calendar);
+                return calendar;
+            } catch (ParseException ignored) {
+            }
+        }
+        return parseCourseDate(text);
     }
 
     private String entryTypeLabel(String type) {
@@ -2538,6 +2820,9 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     public void reminderStatusListener(int reminderId, String scheduledAt, boolean taken) {
         if (mCurrentPage != PAGE_TODAY || reminderId <= 0
                 || scheduledAt == null || scheduledAt.length() == 0) {
+            return;
+        }
+        if (isSelectedDateAfterToday()) {
             return;
         }
         ReminderDatabase.ConfirmResult result = rb.setReminderTakenStatus(reminderId, scheduledAt, taken);
@@ -3526,6 +3811,9 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     @Override
     public void confirmListener(int pos) {
         if (mCurrentPage != PAGE_TODAY || pos < 0 || pos >= medicineList.size()) {
+            return;
+        }
+        if (isSelectedDateAfterToday()) {
             return;
         }
         ReminderItem item = medicineList.get(pos);

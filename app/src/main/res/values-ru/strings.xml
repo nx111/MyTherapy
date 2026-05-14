@@ -152,8 +152,10 @@
     <string name="lab_unit_hint">Единица</string>
     <string name="lab_result_value_hint">Значение результата</string>
     <string name="lab_reference_range">Норма %1$s-%2$s %3$s</string>
-    <string name="lab_latest_result">Последний %1$s %2$s · %3$s</string>
+    <string name="lab_latest_result">%3$s\u0020\u0020%1$s %2$s</string>
     <string name="lab_no_result">Нет результата</string>
+    <string name="lab_view_trend">Тренд</string>
+    <string name="lab_view_list">Список</string>
     <string name="lab_normal">Норма</string>
     <string name="lab_low">Низко</string>
     <string name="lab_high">Высоко</string>
