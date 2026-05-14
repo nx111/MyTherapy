@@ -2535,6 +2535,22 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     }
 
     @Override
+    public void reminderStatusListener(int reminderId, String scheduledAt, boolean taken) {
+        if (mCurrentPage != PAGE_TODAY || reminderId <= 0
+                || scheduledAt == null || scheduledAt.length() == 0) {
+            return;
+        }
+        ReminderDatabase.ConfirmResult result = rb.setReminderTakenStatus(reminderId, scheduledAt, taken);
+        Toast.makeText(getApplicationContext(), result.message, Toast.LENGTH_SHORT).show();
+        if (result.success) {
+            if (taken) {
+                AlarmReceiver.completeConfirmedOccurrence(getApplicationContext(), reminderId, scheduledAt);
+            }
+            loadReminderList();
+        }
+    }
+
+    @Override
     public boolean longClickListener(int pos) {
         if (pos < 0 || pos >= summaryList.size()) {
             return false;

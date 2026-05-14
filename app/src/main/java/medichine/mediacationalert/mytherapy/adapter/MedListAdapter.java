@@ -50,7 +50,7 @@ public class MedListAdapter extends RecyclerView.Adapter<MedListAdapter.SimpleHo
         holder.setStockInfo(item.mStockSummary);
         holder.setActiveImage(item.mActive);
         holder.setIcon(item.mIconType, item.mIconUri);
-        holder.setMedicineLines(item.mMedicineLines);
+        holder.setMedicineLines(item.mScheduledAt, item.mMedicineLines);
         holder.setTakenState(item.mTaken, "true".equals(item.mActive));
 
         holder.itemView.setOnClickListener(v -> listener.clickListener(position));
@@ -114,7 +114,7 @@ public class MedListAdapter extends RecyclerView.Adapter<MedListAdapter.SimpleHo
             setMedicineIcon(mThumbnailImage, iconType, iconUri);
         }
 
-        public void setMedicineLines(List<ReminderItem.MedicineLine> lines) {
+        public void setMedicineLines(String scheduledAt, List<ReminderItem.MedicineLine> lines) {
             mMedicineContainer.removeAllViews();
             if (lines == null || lines.isEmpty()) {
                 mMedicineContainer.setVisibility(View.GONE);
@@ -163,6 +163,20 @@ public class MedListAdapter extends RecyclerView.Adapter<MedListAdapter.SimpleHo
                 check.setText(line.taken ? "\u2713" : "\u25CB");
                 check.setTextColor(activity.getResources().getColor(line.taken ? R.color.nav_selected : R.color.text_secondary));
                 check.setTextSize(line.taken ? 24 : 28);
+                check.setClickable(true);
+                check.setLongClickable(true);
+                check.setOnClickListener(v -> {
+                    if (!line.taken) {
+                        listener.reminderStatusListener(line.reminderId, scheduledAt, true);
+                    }
+                });
+                check.setOnLongClickListener(v -> {
+                    if (!line.taken) {
+                        return true;
+                    }
+                    listener.reminderStatusListener(line.reminderId, scheduledAt, false);
+                    return true;
+                });
                 row.addView(check, new LinearLayout.LayoutParams(dp(40), dp(40)));
 
                 mMedicineContainer.addView(row, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
