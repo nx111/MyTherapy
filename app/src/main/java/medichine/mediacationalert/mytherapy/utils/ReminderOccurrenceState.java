@@ -15,8 +15,12 @@ final class ReminderOccurrenceState {
         if (database.isReminderTaken(reminder.getID(), scheduledAt) || isIgnored(context, reminder.getID(), scheduledAt)) {
             return false;
         }
+        long now = System.currentTimeMillis();
         long snoozedUntil = getSnoozedUntil(context, reminder.getID(), scheduledAt);
-        return snoozedUntil <= System.currentTimeMillis();
+        if (snoozedUntil > 0L) {
+            return snoozedUntil <= now;
+        }
+        return ReminderSchedule.parseScheduledAt(scheduledAt).getTimeInMillis() <= now;
     }
 
     static void markIgnored(Context context, int reminderId, String scheduledAt) {

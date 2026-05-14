@@ -116,7 +116,11 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
         }
 
         ReminderDatabase rb = new ReminderDatabase(context);
-        List<Reminder> group = rb.getActiveRemindersAt(scheduledAt);
+        List<Reminder> group = pendingReminders(context, rb, rb.getActiveRemindersAt(scheduledAt), scheduledAt);
+        if (group.isEmpty()) {
+            cancelNotification(context, scheduledAt);
+            return;
+        }
         ArrayList<Integer> reminderIds = new ArrayList<>();
         for (Reminder reminder : group) {
             reminderIds.add(reminder.getID());
