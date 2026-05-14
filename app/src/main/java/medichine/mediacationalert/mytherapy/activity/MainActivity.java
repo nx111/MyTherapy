@@ -1145,7 +1145,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         for (Reminder reminder : rb.getAllReminders()) {
             for (ScheduledReminder scheduled : collectOccurrences(reminder, start, end)) {
                 boolean taken = rb.isReminderTaken(reminder.getID(), scheduled.scheduledAt);
-                if (!taken && shouldShowScheduledOccurrence(reminder)) {
+                if (shouldShowScheduledOccurrence(reminder)) {
                     scheduledReminders.add(new ScheduledReminder(reminder, scheduled.scheduledAt, scheduled.timeMillis, taken));
                 }
             }
@@ -1561,6 +1561,17 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         mAdapter = new MedListAdapter(medicineList, this, this);
         mList.setAdapter(mAdapter);
         updateEmptyState(medicineList.isEmpty(), R.string.no_today_reminders);
+        scrollToFirstUnconfirmedReminder();
+    }
+
+    private void scrollToFirstUnconfirmedReminder() {
+        for (int i = 0; i < medicineList.size(); i++) {
+            if (!medicineList.get(i).mTaken) {
+                int position = i;
+                mList.post(() -> mList.smoothScrollToPosition(position));
+                return;
+            }
+        }
     }
 
     private List<SummaryItem> generateJournalData() {
