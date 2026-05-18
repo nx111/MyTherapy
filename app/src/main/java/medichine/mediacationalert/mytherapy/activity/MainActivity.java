@@ -1244,7 +1244,8 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                     reminderIds.add(reminder.getID());
                 }
                 double stock = rb.getTotalStock(reminder.getTitle());
-                String doseText = formatDoseQuantity(reminder);
+                double displayDose = displayedDose(reminder, scheduled.scheduledAt, scheduled.taken);
+                String doseText = formatDoseQuantity(reminder, displayDose);
                 String stockText = getString(R.string.stock_amount, formatDoseQuantity(reminder, stock));
                 medicineLines.add(new ReminderItem.MedicineLine(
                         reminder.getID(),
@@ -1259,7 +1260,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 }
                 details.append(getString(R.string.medicine_detail_line,
                         reminder.getTitle(),
-                        formatDoseQuantity(reminder),
+                        formatDoseQuantity(reminder, displayDose),
                         formatDoseQuantity(reminder, stock)));
             }
 
@@ -1335,7 +1336,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
             String status = parts[1] + " " + (taken
                     ? "\u2713"
                     : active ? getString(R.string.not_taken) : getString(R.string.paused));
-            String details = formatDoseQuantity(reminder);
+            String details = formatDoseQuantity(reminder, displayedDose(reminder, scheduled.scheduledAt, taken));
             items.add(new SummaryItem(
                     reminder.getTitle(),
                     "",
@@ -1504,6 +1505,14 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
 
     private String formatDoseQuantity(Reminder reminder) {
         return formatDoseQuantity(reminder, reminder.getDose());
+    }
+
+    private double displayedDose(Reminder reminder, String scheduledAt, boolean taken) {
+        double dose = reminder.getDose();
+        if (taken) {
+            dose += rb.getSupplementalDose(reminder.getTitle(), scheduledAt);
+        }
+        return dose;
     }
 
     private String formatDoseQuantity(Reminder reminder, double value) {

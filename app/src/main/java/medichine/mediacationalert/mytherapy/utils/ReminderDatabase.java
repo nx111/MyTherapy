@@ -722,6 +722,26 @@ public class ReminderDatabase extends SQLiteOpenHelper {
         return count;
     }
 
+    public double getSupplementalDose(String title, String scheduledAt) {
+        if (title == null || scheduledAt == null || scheduledAt.length() == 0) {
+            return 0;
+        }
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = db.rawQuery(
+                "SELECT SUM(" + LOG_DOSE + ") FROM " + TABLE_INTAKE_LOGS
+                        + " WHERE " + LOG_ACCOUNT_ID + "=?"
+                        + " AND " + LOG_TITLE + "=?"
+                        + " AND " + LOG_SCHEDULED_AT + "=?"
+                        + " AND " + LOG_REMINDER_ID + "<0",
+                new String[]{accountIdText(), normalizeTitle(title), scheduledAt});
+        double total = 0;
+        if (cursor.moveToFirst()) {
+            total = cursor.isNull(0) ? 0 : cursor.getDouble(0);
+        }
+        cursor.close();
+        return total;
+    }
+
     public String exportCurrentAccountArchiveCsv() {
         StringBuilder builder = new StringBuilder();
         builder.append("scheduled_date,actual_date,type,name,value,unit,status,end_date\n");
