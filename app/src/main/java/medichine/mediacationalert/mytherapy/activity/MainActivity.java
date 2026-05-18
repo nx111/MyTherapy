@@ -3108,15 +3108,13 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                     optionDialog.dismiss();
                     toggleCoursePlan(reminder, groupIds, currentDialog);
                 }));
-        if (isExpiredCoursePlan(reminder)) {
-            content.addView(createCourseActionRow(
-                    R.drawable.baseline_add_dialog_24,
-                    getString(R.string.supplemental_intake),
-                    v -> {
-                        optionDialog.dismiss();
-                        showSupplementalIntakeDialog(reminder, groupIds, currentDialog);
-                    }));
-        }
+        content.addView(createCourseActionRow(
+                R.drawable.baseline_add_dialog_24,
+                getString(R.string.supplemental_intake),
+                v -> {
+                    optionDialog.dismiss();
+                    showSupplementalIntakeDialog(reminder, groupIds, currentDialog);
+                }));
         content.addView(createCourseActionRow(
                 R.drawable.baseline_delete_24,
                 getString(R.string.delete_plan),
@@ -3125,10 +3123,6 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                     confirmDeleteCoursePlan(reminder, groupIds, currentDialog);
                 }));
         optionDialog.show();
-    }
-
-    private boolean isExpiredCoursePlan(Reminder reminder) {
-        return ReminderSchedule.nextOccurrenceAfter(reminder, System.currentTimeMillis()) == null;
     }
 
     private void showSupplementalIntakeDialog(Reminder reminder, List<Integer> groupIds, AlertDialog currentDialog) {
