@@ -13,6 +13,7 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -1143,6 +1144,47 @@ public class ReminderDatabase extends SQLiteOpenHelper {
                     db.setTransactionSuccessful();
                     result = new ConfirmResult(true, mContext.getString(R.string.not_taken), 1);
                 }
+            }
+        } finally {
+            db.endTransaction();
+        }
+        if (shouldCheckStockAlert) {
+            notifyLowStockIfNeeded(reminder);
+        }
+        return result;
+    }
+
+    public ConfirmResult addSupplementalIntake(int reminderId, double dose) {
+        Reminder reminder = getReminder(reminderId);
+        if (reminder == null) {
+            return new ConfirmResult(false, mContext.getString(R.string.reminder_not_found), 0);
+        }
+        if (dose <= 0) {
+            return new ConfirmResult(false, mContext.getString(R.string.dose_must_be_positive), 0);
+        }
+
+        boolean shouldCheckStockAlert = false;
+        ConfirmResult result;
+        SQLiteDatabase db = this.getWritableDatabase();
+        db.beginTransaction();
+        try {
+            String scheduledAt = ReminderSchedule.format(Calendar.getInstance());
+            ContentValues values = new ContentValues();
+            values.put(LOG_ACCOUNT_ID, mCurrentAccountId);
+            values.put(LOG_REMINDER_ID, -Math.abs(reminder.getID()));
+            values.put(LOG_TITLE, normalizeTitle(reminder.getTitle()));
+            values.put(LOG_DOSE, dose);
+            values.put(LOG_SCHEDULED_AT, scheduledAt);
+            values.put(LOG_TAKEN_AT, nowText());
+
+            long id = db.insertWithOnConflict(TABLE_INTAKE_LOGS, null, values, SQLiteDatabase.CONFLICT_IGNORE);
+            if (id == -1) {
+                result = new ConfirmResult(false, mContext.getString(R.string.already_confirmed), 0);
+            } else {
+                consumeStock(db, reminder.getTitle(), dose);
+                shouldCheckStockAlert = true;
+                db.setTransactionSuccessful();
+                result = new ConfirmResult(true, mContext.getString(R.string.saved), 1);
             }
         } finally {
             db.endTransaction();

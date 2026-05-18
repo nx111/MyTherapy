@@ -192,6 +192,7 @@
     <string name="add_plan">Add Plan</string>
     <string name="select_plan_action">Plan Options</string>
     <string name="edit_plan">Edit Plan</string>
+    <string name="supplemental_intake">Catch-up Dose</string>
     <string name="medicine_spec">Specification</string>
     <string name="medicine_spec_format">Spec: %1$s</string>
     <string name="stock_alert_threshold">Stock Alert</string>

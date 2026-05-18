@@ -488,6 +488,9 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
     }
 
     private boolean scheduleReminderAfter(Context context, Reminder reminder, long afterMillis, boolean includeMissedToday) {
+        if (includeMissedToday && ReminderSchedule.nextOccurrenceAfter(reminder, afterMillis) == null) {
+            return false;
+        }
         PendingOccurrence next = nextPendingOccurrence(context, reminder, afterMillis, includeMissedToday);
         if (next == null) {
             return false;

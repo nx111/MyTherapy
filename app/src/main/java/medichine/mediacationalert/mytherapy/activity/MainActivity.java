@@ -3106,6 +3106,15 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                     optionDialog.dismiss();
                     toggleCoursePlan(reminder, groupIds, currentDialog);
                 }));
+        if (isExpiredCoursePlan(reminder)) {
+            content.addView(createCourseActionRow(
+                    R.drawable.baseline_add_dialog_24,
+                    getString(R.string.supplemental_intake),
+                    v -> {
+                        optionDialog.dismiss();
+                        showSupplementalIntakeDialog(reminder, groupIds, currentDialog);
+                    }));
+        }
         content.addView(createCourseActionRow(
                 R.drawable.baseline_delete_24,
                 getString(R.string.delete_plan),
@@ -3114,6 +3123,55 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                     confirmDeleteCoursePlan(reminder, groupIds, currentDialog);
                 }));
         optionDialog.show();
+    }
+
+    private boolean isExpiredCoursePlan(Reminder reminder) {
+        return ReminderSchedule.nextOccurrenceAfter(reminder, System.currentTimeMillis()) == null;
+    }
+
+    private void showSupplementalIntakeDialog(Reminder reminder, List<Integer> groupIds, AlertDialog currentDialog) {
+        Reminder fresh = rb.getReminder(reminder.getID());
+        if (fresh == null) {
+            return;
+        }
+
+        LinearLayout form = new LinearLayout(this);
+        form.setOrientation(LinearLayout.VERTICAL);
+        int padding = dp(20);
+        form.setPadding(padding, dp(8), padding, 0);
+
+        form.addView(formLabel(R.string.dose));
+        EditText dose = new EditText(this);
+        dose.setSingleLine(true);
+        dose.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        dose.setText(formatQuantity(fresh.getDose()));
+        form.addView(dose, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(R.string.supplemental_intake)
+                .setView(form)
+                .setPositiveButton(R.string.saved, null)
+                .setNegativeButton(R.string.cancel, null)
+                .create();
+        dialog.setOnShowListener(d -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            Double doseValue = parseNumber(dose);
+            if (doseValue == null) {
+                dose.setError(getString(R.string.enter_valid_dose));
+                return;
+            }
+            if (doseValue <= 0) {
+                dose.setError(getString(R.string.dose_must_be_positive));
+                return;
+            }
+            ReminderDatabase.ConfirmResult result = rb.addSupplementalIntake(fresh.getID(), doseValue);
+            Toast.makeText(getApplicationContext(), result.message, Toast.LENGTH_SHORT).show();
+            if (result.success) {
+                dialog.dismiss();
+                refreshCourseDetail(groupIds, currentDialog);
+            }
+        }));
+        dialog.show();
     }
 
     private void showMedicineInfoEditor(String title, Reminder displayReminder, List<Integer> groupIds,
@@ -3514,10 +3572,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         reminder.setRepeatNo(String.valueOf(doseTimes.split(",").length));
         reminder.setActive(active ? "true" : "false");
 
-        if (active && ReminderSchedule.nextOccurrenceAfter(reminder, System.currentTimeMillis()) == null) {
-            Toast.makeText(getApplicationContext(), R.string.choose_future_time, Toast.LENGTH_SHORT).show();
-            return false;
-        }
+        boolean hasFutureOccurrence = ReminderSchedule.nextOccurrenceAfter(reminder, System.currentTimeMillis()) != null;
         if (rb.findDuplicateReminder(reminder, reminder.getID()) != null) {
             Toast.makeText(getApplicationContext(), R.string.duplicate_reminder_plan, Toast.LENGTH_SHORT).show();
             return false;
@@ -3539,7 +3594,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
             rb.updateReminder(reminder);
             mAlarmReceiver.cancelAlarm(getApplicationContext(), reminder.getID());
         }
-        if (active) {
+        if (active && hasFutureOccurrence) {
             mAlarmReceiver.scheduleReminder(getApplicationContext(), reminder);
         }
         Toast.makeText(getApplicationContext(), isNew ? R.string.saved : R.string.edited, Toast.LENGTH_SHORT).show();

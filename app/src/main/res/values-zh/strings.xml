@@ -172,6 +172,7 @@
     <string name="add_plan">新建计划</string>
     <string name="select_plan_action">计划选项</string>
     <string name="edit_plan">修改计划</string>
+    <string name="supplemental_intake">补服</string>
     <string name="medicine_spec">规格</string>
     <string name="medicine_spec_format">规格：%1$s</string>
     <string name="stock_alert_threshold">库存报警</string>
