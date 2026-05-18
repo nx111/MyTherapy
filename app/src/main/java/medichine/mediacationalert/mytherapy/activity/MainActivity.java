@@ -2840,14 +2840,6 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         if (pos < 0 || pos >= summaryList.size()) {
             return false;
         }
-        if (mCurrentPage == PAGE_COURSE) {
-            List<Reminder> reminders = courseReminderMap.get(pos);
-            if (reminders == null || reminders.isEmpty()) {
-                return false;
-            }
-            showSupplementalIntakeDialog(reminders.get(0), null, null);
-            return true;
-        }
         if (mCurrentPage != PAGE_HISTORY) {
             return false;
         }
@@ -3040,7 +3032,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
 
         row.setOnClickListener(v -> showCoursePlanOptions(reminder, title, groupIds, dialogHolder[0]));
         row.setOnLongClickListener(v -> {
-            showCoursePlanOptions(reminder, title, groupIds, dialogHolder[0]);
+            showSupplementalIntakeDialog(reminder, groupIds, dialogHolder[0]);
             return true;
         });
 
