@@ -1154,7 +1154,7 @@ public class ReminderDatabase extends SQLiteOpenHelper {
         return result;
     }
 
-    public ConfirmResult addSupplementalIntake(int reminderId, double dose) {
+    public ConfirmResult addSupplementalIntake(int reminderId, String scheduledAt, double dose) {
         Reminder reminder = getReminder(reminderId);
         if (reminder == null) {
             return new ConfirmResult(false, mContext.getString(R.string.reminder_not_found), 0);
@@ -1168,13 +1168,15 @@ public class ReminderDatabase extends SQLiteOpenHelper {
         SQLiteDatabase db = this.getWritableDatabase();
         db.beginTransaction();
         try {
-            String scheduledAt = supplementalScheduledAt(reminder);
+            String logScheduledAt = scheduledAt == null || scheduledAt.length() == 0
+                    ? ReminderSchedule.format(Calendar.getInstance())
+                    : scheduledAt;
             ContentValues values = new ContentValues();
             values.put(LOG_ACCOUNT_ID, mCurrentAccountId);
             values.put(LOG_REMINDER_ID, supplementalLogReminderId());
             values.put(LOG_TITLE, normalizeTitle(reminder.getTitle()));
             values.put(LOG_DOSE, dose);
-            values.put(LOG_SCHEDULED_AT, scheduledAt);
+            values.put(LOG_SCHEDULED_AT, logScheduledAt);
             values.put(LOG_TAKEN_AT, nowText());
 
             long id = db.insertWithOnConflict(TABLE_INTAKE_LOGS, null, values, SQLiteDatabase.CONFLICT_IGNORE);
@@ -1193,13 +1195,6 @@ public class ReminderDatabase extends SQLiteOpenHelper {
             notifyLowStockIfNeeded(reminder);
         }
         return result;
-    }
-
-    private String supplementalScheduledAt(Reminder reminder) {
-        Calendar today = Calendar.getInstance();
-        return ReminderSchedule.format(ReminderSchedule.parseDateTime(
-                ReminderSchedule.formatDate(today),
-                ReminderSchedule.firstDoseTime(reminder)));
     }
 
     private int supplementalLogReminderId() {

@@ -2836,6 +2836,15 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     }
 
     @Override
+    public void reminderSupplementalIntakeListener(int reminderId, String scheduledAt) {
+        if (mCurrentPage != PAGE_TODAY || reminderId <= 0
+                || scheduledAt == null || scheduledAt.length() == 0) {
+            return;
+        }
+        showSupplementalIntakeDialog(reminderId, scheduledAt, null, null);
+    }
+
+    @Override
     public boolean longClickListener(int pos) {
         if (pos < 0 || pos >= summaryList.size()) {
             return false;
@@ -3032,7 +3041,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
 
         row.setOnClickListener(v -> showCoursePlanOptions(reminder, title, groupIds, dialogHolder[0]));
         row.setOnLongClickListener(v -> {
-            showSupplementalIntakeDialog(reminder, groupIds, dialogHolder[0]);
+            showCoursePlanOptions(reminder, title, groupIds, dialogHolder[0]);
             return true;
         });
 
@@ -3118,8 +3127,9 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         optionDialog.show();
     }
 
-    private void showSupplementalIntakeDialog(Reminder reminder, List<Integer> groupIds, AlertDialog currentDialog) {
-        Reminder fresh = rb.getReminder(reminder.getID());
+    private void showSupplementalIntakeDialog(int reminderId, String scheduledAt,
+                                              List<Integer> groupIds, AlertDialog currentDialog) {
+        Reminder fresh = rb.getReminder(reminderId);
         if (fresh == null) {
             return;
         }
@@ -3153,7 +3163,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 dose.setError(getString(R.string.dose_must_be_positive));
                 return;
             }
-            ReminderDatabase.ConfirmResult result = rb.addSupplementalIntake(fresh.getID(), doseValue);
+            ReminderDatabase.ConfirmResult result = rb.addSupplementalIntake(fresh.getID(), scheduledAt, doseValue);
             Toast.makeText(getApplicationContext(), result.message, Toast.LENGTH_SHORT).show();
             if (result.success) {
                 dialog.dismiss();

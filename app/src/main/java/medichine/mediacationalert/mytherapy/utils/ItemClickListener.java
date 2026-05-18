@@ -12,6 +12,9 @@ public interface ItemClickListener {
     default void reminderStatusListener(int reminderId, String scheduledAt, boolean taken) {
     }
 
+    default void reminderSupplementalIntakeListener(int reminderId, String scheduledAt) {
+    }
+
     default boolean longClickListener(int pos) {
         return false;
     }
