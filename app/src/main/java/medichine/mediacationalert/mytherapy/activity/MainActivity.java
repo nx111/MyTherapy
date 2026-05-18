@@ -2840,6 +2840,14 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         if (pos < 0 || pos >= summaryList.size()) {
             return false;
         }
+        if (mCurrentPage == PAGE_COURSE) {
+            List<Reminder> reminders = courseReminderMap.get(pos);
+            if (reminders == null || reminders.isEmpty()) {
+                return false;
+            }
+            showSupplementalIntakeDialog(reminders.get(0), null, null);
+            return true;
+        }
         if (mCurrentPage != PAGE_HISTORY) {
             return false;
         }
@@ -3109,13 +3117,6 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                     toggleCoursePlan(reminder, groupIds, currentDialog);
                 }));
         content.addView(createCourseActionRow(
-                R.drawable.baseline_add_dialog_24,
-                getString(R.string.supplemental_intake),
-                v -> {
-                    optionDialog.dismiss();
-                    showSupplementalIntakeDialog(reminder, groupIds, currentDialog);
-                }));
-        content.addView(createCourseActionRow(
                 R.drawable.baseline_delete_24,
                 getString(R.string.delete_plan),
                 v -> {
@@ -3164,7 +3165,11 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
             Toast.makeText(getApplicationContext(), result.message, Toast.LENGTH_SHORT).show();
             if (result.success) {
                 dialog.dismiss();
-                refreshCourseDetail(groupIds, currentDialog);
+                if (groupIds == null) {
+                    loadCurrentPage();
+                } else {
+                    refreshCourseDetail(groupIds, currentDialog);
+                }
             }
         }));
         dialog.show();

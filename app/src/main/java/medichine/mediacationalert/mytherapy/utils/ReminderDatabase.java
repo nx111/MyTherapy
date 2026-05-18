@@ -1171,7 +1171,7 @@ public class ReminderDatabase extends SQLiteOpenHelper {
             String scheduledAt = ReminderSchedule.format(Calendar.getInstance());
             ContentValues values = new ContentValues();
             values.put(LOG_ACCOUNT_ID, mCurrentAccountId);
-            values.put(LOG_REMINDER_ID, -Math.abs(reminder.getID()));
+            values.put(LOG_REMINDER_ID, supplementalLogReminderId());
             values.put(LOG_TITLE, normalizeTitle(reminder.getTitle()));
             values.put(LOG_DOSE, dose);
             values.put(LOG_SCHEDULED_AT, scheduledAt);
@@ -1193,6 +1193,11 @@ public class ReminderDatabase extends SQLiteOpenHelper {
             notifyLowStockIfNeeded(reminder);
         }
         return result;
+    }
+
+    private int supplementalLogReminderId() {
+        int id = (int) (System.currentTimeMillis() & 0x7fffffff);
+        return id == 0 ? -1 : -id;
     }
 
     private void notifyLowStockIfNeeded(List<Reminder> reminders) {
