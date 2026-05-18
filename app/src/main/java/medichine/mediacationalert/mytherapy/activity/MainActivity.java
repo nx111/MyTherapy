@@ -2991,6 +2991,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
+        row.setClickable(true);
         row.setLongClickable(true);
         row.setPadding(dp(12), dp(10), dp(12), dp(10));
 
@@ -3029,6 +3030,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 : R.color.text_secondary));
         row.addView(status, new LinearLayout.LayoutParams(dp(24), dp(24)));
 
+        row.setOnClickListener(v -> showCoursePlanOptions(reminder, title, groupIds, dialogHolder[0]));
         row.setOnLongClickListener(v -> {
             showCoursePlanOptions(reminder, title, groupIds, dialogHolder[0]);
             return true;
