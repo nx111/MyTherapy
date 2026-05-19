@@ -4,6 +4,8 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 
+import medichine.mediacationalert.mytherapy.activity.MainActivity;
+
 public class BootReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
@@ -23,5 +25,11 @@ public class BootReceiver extends BroadcastReceiver {
             }
         }
         alarmReceiver.reschedulePendingConfirmations(context);
+
+        if (Intent.ACTION_BOOT_COMPLETED.equals(action)) {
+            Intent launchIntent = new Intent(context, MainActivity.class);
+            launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            context.startActivity(launchIntent);
+        }
     }
 }
