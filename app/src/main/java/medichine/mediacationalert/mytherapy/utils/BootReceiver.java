@@ -22,5 +22,6 @@ public class BootReceiver extends BroadcastReceiver {
                 alarmReceiver.scheduleReminder(context, reminder);
             }
         }
+        alarmReceiver.reschedulePendingConfirmations(context);
     }
 }

@@ -76,14 +76,21 @@ public class ReminderRingService extends Service {
 
     private Notification buildNotification(String scheduledAt) {
         ReminderDatabase rb = new ReminderDatabase(this);
-        List<Reminder> group = rb.getActiveRemindersAt(scheduledAt);
-        group = new AlarmReceiver().pendingReminders(this, rb, group, scheduledAt);
+        AlarmReceiver receiver = new AlarmReceiver();
+        boolean confirmation = AlarmReceiver.isConfirmationKey(scheduledAt);
+        String originalScheduledAt = AlarmReceiver.scheduledAtFromConfirmationKey(scheduledAt);
+        List<Reminder> group = rb.getActiveRemindersAt(originalScheduledAt);
+        group = confirmation
+                ? receiver.confirmationReminders(this, rb, group, originalScheduledAt)
+                : receiver.pendingReminders(this, rb, group, originalScheduledAt);
         if (group.isEmpty()) {
             return null;
         }
         NotificationManager notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
         AlarmReceiver.createNotificationChannel(this, notificationManager);
-        return AlarmReceiver.buildReminderNotification(this, group, scheduledAt);
+        return confirmation
+                ? AlarmReceiver.buildConfirmationReminderNotification(this, group, originalScheduledAt)
+                : AlarmReceiver.buildReminderNotification(this, group, originalScheduledAt);
     }
 
     private void playAlarmRingtone() {
