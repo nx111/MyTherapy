@@ -3,6 +3,7 @@ package medichine.mediacationalert.mytherapy.adapter;
 import android.app.Activity;
 import android.net.Uri;
 import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -166,9 +167,7 @@ public class MedListAdapter extends RecyclerView.Adapter<MedListAdapter.SimpleHo
 
                 TextView check = new TextView(activity);
                 check.setGravity(Gravity.CENTER);
-                check.setText(line.taken ? "\u2713" : "\u25CB");
-                check.setTextColor(activity.getResources().getColor(line.taken ? R.color.nav_selected : R.color.text_secondary));
-                check.setTextSize(line.taken ? 24 : 28);
+                setStatusIcon(check, line.taken);
                 check.setClickable(true);
                 check.setLongClickable(true);
                 check.setOnClickListener(v -> {
@@ -187,6 +186,27 @@ public class MedListAdapter extends RecyclerView.Adapter<MedListAdapter.SimpleHo
 
                 mMedicineContainer.addView(row, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
             }
+        }
+
+        private void setStatusIcon(TextView status, boolean taken) {
+            status.setText(taken ? "\u2713" : "");
+            status.setTextColor(activity.getResources().getColor(taken ? R.color.on_accent : R.color.text_secondary));
+            status.setTextSize(taken ? 20 : 0);
+            status.setTypeface(Typeface.DEFAULT_BOLD);
+            status.setIncludeFontPadding(false);
+            status.setBackground(statusIconBackground(taken));
+        }
+
+        private GradientDrawable statusIconBackground(boolean taken) {
+            GradientDrawable background = new GradientDrawable();
+            background.setShape(GradientDrawable.OVAL);
+            if (taken) {
+                background.setColor(activity.getResources().getColor(R.color.history_taken));
+            } else {
+                background.setColor(activity.getResources().getColor(R.color.transperent));
+                background.setStroke(dp(2), activity.getResources().getColor(R.color.outline));
+            }
+            return background;
         }
 
         private void setMedicineIcon(ImageView imageView, String iconType, String iconUri) {
