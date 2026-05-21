@@ -157,7 +157,7 @@ public class MedListAdapter extends RecyclerView.Adapter<MedListAdapter.SimpleHo
                 title.setTypeface(Typeface.DEFAULT_BOLD);
 
                 TextView detail = new TextView(activity);
-                detail.setText(line.doseText + " • " + line.stockText);
+                detail.setText(line.doseText + "     " + line.stockText);
                 detail.setTextColor(activity.getResources().getColor(R.color.text_secondary));
                 detail.setTextSize(13);
 
