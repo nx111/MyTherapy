@@ -44,11 +44,12 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
     private static final String CHANNEL_NAME = "Notification";
     static final String ACTION_TAKE_GROUP = "medichine.mediacationalert.mytherapy.ACTION_TAKE_GROUP";
     static final String ACTION_CONFIRM_GROUP = "medichine.mediacationalert.mytherapy.ACTION_CONFIRM_GROUP";
+    public static final String ACTION_IN_APP_CONFIRMATION = "medichine.mediacationalert.mytherapy.ACTION_IN_APP_CONFIRMATION";
     private static final String ACTION_SHOW_CONFIRMATION = "medichine.mediacationalert.mytherapy.ACTION_SHOW_CONFIRMATION";
     static final String ACTION_SKIP_GROUP = "medichine.mediacationalert.mytherapy.ACTION_SKIP_GROUP";
     static final String ACTION_DELAY_OPTIONS = "medichine.mediacationalert.mytherapy.ACTION_DELAY_OPTIONS";
     static final String ACTION_DELAY_MINUTES = "medichine.mediacationalert.mytherapy.ACTION_DELAY_MINUTES";
-    static final String EXTRA_SCHEDULED_AT = "scheduled_at";
+    public static final String EXTRA_SCHEDULED_AT = "scheduled_at";
     static final String EXTRA_DELAY_MINUTES = "delay_minutes";
     private static final long REMINDER_RETRY_MILLIS = 5L * 60000L;
     private static final long CONFIRM_FOLLOW_UP_MILLIS = 20L * 60000L;
@@ -162,12 +163,16 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
 
     private void confirmFollowUpFromNotification(Context context, Intent intent) {
         String scheduledAt = intent.getStringExtra(EXTRA_SCHEDULED_AT);
+        confirmFollowUp(context, scheduledAt);
+    }
+
+    public static void confirmFollowUp(Context context, String scheduledAt) {
         if (scheduledAt == null) {
             return;
         }
-
         ReminderDatabase rb = new ReminderDatabase(context);
-        List<Reminder> group = confirmationReminders(context, rb, rb.getActiveRemindersAt(scheduledAt), scheduledAt);
+        AlarmReceiver receiver = new AlarmReceiver();
+        List<Reminder> group = receiver.confirmationReminders(context, rb, rb.getActiveRemindersAt(scheduledAt), scheduledAt);
         for (Reminder reminder : group) {
             ReminderOccurrenceState.clearConfirmationPending(context, reminder.getID(), scheduledAt);
         }
@@ -256,6 +261,7 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
         this.manager.cancel(CHANNEL_ID, confirmationNotificationIdFor(scheduledAt));
         this.manager.notify(confirmationNotificationIdFor(scheduledAt), notification);
         ReminderRingService.start(context, confirmationKeyFor(scheduledAt));
+        sendInAppConfirmation(context, scheduledAt);
     }
 
     private void showDelayOptionsNotification(Context context, List<Reminder> group, String scheduledAt) {
@@ -294,6 +300,7 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
 
     static Notification buildReminderNotification(Context context, List<Reminder> group, String scheduledAt) {
         Intent mainIntent = new Intent(context, MainActivity.class);
+        mainIntent.putExtra(MainActivity.EXTRA_STOP_REMINDER_SOUND, true);
         PendingIntent mClick = PendingIntent.getActivity(context, notificationIdFor(scheduledAt), mainIntent, AppUtils.Companion.getFlag());
 
         PendingIntent takenClick = groupAction(context, scheduledAt, ACTION_TAKE_GROUP, 1);
@@ -316,6 +323,7 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
                 .setSound(null)
                 .setSilent(true)
                 .setContentIntent(mClick)
+                .setDeleteIntent(ReminderRingService.stopPendingIntent(context, scheduledAt))
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setCategory(NotificationCompat.CATEGORY_ALARM)
                 .setAutoCancel(true)
@@ -329,6 +337,7 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
     static Notification buildConfirmationReminderNotification(Context context, List<Reminder> group, String scheduledAt) {
         String confirmationKey = confirmationKeyFor(scheduledAt);
         Intent mainIntent = new Intent(context, MainActivity.class);
+        mainIntent.putExtra(MainActivity.EXTRA_STOP_REMINDER_SOUND, true);
         PendingIntent click = PendingIntent.getActivity(context, notificationIdFor(confirmationKey), mainIntent, AppUtils.Companion.getFlag());
         PendingIntent confirmClick = groupAction(context, scheduledAt, ACTION_CONFIRM_GROUP, 4);
 
@@ -344,6 +353,7 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
                 .setSound(null)
                 .setSilent(true)
                 .setContentIntent(click)
+                .setDeleteIntent(ReminderRingService.stopPendingIntent(context, confirmationKey))
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setCategory(NotificationCompat.CATEGORY_ALARM)
                 .setAutoCancel(true)
@@ -352,7 +362,7 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
                 .build();
     }
 
-    private static String buildGroupText(Context context, List<Reminder> group) {
+    public static String buildGroupText(Context context, List<Reminder> group) {
         StringBuilder builder = new StringBuilder();
         for (Reminder reminder : group) {
             if (builder.length() > 0) {
@@ -461,6 +471,14 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
         return pending;
     }
 
+    public static List<Reminder> getDueConfirmationReminders(Context context, ReminderDatabase rb, String scheduledAt) {
+        if (rb == null || scheduledAt == null || scheduledAt.length() == 0) {
+            return new ArrayList<>();
+        }
+        AlarmReceiver receiver = new AlarmReceiver();
+        return receiver.confirmationReminders(context, rb, rb.getActiveRemindersAt(scheduledAt), scheduledAt);
+    }
+
     public static void scheduleFollowUpConfirmation(Context context, List<Integer> reminderIds, String scheduledAt) {
         if (reminderIds == null || reminderIds.isEmpty() || scheduledAt == null || scheduledAt.length() == 0) {
             return;
@@ -538,6 +556,13 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
             notificationManager.cancel(CHANNEL_ID, confirmationNotificationIdFor(scheduledAt));
             notificationManager.cancel(confirmationNotificationIdFor(scheduledAt));
         }
+    }
+
+    private static void sendInAppConfirmation(Context context, String scheduledAt) {
+        Intent intent = new Intent(ACTION_IN_APP_CONFIRMATION);
+        intent.setPackage(context.getPackageName());
+        intent.putExtra(EXTRA_SCHEDULED_AT, scheduledAt);
+        context.sendBroadcast(intent);
     }
 
     private void scheduleGroupNextAfter(Context context, List<Reminder> group, long afterMillis) {

@@ -9,8 +9,10 @@ import android.app.DatePickerDialog;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.ProgressDialog;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Paint;
@@ -104,11 +106,13 @@ import medichine.mediacationalert.mytherapy.utils.MyTherapyArchiveImporter;
 import medichine.mediacationalert.mytherapy.utils.Prefs;
 import medichine.mediacationalert.mytherapy.utils.Reminder;
 import medichine.mediacationalert.mytherapy.utils.ReminderDatabase;
+import medichine.mediacationalert.mytherapy.utils.ReminderRingService;
 import medichine.mediacationalert.mytherapy.utils.ReminderSchedule;
 import medichine.mediacationalert.mytherapy.utils.StockAlertNotifier;
 import medichine.mediacationalert.mytherapy.view.LabTrendChartView;
 
 public class MainActivity extends AppCompatActivity implements ItemClickListener {
+    public static final String EXTRA_STOP_REMINDER_SOUND = "stop_reminder_sound";
     private static final int REQUEST_POST_NOTIFICATIONS = 1001;
     private static final String PREF_NOTIFICATION_PERMISSION_REQUESTED = "notification_permission_requested";
     private static final String PREF_NOTIFICATION_SETTINGS_HANDLED = "notification_settings_handled";
@@ -152,6 +156,10 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     private final LinkedHashMap<Integer, List<Reminder>> courseReminderMap = new LinkedHashMap<>();
     private ReminderDatabase rb;
     private AlarmReceiver mAlarmReceiver;
+    private BroadcastReceiver mInAppConfirmationReceiver;
+    private AlertDialog mFollowUpConfirmationDialog;
+    private String mFollowUpConfirmationDialogScheduledAt;
+    private String mDismissedFollowUpConfirmationScheduledAt;
     private ItemTouchHelper mLabItemTouchHelper;
     private CourseIconEditState mCourseIconEditState;
     private boolean mExportFullBackup;
@@ -184,6 +192,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         super.onCreate(savedInstanceState);
 
         setContentView(R.layout.activity_main);
+        stopReminderSoundIfRequested(getIntent());
 
         ActionBar actionBar = getSupportActionBar();
         if (actionBar != null) {
@@ -261,6 +270,19 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         mAlarmReceiver = new AlarmReceiver();
         updateCalendarHeader();
         showRestoredPage();
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        stopReminderSoundIfRequested(intent);
+    }
+
+    private void stopReminderSoundIfRequested(Intent intent) {
+        if (intent != null && intent.getBooleanExtra(EXTRA_STOP_REMINDER_SOUND, false)) {
+            ReminderRingService.stop(getApplicationContext());
+        }
     }
 
     @Override
@@ -1544,11 +1566,98 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     @Override
     public void onResume() {
         super.onResume();
+        registerInAppConfirmationReceiver();
         if (rb != null) {
             rescheduleCurrentAccountReminders();
         }
         loadCurrentPage();
         checkReminderSystemSettings();
+    }
+
+    @Override
+    protected void onPause() {
+        unregisterInAppConfirmationReceiver();
+        dismissFollowUpConfirmationDialog();
+        super.onPause();
+    }
+
+    private void registerInAppConfirmationReceiver() {
+        if (mInAppConfirmationReceiver != null) {
+            return;
+        }
+        mInAppConfirmationReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                if (AlarmReceiver.ACTION_IN_APP_CONFIRMATION.equals(intent.getAction())) {
+                    showInAppFollowUpConfirmation(intent.getStringExtra(AlarmReceiver.EXTRA_SCHEDULED_AT));
+                }
+            }
+        };
+        IntentFilter filter = new IntentFilter(AlarmReceiver.ACTION_IN_APP_CONFIRMATION);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            registerReceiver(mInAppConfirmationReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            registerReceiver(mInAppConfirmationReceiver, filter);
+        }
+    }
+
+    private void unregisterInAppConfirmationReceiver() {
+        if (mInAppConfirmationReceiver == null) {
+            return;
+        }
+        unregisterReceiver(mInAppConfirmationReceiver);
+        mInAppConfirmationReceiver = null;
+    }
+
+    private void showInAppFollowUpConfirmation(String scheduledAt) {
+        if (scheduledAt == null || scheduledAt.length() == 0 || rb == null || isFinishing()
+                || scheduledAt.equals(mDismissedFollowUpConfirmationScheduledAt)) {
+            return;
+        }
+
+        List<Reminder> group = AlarmReceiver.getDueConfirmationReminders(getApplicationContext(), rb, scheduledAt);
+        if (group.isEmpty()) {
+            return;
+        }
+
+        if (mFollowUpConfirmationDialog != null && mFollowUpConfirmationDialog.isShowing()) {
+            if (scheduledAt.equals(mFollowUpConfirmationDialogScheduledAt)) {
+                return;
+            }
+            mFollowUpConfirmationDialog.dismiss();
+        }
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(R.string.confirm_medication_title)
+                .setMessage(AlarmReceiver.buildGroupText(this, group))
+                .setPositiveButton(R.string.notification_confirm, (d, which) -> {
+                    mDismissedFollowUpConfirmationScheduledAt = null;
+                    AlarmReceiver.confirmFollowUp(getApplicationContext(), scheduledAt);
+                })
+                .setNegativeButton(R.string.cancel, (d, which) -> mDismissedFollowUpConfirmationScheduledAt = scheduledAt)
+                .create();
+        dialog.setOnCancelListener(d -> mDismissedFollowUpConfirmationScheduledAt = scheduledAt);
+        dialog.setOnDismissListener(d -> {
+            if (mFollowUpConfirmationDialog == dialog) {
+                mFollowUpConfirmationDialog = null;
+                mFollowUpConfirmationDialogScheduledAt = null;
+            }
+        });
+        mFollowUpConfirmationDialog = dialog;
+        mFollowUpConfirmationDialogScheduledAt = scheduledAt;
+        dialog.show();
+        Window window = dialog.getWindow();
+        if (window != null) {
+            window.setBackgroundDrawableResource(R.drawable.dialog_panel_bg);
+        }
+    }
+
+    private void dismissFollowUpConfirmationDialog() {
+        if (mFollowUpConfirmationDialog != null) {
+            mFollowUpConfirmationDialog.dismiss();
+            mFollowUpConfirmationDialog = null;
+            mFollowUpConfirmationDialogScheduledAt = null;
+        }
     }
 
     private void loadCurrentPage() {

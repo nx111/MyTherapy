@@ -2,10 +2,12 @@ package medichine.mediacationalert.mytherapy.utils;
 
 import android.app.Notification;
 import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.media.AudioAttributes;
+import android.media.AudioManager;
 import android.media.Ringtone;
 import android.media.RingtoneManager;
 import android.net.Uri;
@@ -44,6 +46,13 @@ public class ReminderRingService extends Service {
             context.stopService(new Intent(context, ReminderRingService.class));
         } catch (IllegalStateException ignored) {
         }
+    }
+
+    static PendingIntent stopPendingIntent(Context context, String scheduledAt) {
+        Intent intent = new Intent(context, ReminderRingService.class);
+        intent.setAction(ACTION_STOP);
+        int requestCode = Math.abs((ACTION_STOP + "|" + scheduledAt).hashCode());
+        return PendingIntent.getService(context, requestCode, intent, AppUtils.Companion.getFlag());
     }
 
     @Override
@@ -95,6 +104,10 @@ public class ReminderRingService extends Service {
 
     private void playAlarmRingtone() {
         stopRingtone();
+        AudioManager audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
+        if (audioManager != null && audioManager.getRingerMode() != AudioManager.RINGER_MODE_NORMAL) {
+            return;
+        }
         Uri soundUri = AlarmReceiver.getReminderSoundUri(this);
         if (soundUri == null) {
             return;
