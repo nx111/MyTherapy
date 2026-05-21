@@ -6,6 +6,7 @@ import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.media.AudioAttributes;
 import android.media.AudioManager;
 import android.media.Ringtone;
@@ -22,6 +23,8 @@ public class ReminderRingService extends Service {
     private static final String ACTION_START = "medichine.mediacationalert.mytherapy.ACTION_START_RING";
     private static final String ACTION_STOP = "medichine.mediacationalert.mytherapy.ACTION_STOP_RING";
     private static final String EXTRA_SCHEDULED_AT = "scheduled_at";
+    private static final String PREFS_NAME = "reminder_ring_state";
+    private static final String KEY_QUIET_UNTIL = "quiet_until:";
     private static final long MAX_RING_MILLIS = 30000L;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -46,6 +49,15 @@ public class ReminderRingService extends Service {
             context.stopService(new Intent(context, ReminderRingService.class));
         } catch (IllegalStateException ignored) {
         }
+    }
+
+    public static void silence(Context context, String scheduledAt, long durationMillis) {
+        if (scheduledAt == null || scheduledAt.length() == 0 || durationMillis <= 0L) {
+            return;
+        }
+        prefs(context).edit()
+                .putLong(key(KEY_QUIET_UNTIL, scheduledAt), System.currentTimeMillis() + durationMillis)
+                .apply();
     }
 
     static PendingIntent stopPendingIntent(Context context, String scheduledAt) {
@@ -77,6 +89,11 @@ public class ReminderRingService extends Service {
             return START_NOT_STICKY;
         }
         startForeground(AlarmReceiver.notificationIdFor(scheduledAt), notification);
+        if (isQuiet(scheduledAt)) {
+            stopRingtone();
+            stopSelf();
+            return START_NOT_STICKY;
+        }
         playAlarmRingtone();
         handler.removeCallbacksAndMessages(null);
         handler.postDelayed(this::stopSelf, MAX_RING_MILLIS);
@@ -134,6 +151,25 @@ public class ReminderRingService extends Service {
             ringtone.stop();
         }
         ringtone = null;
+    }
+
+    private boolean isQuiet(String scheduledAt) {
+        long quietUntil = prefs(this).getLong(key(KEY_QUIET_UNTIL, scheduledAt), 0L);
+        if (quietUntil <= System.currentTimeMillis()) {
+            if (quietUntil > 0L) {
+                prefs(this).edit().remove(key(KEY_QUIET_UNTIL, scheduledAt)).apply();
+            }
+            return false;
+        }
+        return true;
+    }
+
+    private static SharedPreferences prefs(Context context) {
+        return context.getApplicationContext().getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
+    }
+
+    private static String key(String prefix, String scheduledAt) {
+        return prefix + scheduledAt;
     }
 
     @Override

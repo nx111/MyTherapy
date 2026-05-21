@@ -113,6 +113,8 @@ import medichine.mediacationalert.mytherapy.view.LabTrendChartView;
 
 public class MainActivity extends AppCompatActivity implements ItemClickListener {
     public static final String EXTRA_STOP_REMINDER_SOUND = "stop_reminder_sound";
+    public static final String EXTRA_REMINDER_SOUND_KEY = "reminder_sound_key";
+    private static final long REMINDER_OPEN_QUIET_MILLIS = 5L * 60000L;
     private static final int REQUEST_POST_NOTIFICATIONS = 1001;
     private static final String PREF_NOTIFICATION_PERMISSION_REQUESTED = "notification_permission_requested";
     private static final String PREF_NOTIFICATION_SETTINGS_HANDLED = "notification_settings_handled";
@@ -281,6 +283,10 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
 
     private void stopReminderSoundIfRequested(Intent intent) {
         if (intent != null && intent.getBooleanExtra(EXTRA_STOP_REMINDER_SOUND, false)) {
+            ReminderRingService.silence(
+                    getApplicationContext(),
+                    intent.getStringExtra(EXTRA_REMINDER_SOUND_KEY),
+                    REMINDER_OPEN_QUIET_MILLIS);
             ReminderRingService.stop(getApplicationContext());
         }
     }

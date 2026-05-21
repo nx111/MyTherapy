@@ -301,6 +301,7 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
     static Notification buildReminderNotification(Context context, List<Reminder> group, String scheduledAt) {
         Intent mainIntent = new Intent(context, MainActivity.class);
         mainIntent.putExtra(MainActivity.EXTRA_STOP_REMINDER_SOUND, true);
+        mainIntent.putExtra(MainActivity.EXTRA_REMINDER_SOUND_KEY, scheduledAt);
         PendingIntent mClick = PendingIntent.getActivity(context, notificationIdFor(scheduledAt), mainIntent, AppUtils.Companion.getFlag());
 
         PendingIntent takenClick = groupAction(context, scheduledAt, ACTION_TAKE_GROUP, 1);
@@ -338,6 +339,7 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
         String confirmationKey = confirmationKeyFor(scheduledAt);
         Intent mainIntent = new Intent(context, MainActivity.class);
         mainIntent.putExtra(MainActivity.EXTRA_STOP_REMINDER_SOUND, true);
+        mainIntent.putExtra(MainActivity.EXTRA_REMINDER_SOUND_KEY, confirmationKey);
         PendingIntent click = PendingIntent.getActivity(context, notificationIdFor(confirmationKey), mainIntent, AppUtils.Companion.getFlag());
         PendingIntent confirmClick = groupAction(context, scheduledAt, ACTION_CONFIRM_GROUP, 4);
 
