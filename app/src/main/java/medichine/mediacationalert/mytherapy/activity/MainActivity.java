@@ -15,6 +15,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
+import android.graphics.Canvas;
 import android.graphics.Paint;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
@@ -2903,7 +2904,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 ? getResources().getColor(R.color.lab_high_value)
                 : selected ? getResources().getColor(R.color.nav_selected) : getResources().getColor(R.color.text_secondary));
 
-        TextView date = new TextView(this);
+        TextView date = selected && isToday ? new StrokedTextView(this) : new TextView(this);
         date.setGravity(Gravity.CENTER);
         date.setText(String.valueOf(day.get(Calendar.DAY_OF_MONTH)));
         date.setTextSize(13);
@@ -2911,10 +2912,13 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         date.setTextColor(isToday
                 ? getResources().getColor(R.color.lab_high_value)
                 : selected ? getResources().getColor(R.color.on_accent) : getResources().getColor(R.color.text_primary));
+        if (date instanceof StrokedTextView) {
+            ((StrokedTextView) date).setStroke(getResources().getColor(R.color.on_accent), dp(1));
+        }
         LinearLayout.LayoutParams dateParams = new LinearLayout.LayoutParams(dp(42), dp(36));
         dateParams.topMargin = dp(4);
         date.setLayoutParams(dateParams);
-        if (selected && !isToday) {
+        if (selected) {
             GradientDrawable selectedBg = new GradientDrawable();
             selectedBg.setShape(GradientDrawable.RECTANGLE);
             selectedBg.setCornerRadius(dp(8));
@@ -4103,6 +4107,39 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
 
     private int dp(int value) {
         return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
+    }
+
+    private static class StrokedTextView extends TextView {
+        private int strokeColor;
+        private float strokeWidth;
+
+        StrokedTextView(Context context) {
+            super(context);
+        }
+
+        void setStroke(int color, float width) {
+            strokeColor = color;
+            strokeWidth = width;
+        }
+
+        @Override
+        protected void onDraw(Canvas canvas) {
+            int fillColor = getCurrentTextColor();
+            Paint.Style oldStyle = getPaint().getStyle();
+            float oldStrokeWidth = getPaint().getStrokeWidth();
+
+            getPaint().setStyle(Paint.Style.STROKE);
+            getPaint().setStrokeWidth(strokeWidth);
+            setTextColor(strokeColor);
+            super.onDraw(canvas);
+
+            getPaint().setStyle(Paint.Style.FILL);
+            setTextColor(fillColor);
+            super.onDraw(canvas);
+
+            getPaint().setStyle(oldStyle);
+            getPaint().setStrokeWidth(oldStrokeWidth);
+        }
     }
 
     private static class ScheduledReminder {
