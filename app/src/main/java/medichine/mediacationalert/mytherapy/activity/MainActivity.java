@@ -250,6 +250,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 mCurrentPage = PAGE_REPORT;
             } else {
                 mCurrentPage = PAGE_TODAY;
+                resetSelectedDateToToday();
             }
             loadCurrentPage();
             return true;
@@ -257,6 +258,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         mBottomNavigation.setOnItemReselectedListener(item -> {
             if (item.getItemId() == R.id.nav_today && mCurrentPage == PAGE_HISTORY) {
                 mCurrentPage = PAGE_TODAY;
+                resetSelectedDateToToday();
                 loadCurrentPage();
             }
         });
@@ -325,6 +327,14 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
             return R.id.nav_today;
         }
         return 0;
+    }
+
+    private void resetSelectedDateToToday() {
+        Calendar today = Calendar.getInstance();
+        normalizeDate(today);
+        if (mSelectedDate == null || !sameDate(mSelectedDate, today)) {
+            mSelectedDate = today;
+        }
     }
 
     private void setupLabItemDragSorting() {
@@ -2874,6 +2884,10 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     }
 
     private View createCalendarDayView(Calendar day, boolean selected) {
+        Calendar today = Calendar.getInstance();
+        normalizeDate(today);
+        boolean isToday = sameDate(day, today);
+
         LinearLayout item = new LinearLayout(this);
         item.setOrientation(LinearLayout.VERTICAL);
         item.setGravity(Gravity.CENTER);
@@ -2885,18 +2899,22 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         week.setGravity(Gravity.CENTER);
         week.setText(new SimpleDateFormat("EEE", Locale.getDefault()).format(day.getTime()));
         week.setTextSize(13);
-        week.setTextColor(selected ? getResources().getColor(R.color.nav_selected) : getResources().getColor(R.color.text_secondary));
+        week.setTextColor(isToday
+                ? getResources().getColor(R.color.lab_high_value)
+                : selected ? getResources().getColor(R.color.nav_selected) : getResources().getColor(R.color.text_secondary));
 
         TextView date = new TextView(this);
         date.setGravity(Gravity.CENTER);
         date.setText(String.valueOf(day.get(Calendar.DAY_OF_MONTH)));
         date.setTextSize(13);
         date.setTypeface(Typeface.DEFAULT_BOLD);
-        date.setTextColor(selected ? getResources().getColor(R.color.on_accent) : getResources().getColor(R.color.text_primary));
+        date.setTextColor(isToday
+                ? getResources().getColor(R.color.lab_high_value)
+                : selected ? getResources().getColor(R.color.on_accent) : getResources().getColor(R.color.text_primary));
         LinearLayout.LayoutParams dateParams = new LinearLayout.LayoutParams(dp(42), dp(36));
         dateParams.topMargin = dp(4);
         date.setLayoutParams(dateParams);
-        if (selected) {
+        if (selected && !isToday) {
             GradientDrawable selectedBg = new GradientDrawable();
             selectedBg.setShape(GradientDrawable.RECTANGLE);
             selectedBg.setCornerRadius(dp(8));
