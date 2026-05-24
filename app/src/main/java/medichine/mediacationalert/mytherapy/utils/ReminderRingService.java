@@ -176,7 +176,11 @@ public class ReminderRingService extends Service {
     public void onDestroy() {
         handler.removeCallbacksAndMessages(null);
         stopRingtone();
-        stopForeground(false);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            stopForeground(STOP_FOREGROUND_DETACH);
+        } else {
+            stopForeground(false);
+        }
         super.onDestroy();
     }
 
