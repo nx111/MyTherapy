@@ -24,6 +24,7 @@ public class BootReceiver extends BroadcastReceiver {
                 alarmReceiver.scheduleReminderAfter(context, reminder, System.currentTimeMillis());
             }
         }
+        alarmReceiver.showDueReminderIfNeeded(context);
         alarmReceiver.reschedulePendingConfirmations(context);
 
         if (Intent.ACTION_BOOT_COMPLETED.equals(action)) {

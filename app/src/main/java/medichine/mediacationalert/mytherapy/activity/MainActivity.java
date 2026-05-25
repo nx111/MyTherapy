@@ -951,6 +951,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 alarmReceiver.scheduleReminderAfter(getApplicationContext(), reminder, System.currentTimeMillis());
             }
         }
+        alarmReceiver.showDueReminderIfNeeded(getApplicationContext());
     }
 
     private void openArchiveImport() {

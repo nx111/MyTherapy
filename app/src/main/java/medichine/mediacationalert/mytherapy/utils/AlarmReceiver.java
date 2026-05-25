@@ -770,6 +770,21 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
         }
     }
 
+    public void showDueReminderIfNeeded(Context context) {
+        ReminderDatabase rb = new ReminderDatabase(context);
+        String scheduledAt = nextDueReminderScheduledAt(context, rb);
+        if (scheduledAt == null) {
+            return;
+        }
+
+        List<Reminder> group = pendingReminders(context, rb, rb.getActiveRemindersAt(scheduledAt), scheduledAt);
+        if (group.isEmpty()) {
+            return;
+        }
+        showReminderNotification(context, group.get(0), group, scheduledAt);
+        scheduleReminderAt(context, group.get(0), scheduledAt, System.currentTimeMillis() + REMINDER_RETRY_MILLIS);
+    }
+
     public boolean scheduleReminderAfter(Context context, Reminder reminder, long afterMillis) {
         return scheduleReminderAfter(context, reminder, afterMillis, false);
     }
@@ -817,6 +832,31 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
             }
         }
         return next;
+    }
+
+    private String nextDueReminderScheduledAt(Context context, ReminderDatabase rb) {
+        long now = System.currentTimeMillis();
+        long startMillis = startOfDayMillis(now);
+        String nextScheduledAt = null;
+        long nextMillis = Long.MAX_VALUE;
+
+        for (Reminder reminder : rb.getAllReminders()) {
+            if (!"true".equals(reminder.getActive())) {
+                continue;
+            }
+            for (Calendar occurrence : ReminderSchedule.occurrencesBetween(reminder, startMillis, now)) {
+                String scheduledAt = ReminderSchedule.format(occurrence);
+                if (!ReminderOccurrenceState.isPendingNow(context, rb, reminder, scheduledAt)) {
+                    continue;
+                }
+                long scheduledMillis = occurrence.getTimeInMillis();
+                if (scheduledMillis < nextMillis) {
+                    nextMillis = scheduledMillis;
+                    nextScheduledAt = scheduledAt;
+                }
+            }
+        }
+        return nextScheduledAt;
     }
 
     private long startOfDayMillis(long timeMillis) {
