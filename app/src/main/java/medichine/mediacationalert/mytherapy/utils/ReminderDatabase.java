@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
@@ -671,6 +672,24 @@ public class ReminderDatabase extends SQLiteOpenHelper {
         boolean exists = cursor.moveToFirst();
         cursor.close();
         return exists;
+    }
+
+    public long getReminderTakenAtMillis(int reminderId, String scheduledAt) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = db.query(TABLE_INTAKE_LOGS, new String[]{LOG_TAKEN_AT},
+                LOG_REMINDER_ID + "=? AND " + LOG_SCHEDULED_AT + "=? AND " + LOG_ACCOUNT_ID + "=?",
+                new String[]{String.valueOf(reminderId), scheduledAt, accountIdText()}, null, null, null, "1");
+        if (!cursor.moveToFirst()) {
+            cursor.close();
+            return 0L;
+        }
+        String takenAt = cursor.getString(cursor.getColumnIndexOrThrow(LOG_TAKEN_AT));
+        cursor.close();
+        try {
+            return new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).parse(takenAt).getTime();
+        } catch (ParseException e) {
+            return 0L;
+        }
     }
 
     public boolean insertIntakeLog(int reminderId, String title, double dose, String scheduledAt, String takenAt) {

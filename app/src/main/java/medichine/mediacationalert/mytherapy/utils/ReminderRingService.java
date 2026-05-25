@@ -23,6 +23,7 @@ public class ReminderRingService extends Service {
     private static final String ACTION_START = "medichine.mediacationalert.mytherapy.ACTION_START_RING";
     private static final String ACTION_STOP = "medichine.mediacationalert.mytherapy.ACTION_STOP_RING";
     private static final String EXTRA_SCHEDULED_AT = "scheduled_at";
+    private static final String EXTRA_CONFIRMATION_REMINDER_IDS = "confirmation_reminder_ids";
     private static final String PREFS_NAME = "reminder_ring_state";
     private static final String KEY_QUIET_UNTIL = "quiet_until:";
     private static final long MAX_RING_MILLIS = 30000L;
@@ -34,6 +35,21 @@ public class ReminderRingService extends Service {
         Intent intent = new Intent(context, ReminderRingService.class);
         intent.setAction(ACTION_START);
         intent.putExtra(EXTRA_SCHEDULED_AT, scheduledAt);
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(intent);
+            } else {
+                context.startService(intent);
+            }
+        } catch (IllegalStateException ignored) {
+        }
+    }
+
+    public static void start(Context context, String scheduledAt, List<Reminder> reminders) {
+        Intent intent = new Intent(context, ReminderRingService.class);
+        intent.setAction(ACTION_START);
+        intent.putExtra(EXTRA_SCHEDULED_AT, scheduledAt);
+        intent.putExtra(EXTRA_CONFIRMATION_REMINDER_IDS, reminderIds(reminders));
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 context.startForegroundService(intent);
@@ -83,7 +99,7 @@ public class ReminderRingService extends Service {
             return START_NOT_STICKY;
         }
 
-        Notification notification = buildNotification(scheduledAt);
+        Notification notification = buildNotification(intent);
         if (notification == null) {
             stopSelf();
             return START_NOT_STICKY;
@@ -100,12 +116,19 @@ public class ReminderRingService extends Service {
         return START_NOT_STICKY;
     }
 
-    private Notification buildNotification(String scheduledAt) {
+    private Notification buildNotification(Intent intent) {
+        String scheduledAt = intent.getStringExtra(EXTRA_SCHEDULED_AT);
         ReminderDatabase rb = new ReminderDatabase(this);
         AlarmReceiver receiver = new AlarmReceiver();
         boolean confirmation = AlarmReceiver.isConfirmationKey(scheduledAt);
         String originalScheduledAt = AlarmReceiver.scheduledAtFromConfirmationKey(scheduledAt);
-        List<Reminder> group = rb.getActiveRemindersAt(originalScheduledAt);
+        int[] confirmationIds = intent.getIntArrayExtra(EXTRA_CONFIRMATION_REMINDER_IDS);
+        if (confirmation && (confirmationIds == null || confirmationIds.length == 0)) {
+            return null;
+        }
+        List<Reminder> group = confirmation
+                ? remindersForIds(rb, confirmationIds)
+                : rb.getActiveRemindersAt(originalScheduledAt);
         group = confirmation
                 ? receiver.confirmationReminders(this, rb, group, originalScheduledAt)
                 : receiver.pendingReminders(this, rb, group, originalScheduledAt);
@@ -117,6 +140,31 @@ public class ReminderRingService extends Service {
         return confirmation
                 ? AlarmReceiver.buildConfirmationReminderNotification(this, group, originalScheduledAt)
                 : AlarmReceiver.buildReminderNotification(this, group, originalScheduledAt);
+    }
+
+    private List<Reminder> remindersForIds(ReminderDatabase rb, int[] ids) {
+        java.util.ArrayList<Reminder> reminders = new java.util.ArrayList<>();
+        if (ids == null) {
+            return reminders;
+        }
+        for (int id : ids) {
+            Reminder reminder = rb.getReminder(id);
+            if (reminder != null) {
+                reminders.add(reminder);
+            }
+        }
+        return reminders;
+    }
+
+    private static int[] reminderIds(List<Reminder> reminders) {
+        if (reminders == null || reminders.isEmpty()) {
+            return new int[0];
+        }
+        int[] ids = new int[reminders.size()];
+        for (int i = 0; i < reminders.size(); i++) {
+            ids[i] = reminders.get(i).getID();
+        }
+        return ids;
     }
 
     private void playAlarmRingtone() {

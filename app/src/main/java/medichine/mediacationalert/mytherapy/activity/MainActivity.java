@@ -948,7 +948,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         }
         for (Reminder reminder : rb.getAllReminders()) {
             if ("true".equals(reminder.getActive())) {
-                alarmReceiver.scheduleReminder(getApplicationContext(), reminder);
+                alarmReceiver.scheduleReminderAfter(getApplicationContext(), reminder, System.currentTimeMillis());
             }
         }
     }

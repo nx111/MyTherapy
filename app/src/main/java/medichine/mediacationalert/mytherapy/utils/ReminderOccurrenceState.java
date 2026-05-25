@@ -110,7 +110,7 @@ final class ReminderOccurrenceState {
                 .apply();
     }
 
-    private static long getConfirmationDueAt(Context context, int reminderId, String scheduledAt) {
+    static long getConfirmationDueAt(Context context, int reminderId, String scheduledAt) {
         return prefs(context).getLong(key(KEY_CONFIRM_DUE_AT, reminderId, scheduledAt), 0L);
     }
 

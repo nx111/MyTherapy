@@ -21,7 +21,7 @@ public class BootReceiver extends BroadcastReceiver {
         AlarmReceiver alarmReceiver = new AlarmReceiver();
         for (Reminder reminder : rb.getAllReminders()) {
             if ("true".equals(reminder.getActive())) {
-                alarmReceiver.scheduleReminder(context, reminder);
+                alarmReceiver.scheduleReminderAfter(context, reminder, System.currentTimeMillis());
             }
         }
         alarmReceiver.reschedulePendingConfirmations(context);

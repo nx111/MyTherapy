@@ -188,6 +188,24 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
         }
 
         ReminderDatabase rb = new ReminderDatabase(context);
+        int reminderId = intent.getIntExtra(ReminderEditActivity.EXTRA_REMINDER_ID, -1);
+        if (reminderId <= 0) {
+            cancelConfirmationNotification(context, scheduledAt);
+            return;
+        }
+        long dueAtMillis = confirmationDueAtMillis(rb, reminderId, scheduledAt);
+        if (dueAtMillis <= 0L) {
+            ReminderOccurrenceState.clearConfirmationPending(context, reminderId, scheduledAt);
+            cancelConfirmationNotification(context, scheduledAt);
+            return;
+        }
+        if (dueAtMillis > System.currentTimeMillis()) {
+            ReminderOccurrenceState.markConfirmationPending(context, reminderId, scheduledAt, dueAtMillis);
+            setConfirmationAlarm(context, reminderId, scheduledAt, dueAtMillis);
+            cancelConfirmationNotification(context, scheduledAt);
+            return;
+        }
+
         List<Reminder> group = confirmationReminders(context, rb, rb.getActiveRemindersAt(scheduledAt), scheduledAt);
         if (group.isEmpty()) {
             cancelConfirmationNotification(context, scheduledAt);
@@ -262,7 +280,7 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
 
         this.manager.cancel(CHANNEL_ID, confirmationNotificationIdFor(scheduledAt));
         this.manager.notify(confirmationNotificationIdFor(scheduledAt), notification);
-        ReminderRingService.start(context, confirmationKeyFor(scheduledAt));
+        ReminderRingService.start(context, confirmationKeyFor(scheduledAt), group);
         sendInAppConfirmation(context, scheduledAt);
     }
 
@@ -467,8 +485,16 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
 
     List<Reminder> confirmationReminders(Context context, ReminderDatabase rb, List<Reminder> group, String scheduledAt) {
         ArrayList<Reminder> pending = new ArrayList<>();
+        long now = System.currentTimeMillis();
         for (Reminder reminder : group) {
-            if (ReminderOccurrenceState.isConfirmationDueNow(context, rb, reminder, scheduledAt)) {
+            long dueAtMillis = confirmationDueAtMillis(rb, reminder.getID(), scheduledAt);
+            if (dueAtMillis > 0L
+                    && dueAtMillis <= now
+                    && rb.isReminderTaken(reminder.getID(), scheduledAt)) {
+                long storedDueAt = ReminderOccurrenceState.getConfirmationDueAt(context, reminder.getID(), scheduledAt);
+                if (storedDueAt != dueAtMillis) {
+                    ReminderOccurrenceState.markConfirmationPending(context, reminder.getID(), scheduledAt, dueAtMillis);
+                }
                 pending.add(reminder);
             }
         }
@@ -490,13 +516,16 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
 
         ReminderDatabase rb = new ReminderDatabase(context);
         AlarmReceiver receiver = new AlarmReceiver();
-        long dueAtMillis = confirmationDueAtMillis(scheduledAt);
         for (Integer reminderId : reminderIds) {
             if (reminderId == null || !rb.isReminderTaken(reminderId, scheduledAt)) {
                 continue;
             }
             Reminder reminder = rb.getReminder(reminderId);
             if (reminder == null || !"true".equals(reminder.getActive())) {
+                continue;
+            }
+            long dueAtMillis = confirmationDueAtMillis(rb, reminderId, scheduledAt);
+            if (dueAtMillis <= 0L) {
                 continue;
             }
             ReminderOccurrenceState.markConfirmationPending(context, reminderId, scheduledAt, dueAtMillis);
@@ -535,7 +564,15 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
                 ReminderOccurrenceState.clearConfirmationPending(context, state.reminderId, state.scheduledAt);
                 continue;
             }
-            if (state.dueAt <= now && !scheduledAts.contains(state.scheduledAt)) {
+            long dueAtMillis = confirmationDueAtMillis(rb, state.reminderId, state.scheduledAt);
+            if (dueAtMillis <= 0L) {
+                ReminderOccurrenceState.clearConfirmationPending(context, state.reminderId, state.scheduledAt);
+                continue;
+            }
+            if (dueAtMillis != state.dueAt) {
+                ReminderOccurrenceState.markConfirmationPending(context, state.reminderId, state.scheduledAt, dueAtMillis);
+            }
+            if (dueAtMillis <= now && !scheduledAts.contains(state.scheduledAt)) {
                 scheduledAts.add(state.scheduledAt);
             }
         }
@@ -612,10 +649,13 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
         return ReminderSchedule.parseScheduledAt(scheduledAt).getTimeInMillis() + 60000L;
     }
 
-    private static long confirmationDueAtMillis(String scheduledAt) {
-        long now = System.currentTimeMillis();
+    private static long confirmationDueAtMillis(ReminderDatabase rb, int reminderId, String scheduledAt) {
         long scheduledMillis = ReminderSchedule.parseScheduledAt(scheduledAt).getTimeInMillis();
-        return now < scheduledMillis ? scheduledMillis : now + CONFIRM_FOLLOW_UP_MILLIS;
+        long takenAtMillis = rb.getReminderTakenAtMillis(reminderId, scheduledAt);
+        if (takenAtMillis <= 0L) {
+            return 0L;
+        }
+        return takenAtMillis < scheduledMillis ? scheduledMillis : takenAtMillis + CONFIRM_FOLLOW_UP_MILLIS;
     }
 
     private void setSnoozeAlarm(Context context, Reminder reminder, String scheduledAt, long snoozedUntil) {
@@ -640,6 +680,7 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
 
         Intent intent = new Intent(context, AlarmReceiver.class);
         intent.setAction(ACTION_SHOW_CONFIRMATION);
+        intent.putExtra(ReminderEditActivity.EXTRA_REMINDER_ID, reminderId);
         intent.putExtra(EXTRA_SCHEDULED_AT, scheduledAt);
         PendingIntent pendingIntent = PendingIntent.getBroadcast(
                 context,
@@ -717,7 +758,15 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
                 ReminderOccurrenceState.clearConfirmationPending(context, state.reminderId, state.scheduledAt);
                 continue;
             }
-            setConfirmationAlarm(context, state.reminderId, state.scheduledAt, Math.max(state.dueAt, now + 1000L));
+            long dueAtMillis = confirmationDueAtMillis(rb, state.reminderId, state.scheduledAt);
+            if (dueAtMillis <= 0L) {
+                ReminderOccurrenceState.clearConfirmationPending(context, state.reminderId, state.scheduledAt);
+                continue;
+            }
+            if (dueAtMillis != state.dueAt) {
+                ReminderOccurrenceState.markConfirmationPending(context, state.reminderId, state.scheduledAt, dueAtMillis);
+            }
+            setConfirmationAlarm(context, state.reminderId, state.scheduledAt, Math.max(dueAtMillis, now + 1000L));
         }
     }
 
