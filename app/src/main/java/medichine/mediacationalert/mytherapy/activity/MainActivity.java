@@ -1584,10 +1584,14 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     public void onResume() {
         super.onResume();
         registerInAppConfirmationReceiver();
+        mDismissedFollowUpConfirmationScheduledAt = null;
         if (rb != null) {
             rescheduleCurrentAccountReminders();
+            AlarmReceiver alarmReceiver = mAlarmReceiver == null ? new AlarmReceiver() : mAlarmReceiver;
+            alarmReceiver.reschedulePendingConfirmations(getApplicationContext());
         }
         loadCurrentPage();
+        showNextDueFollowUpConfirmation();
         checkReminderSystemSettings();
     }
 
@@ -1650,6 +1654,8 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 .setPositiveButton(R.string.notification_confirm, (d, which) -> {
                     mDismissedFollowUpConfirmationScheduledAt = null;
                     AlarmReceiver.confirmFollowUp(getApplicationContext(), scheduledAt);
+                    loadCurrentPage();
+                    mUiHandler.post(this::showNextDueFollowUpConfirmation);
                 })
                 .setNegativeButton(R.string.cancel, (d, which) -> mDismissedFollowUpConfirmationScheduledAt = scheduledAt)
                 .create();
@@ -1666,6 +1672,21 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         Window window = dialog.getWindow();
         if (window != null) {
             window.setBackgroundDrawableResource(R.drawable.dialog_panel_bg);
+        }
+    }
+
+    private void showNextDueFollowUpConfirmation() {
+        if (rb == null || isFinishing()) {
+            return;
+        }
+        if (mFollowUpConfirmationDialog != null && mFollowUpConfirmationDialog.isShowing()) {
+            return;
+        }
+        for (String scheduledAt : AlarmReceiver.getDueConfirmationScheduledAts(getApplicationContext(), rb)) {
+            if (!scheduledAt.equals(mDismissedFollowUpConfirmationScheduledAt)) {
+                showInAppFollowUpConfirmation(scheduledAt);
+                return;
+            }
         }
     }
 

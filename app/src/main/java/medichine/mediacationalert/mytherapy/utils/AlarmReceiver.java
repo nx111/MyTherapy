@@ -26,6 +26,8 @@ import androidx.legacy.content.WakefulBroadcastReceiver;
 
 import java.util.Calendar;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 import medichine.mediacationalert.mytherapy.R;
@@ -488,7 +490,7 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
 
         ReminderDatabase rb = new ReminderDatabase(context);
         AlarmReceiver receiver = new AlarmReceiver();
-        long dueAtMillis = System.currentTimeMillis() + CONFIRM_FOLLOW_UP_MILLIS;
+        long dueAtMillis = confirmationDueAtMillis(scheduledAt);
         for (Integer reminderId : reminderIds) {
             if (reminderId == null || !rb.isReminderTaken(reminderId, scheduledAt)) {
                 continue;
@@ -506,6 +508,38 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
         ArrayList<Integer> reminderIds = new ArrayList<>();
         reminderIds.add(reminderId);
         scheduleFollowUpConfirmation(context, reminderIds, scheduledAt);
+    }
+
+    public static List<String> getDueConfirmationScheduledAts(Context context, ReminderDatabase rb) {
+        ArrayList<String> scheduledAts = new ArrayList<>();
+        if (context == null || rb == null) {
+            return scheduledAts;
+        }
+
+        List<ReminderOccurrenceState.ConfirmationState> states =
+                ReminderOccurrenceState.getPendingConfirmations(context);
+        Collections.sort(states, new Comparator<ReminderOccurrenceState.ConfirmationState>() {
+            @Override
+            public int compare(ReminderOccurrenceState.ConfirmationState left,
+                               ReminderOccurrenceState.ConfirmationState right) {
+                return Long.compare(left.dueAt, right.dueAt);
+            }
+        });
+
+        long now = System.currentTimeMillis();
+        for (ReminderOccurrenceState.ConfirmationState state : states) {
+            Reminder reminder = rb.getReminder(state.reminderId);
+            if (reminder == null
+                    || !"true".equals(reminder.getActive())
+                    || !rb.isReminderTaken(state.reminderId, state.scheduledAt)) {
+                ReminderOccurrenceState.clearConfirmationPending(context, state.reminderId, state.scheduledAt);
+                continue;
+            }
+            if (state.dueAt <= now && !scheduledAts.contains(state.scheduledAt)) {
+                scheduledAts.add(state.scheduledAt);
+            }
+        }
+        return scheduledAts;
     }
 
     public static void completeConfirmedOccurrence(Context context, List<Integer> reminderIds, String scheduledAt) {
@@ -576,6 +610,12 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
 
     private static long nextSearchAfter(String scheduledAt) {
         return ReminderSchedule.parseScheduledAt(scheduledAt).getTimeInMillis() + 60000L;
+    }
+
+    private static long confirmationDueAtMillis(String scheduledAt) {
+        long now = System.currentTimeMillis();
+        long scheduledMillis = ReminderSchedule.parseScheduledAt(scheduledAt).getTimeInMillis();
+        return now < scheduledMillis ? scheduledMillis : now + CONFIRM_FOLLOW_UP_MILLIS;
     }
 
     private void setSnoozeAlarm(Context context, Reminder reminder, String scheduledAt, long snoozedUntil) {
