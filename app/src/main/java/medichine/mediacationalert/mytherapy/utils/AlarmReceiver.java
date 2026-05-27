@@ -18,7 +18,6 @@ import android.graphics.Color;
 import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Build;
-import android.os.SystemClock;
 
 import androidx.core.app.NotificationCompat;
 import androidx.legacy.content.WakefulBroadcastReceiver;
@@ -874,23 +873,21 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
             mAlarmManager = (AlarmManager) context.getSystemService(Context.ALARM_SERVICE);
         }
 
-        long diffTime = triggerAtMillis - System.currentTimeMillis();
-        if (diffTime <= 0) {
-            diffTime = 1000L;
+        long now = System.currentTimeMillis();
+        if (triggerAtMillis <= now) {
+            triggerAtMillis = now + 1000L;
         }
-        long elapsedTriggerAt = SystemClock.elapsedRealtime() + diffTime;
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S || mAlarmManager.canScheduleExactAlarms()) {
-                mAlarmManager.setExactAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP, elapsedTriggerAt, pendingIntent);
-            } else {
-                mAlarmManager.setAndAllowWhileIdle(AlarmManager.ELAPSED_REALTIME_WAKEUP, elapsedTriggerAt, pendingIntent);
-            }
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-            mAlarmManager.setExact(AlarmManager.ELAPSED_REALTIME_WAKEUP, elapsedTriggerAt, pendingIntent);
-        } else {
-            mAlarmManager.set(AlarmManager.ELAPSED_REALTIME_WAKEUP, elapsedTriggerAt, pendingIntent);
-        }
+        Intent showIntent = new Intent(context, MainActivity.class);
+        showIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        PendingIntent showPendingIntent = PendingIntent.getActivity(
+                context,
+                requestCodeFor("alarm_clock|" + triggerAtMillis, 0),
+                showIntent,
+                AppUtils.Companion.getFlag());
+        mAlarmManager.setAlarmClock(
+                new AlarmManager.AlarmClockInfo(triggerAtMillis, showPendingIntent),
+                pendingIntent);
     }
 
     public void cancelAlarm(Context context, int ID) {

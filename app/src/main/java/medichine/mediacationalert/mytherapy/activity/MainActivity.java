@@ -3,7 +3,6 @@ package medichine.mediacationalert.mytherapy.activity;
 import static medichine.mediacationalert.mytherapy.utils.Fun.showBanner;
 
 import android.Manifest;
-import android.app.AlarmManager;
 import android.app.AlertDialog;
 import android.app.DatePickerDialog;
 import android.app.NotificationChannel;
@@ -120,7 +119,6 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     private static final String PREF_NOTIFICATION_PERMISSION_REQUESTED = "notification_permission_requested";
     private static final String PREF_NOTIFICATION_SETTINGS_HANDLED = "notification_settings_handled";
     private static final String PREF_NOTIFICATION_CHANNEL_SETTINGS_HANDLED = "notification_channel_settings_handled";
-    private static final String PREF_EXACT_ALARM_SETTINGS_HANDLED = "exact_alarm_settings_handled";
     private static final String PREF_BATTERY_OPTIMIZATION_HANDLED = "battery_optimization_handled";
     private static final int PAGE_TODAY = 0;
     private static final int PAGE_LAB = 1;
@@ -475,21 +473,6 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
             }
         }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
-                && (force || !prefs.getBoolean(PREF_EXACT_ALARM_SETTINGS_HANDLED, false))) {
-            AlarmManager alarmManager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
-            if (alarmManager != null && !alarmManager.canScheduleExactAlarms()) {
-                Intent intent = new Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM)
-                        .setData(Uri.parse("package:" + getPackageName()));
-                showReminderSettingsDialog(
-                        R.string.reminder_settings_title,
-                        R.string.exact_alarm_permission_message,
-                        PREF_EXACT_ALARM_SETTINGS_HANDLED,
-                        intent);
-                return true;
-            }
-        }
-
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
                 && (force || !prefs.getBoolean(PREF_BATTERY_OPTIMIZATION_HANDLED, false))) {
             PowerManager powerManager = (PowerManager) getSystemService(Context.POWER_SERVICE);
@@ -516,12 +499,6 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
             NotificationChannel channel = notificationManager == null ? null
                     : notificationManager.getNotificationChannel(AlarmReceiver.getReminderChannelId(this));
             if (channel != null && channel.getImportance() == NotificationManager.IMPORTANCE_NONE) {
-                return false;
-            }
-        }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            AlarmManager alarmManager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
-            if (alarmManager != null && !alarmManager.canScheduleExactAlarms()) {
                 return false;
             }
         }
