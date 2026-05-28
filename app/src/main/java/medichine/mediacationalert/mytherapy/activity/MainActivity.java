@@ -2009,12 +2009,13 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.MATCH_PARENT));
 
-        ScrollView resultList = createLabResultListView(item, results);
+        boolean[] detailShowsTrend = new boolean[]{showTrend};
+        AlertDialog[] labDialog = new AlertDialog[1];
+        ScrollView resultList = createLabResultListView(item, results, labDialog, detailShowsTrend);
         detailFrame.addView(resultList, new FrameLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.MATCH_PARENT));
 
-        boolean[] detailShowsTrend = new boolean[]{showTrend};
         updateLabDetailMode(trendMode, listMode, chart, resultList, detailShowsTrend[0]);
         trendMode.setOnClickListener(v -> {
             detailShowsTrend[0] = true;
@@ -2029,7 +2030,6 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 ? getString(R.string.lab_no_result)
                 : getString(R.string.lab_history_count, results.size());
 
-        AlertDialog[] labDialog = new AlertDialog[1];
         LinearLayout bottomRow = new LinearLayout(this);
         bottomRow.setGravity(Gravity.CENTER_VERTICAL);
         bottomRow.setOrientation(LinearLayout.HORIZONTAL);
@@ -2140,7 +2140,8 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         button.setTextColor(getResources().getColor(selected ? R.color.on_accent : R.color.text_primary));
     }
 
-    private ScrollView createLabResultListView(LabTestItem item, List<LabResult> results) {
+    private ScrollView createLabResultListView(LabTestItem item, List<LabResult> results,
+                                               AlertDialog[] labDialog, boolean[] detailShowsTrend) {
         ScrollView scrollView = new ScrollView(this);
         scrollView.setFillViewport(true);
         LinearLayout list = new LinearLayout(this);
@@ -2160,7 +2161,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
             return scrollView;
         }
         for (int i = results.size() - 1; i >= 0; i--) {
-            list.addView(createLabResultRow(item, results.get(i)));
+            list.addView(createLabResultRow(item, results.get(i), labDialog, detailShowsTrend));
             if (i > 0) {
                 list.addView(createDividerView());
             }
@@ -2168,7 +2169,8 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         return scrollView;
     }
 
-    private View createLabResultRow(LabTestItem item, LabResult result) {
+    private View createLabResultRow(LabTestItem item, LabResult result,
+                                    AlertDialog[] labDialog, boolean[] detailShowsTrend) {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
@@ -2196,6 +2198,13 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         row.addView(value, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT));
+        row.setOnLongClickListener(v -> {
+            if (labDialog != null && labDialog[0] != null) {
+                labDialog[0].dismiss();
+            }
+            showLabResultForm(item, result, true, detailShowsTrend != null && detailShowsTrend[0]);
+            return true;
+        });
         return row;
     }
 
@@ -2548,6 +2557,10 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     }
 
     private void showLabResultForm(LabTestItem item, boolean returnToDetail, boolean showTrend) {
+        showLabResultForm(item, null, returnToDetail, showTrend);
+    }
+
+    private void showLabResultForm(LabTestItem item, LabResult existing, boolean returnToDetail, boolean showTrend) {
         LinearLayout form = new LinearLayout(this);
         form.setOrientation(LinearLayout.VERTICAL);
         int padding = dp(20);
@@ -2557,9 +2570,12 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         value.setHint(R.string.lab_result_value_hint);
         value.setSingleLine(true);
         value.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL | InputType.TYPE_NUMBER_FLAG_SIGNED);
+        if (existing != null) {
+            value.setText(formatQuantity(existing.mValue));
+        }
         form.addView(value, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
-        String[] resultDate = new String[]{initialLabResultDate()};
+        String[] resultDate = new String[]{existing == null ? initialLabResultDate() : labResultDateForSelector(existing)};
         TextView resultDateText = dateSelectorText(R.string.lab_result_date, resultDate[0]);
         resultDateText.setText(labResultDateSelectorLabel(resultDate[0]));
         resultDateText.setOnClickListener(v -> showLabResultDatePicker(resultDate[0], date -> {
@@ -2591,13 +2607,20 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                     value.setError(getString(R.string.lab_result_required));
                     return;
                 }
-                long id = rb.addLabResult(new LabResult(item.mId, resultValue, labResultCreatedAt(resultDate[0])));
-                if (id == -1) {
+                String createdAt = labResultCreatedAt(resultDate[0]);
+                if (existing == null) {
+                    long id = rb.addLabResult(new LabResult(item.mId, resultValue, createdAt));
+                    if (id == -1) {
+                        Toast.makeText(this, R.string.could_not_save_lab_result, Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                } else if (rb.updateLabResult(new LabResult(existing.mId, item.mId,
+                        item.mName, resultValue, item.mUnit, createdAt)) <= 0) {
                     Toast.makeText(this, R.string.could_not_save_lab_result, Toast.LENGTH_SHORT).show();
                     return;
                 }
                 sLastLabResultDate = resultDate[0];
-                Toast.makeText(this, R.string.saved, Toast.LENGTH_SHORT).show();
+                Toast.makeText(this, existing == null ? R.string.saved : R.string.edited, Toast.LENGTH_SHORT).show();
                 dialog.dismiss();
                 loadCurrentPage();
                 reopenLabDetailIfNeeded(returnToDetail, item.mId, showTrend);
@@ -2611,6 +2634,14 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
             return sLastLabResultDate;
         }
         return ReminderSchedule.formatDate(Calendar.getInstance());
+    }
+
+    private String labResultDateForSelector(LabResult result) {
+        Calendar calendar = parseLabResultDate(result == null ? "" : result.mCreatedAt);
+        if (calendar == null) {
+            return initialLabResultDate();
+        }
+        return ReminderSchedule.formatDate(calendar);
     }
 
     private void reopenLabDetailIfNeeded(boolean returnToDetail, int itemId, boolean showTrend) {

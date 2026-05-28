@@ -1034,6 +1034,17 @@ public class ReminderDatabase extends SQLiteOpenHelper {
         return id;
     }
 
+    public int updateLabResult(LabResult result) {
+        SQLiteDatabase db = this.getWritableDatabase();
+        ContentValues values = new ContentValues();
+        values.put(LAB_RESULT_VALUE, result.mValue);
+        values.put(LAB_RESULT_CREATED_AT, result.mCreatedAt == null || result.mCreatedAt.length() == 0
+                ? nowText()
+                : result.mCreatedAt);
+        return db.update(TABLE_LAB_RESULTS, values, LAB_RESULT_ID + "=?",
+                new String[]{String.valueOf(result.mId)});
+    }
+
     public List<LabResult> getLabResults() {
         List<LabResult> results = new ArrayList<>();
         SQLiteDatabase db = this.getReadableDatabase();
