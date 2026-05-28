@@ -26,10 +26,14 @@ public class ReminderRingService extends Service {
     private static final String EXTRA_CONFIRMATION_REMINDER_IDS = "confirmation_reminder_ids";
     private static final String PREFS_NAME = "reminder_ring_state";
     private static final String KEY_QUIET_UNTIL = "quiet_until:";
+    private static final String KEY_LAST_START_KEY = "last_start_key";
+    private static final String KEY_LAST_START_AT = "last_start_at";
     private static final long MAX_RING_MILLIS = 30000L;
+    private static final long DUPLICATE_START_WINDOW_MILLIS = 45000L;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private Ringtone ringtone;
+    private boolean foregroundStarted;
 
     public static void start(Context context, String scheduledAt) {
         Intent intent = new Intent(context, ReminderRingService.class);
@@ -104,7 +108,15 @@ public class ReminderRingService extends Service {
             stopSelf();
             return START_NOT_STICKY;
         }
+        if (isDuplicateStart(scheduledAt)) {
+            if (!foregroundStarted) {
+                stopSelf();
+            }
+            return START_NOT_STICKY;
+        }
+        rememberStart(scheduledAt);
         startForeground(AlarmReceiver.notificationIdFor(scheduledAt), notification);
+        foregroundStarted = true;
         if (isQuiet(scheduledAt)) {
             stopRingtone();
             stopSelf();
@@ -194,6 +206,21 @@ public class ReminderRingService extends Service {
         ringtone.play();
     }
 
+    private boolean isDuplicateStart(String scheduledAt) {
+        SharedPreferences sharedPreferences = prefs(this);
+        String lastKey = sharedPreferences.getString(KEY_LAST_START_KEY, "");
+        long lastStartAt = sharedPreferences.getLong(KEY_LAST_START_AT, 0L);
+        return scheduledAt.equals(lastKey)
+                && System.currentTimeMillis() - lastStartAt < DUPLICATE_START_WINDOW_MILLIS;
+    }
+
+    private void rememberStart(String scheduledAt) {
+        prefs(this).edit()
+                .putString(KEY_LAST_START_KEY, scheduledAt)
+                .putLong(KEY_LAST_START_AT, System.currentTimeMillis())
+                .apply();
+    }
+
     private void stopRingtone() {
         if (ringtone != null && ringtone.isPlaying()) {
             ringtone.stop();
@@ -224,6 +251,7 @@ public class ReminderRingService extends Service {
     public void onDestroy() {
         handler.removeCallbacksAndMessages(null);
         stopRingtone();
+        foregroundStarted = false;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             stopForeground(STOP_FOREGROUND_DETACH);
         } else {

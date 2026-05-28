@@ -158,6 +158,8 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     private ReminderDatabase rb;
     private AlarmReceiver mAlarmReceiver;
     private BroadcastReceiver mInAppConfirmationReceiver;
+    private AlertDialog mMedicationReminderDialog;
+    private String mMedicationReminderDialogScheduledAt;
     private AlertDialog mFollowUpConfirmationDialog;
     private String mFollowUpConfirmationDialogScheduledAt;
     private String mDismissedFollowUpConfirmationScheduledAt;
@@ -1562,6 +1564,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     public void onResume() {
         super.onResume();
         registerInAppConfirmationReceiver();
+        AlarmReceiver.setAppReminderUiActive(true);
         mDismissedFollowUpConfirmationScheduledAt = null;
         if (rb != null) {
             rescheduleCurrentAccountReminders();
@@ -1575,7 +1578,9 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
 
     @Override
     protected void onPause() {
+        AlarmReceiver.setAppReminderUiActive(false);
         unregisterInAppConfirmationReceiver();
+        dismissMedicationReminderDialog();
         dismissFollowUpConfirmationDialog();
         super.onPause();
     }
@@ -1589,10 +1594,13 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
             public void onReceive(Context context, Intent intent) {
                 if (AlarmReceiver.ACTION_IN_APP_CONFIRMATION.equals(intent.getAction())) {
                     showInAppFollowUpConfirmation(intent.getStringExtra(AlarmReceiver.EXTRA_SCHEDULED_AT));
+                } else if (AlarmReceiver.ACTION_IN_APP_MEDICATION_REMINDER.equals(intent.getAction())) {
+                    showInAppMedicationReminder(intent.getStringExtra(AlarmReceiver.EXTRA_SCHEDULED_AT));
                 }
             }
         };
         IntentFilter filter = new IntentFilter(AlarmReceiver.ACTION_IN_APP_CONFIRMATION);
+        filter.addAction(AlarmReceiver.ACTION_IN_APP_MEDICATION_REMINDER);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(mInAppConfirmationReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
         } else {
@@ -1606,6 +1614,58 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         }
         unregisterReceiver(mInAppConfirmationReceiver);
         mInAppConfirmationReceiver = null;
+    }
+
+    private void showInAppMedicationReminder(String scheduledAt) {
+        if (scheduledAt == null || scheduledAt.length() == 0 || rb == null || isFinishing()) {
+            return;
+        }
+
+        List<Reminder> group = AlarmReceiver.getDueMedicationReminders(getApplicationContext(), rb, scheduledAt);
+        if (group.isEmpty()) {
+            return;
+        }
+
+        if (mMedicationReminderDialog != null && mMedicationReminderDialog.isShowing()) {
+            if (scheduledAt.equals(mMedicationReminderDialogScheduledAt)) {
+                return;
+            }
+            mMedicationReminderDialog.dismiss();
+        }
+
+        ArrayList<Integer> reminderIds = new ArrayList<>();
+        for (Reminder reminder : group) {
+            reminderIds.add(reminder.getID());
+        }
+        int titleRes = group.size() > 1 ? R.string.medication_time_count : R.string.time_to_take_medication;
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(group.size() > 1 ? getString(titleRes, group.size()) : getString(titleRes))
+                .setMessage(AlarmReceiver.buildGroupText(this, group))
+                .setPositiveButton(R.string.notification_taken, (d, which) -> {
+                    ReminderDatabase.ConfirmResult result = rb.confirmReminderGroup(reminderIds, scheduledAt);
+                    Toast.makeText(getApplicationContext(), result.message, Toast.LENGTH_SHORT).show();
+                    if (result.success) {
+                        AlarmReceiver.completeConfirmedOccurrence(getApplicationContext(), reminderIds, scheduledAt);
+                        AlarmReceiver.scheduleFollowUpConfirmation(getApplicationContext(), reminderIds, scheduledAt);
+                        loadCurrentPage();
+                    }
+                })
+                .setNegativeButton(R.string.cancel, null)
+                .create();
+        dialog.setOnDismissListener(d -> {
+            if (mMedicationReminderDialog == dialog) {
+                mMedicationReminderDialog = null;
+                mMedicationReminderDialogScheduledAt = null;
+            }
+        });
+        mMedicationReminderDialog = dialog;
+        mMedicationReminderDialogScheduledAt = scheduledAt;
+        dialog.show();
+        Window window = dialog.getWindow();
+        if (window != null) {
+            window.setBackgroundDrawableResource(R.drawable.dialog_panel_bg);
+        }
     }
 
     private void showInAppFollowUpConfirmation(String scheduledAt) {
@@ -1673,6 +1733,14 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
             mFollowUpConfirmationDialog.dismiss();
             mFollowUpConfirmationDialog = null;
             mFollowUpConfirmationDialogScheduledAt = null;
+        }
+    }
+
+    private void dismissMedicationReminderDialog() {
+        if (mMedicationReminderDialog != null) {
+            mMedicationReminderDialog.dismiss();
+            mMedicationReminderDialog = null;
+            mMedicationReminderDialogScheduledAt = null;
         }
     }
 

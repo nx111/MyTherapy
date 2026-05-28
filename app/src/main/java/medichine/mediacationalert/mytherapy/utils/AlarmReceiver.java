@@ -45,6 +45,7 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
     private static final String CHANNEL_NAME = "Notification";
     static final String ACTION_TAKE_GROUP = "medichine.mediacationalert.mytherapy.ACTION_TAKE_GROUP";
     static final String ACTION_CONFIRM_GROUP = "medichine.mediacationalert.mytherapy.ACTION_CONFIRM_GROUP";
+    public static final String ACTION_IN_APP_MEDICATION_REMINDER = "medichine.mediacationalert.mytherapy.ACTION_IN_APP_MEDICATION_REMINDER";
     public static final String ACTION_IN_APP_CONFIRMATION = "medichine.mediacationalert.mytherapy.ACTION_IN_APP_CONFIRMATION";
     private static final String ACTION_SHOW_CONFIRMATION = "medichine.mediacationalert.mytherapy.ACTION_SHOW_CONFIRMATION";
     static final String ACTION_SKIP_GROUP = "medichine.mediacationalert.mytherapy.ACTION_SKIP_GROUP";
@@ -56,6 +57,11 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
     private static final long CONFIRM_FOLLOW_UP_MILLIS = 20L * 60000L;
     private static final String CONFIRMATION_KEY_PREFIX = "confirm:";
     private static final int[] DELAY_MINUTES = new int[]{10, 20, 30, 60};
+    private static volatile boolean sAppReminderUiActive;
+
+    public static void setAppReminderUiActive(boolean active) {
+        sAppReminderUiActive = active;
+    }
 
     @Override
     public void onReceive(Context context, Intent intent) {
@@ -263,6 +269,12 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
     }
 
     private void showReminderNotification(Context context, Reminder reminder, List<Reminder> group, String scheduledAt) {
+        if (sAppReminderUiActive) {
+            cancelNotification(context, scheduledAt);
+            sendInAppMedicationReminder(context, scheduledAt);
+            return;
+        }
+
         this.manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
         createNotificationChannel(context, this.manager);
         myNotication2 = buildReminderNotification(context, group, scheduledAt);
@@ -273,6 +285,12 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
     }
 
     private void showConfirmationNotification(Context context, List<Reminder> group, String scheduledAt) {
+        if (sAppReminderUiActive) {
+            cancelConfirmationNotification(context, scheduledAt);
+            sendInAppConfirmation(context, scheduledAt);
+            return;
+        }
+
         this.manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
         createNotificationChannel(context, this.manager);
         Notification notification = buildConfirmationReminderNotification(context, group, scheduledAt);
@@ -578,6 +596,14 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
         return scheduledAts;
     }
 
+    public static List<Reminder> getDueMedicationReminders(Context context, ReminderDatabase rb, String scheduledAt) {
+        if (context == null || rb == null || scheduledAt == null || scheduledAt.length() == 0) {
+            return new ArrayList<>();
+        }
+        AlarmReceiver receiver = new AlarmReceiver();
+        return receiver.pendingReminders(context, rb, rb.getActiveRemindersAt(scheduledAt), scheduledAt);
+    }
+
     public static void completeConfirmedOccurrence(Context context, List<Integer> reminderIds, String scheduledAt) {
         if (reminderIds == null || reminderIds.isEmpty() || scheduledAt == null || scheduledAt.length() == 0) {
             return;
@@ -628,6 +654,13 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
             notificationManager.cancel(CHANNEL_ID, confirmationNotificationIdFor(scheduledAt));
             notificationManager.cancel(confirmationNotificationIdFor(scheduledAt));
         }
+    }
+
+    private static void sendInAppMedicationReminder(Context context, String scheduledAt) {
+        Intent intent = new Intent(ACTION_IN_APP_MEDICATION_REMINDER);
+        intent.setPackage(context.getPackageName());
+        intent.putExtra(EXTRA_SCHEDULED_AT, scheduledAt);
+        context.sendBroadcast(intent);
     }
 
     private static void sendInAppConfirmation(Context context, String scheduledAt) {
