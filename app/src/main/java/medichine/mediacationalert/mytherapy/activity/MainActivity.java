@@ -135,6 +135,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     private static final String STATE_CURRENT_PAGE = "current_page";
     private static final String STATE_SELECTED_DATE = "selected_date";
     private static final String STATE_COURSE_SHOW_ALL = "course_show_all";
+    private static String sLastLabResultDate;
 
     private BillingClient billingClient;
     private Prefs prefs;
@@ -2558,11 +2559,12 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         value.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL | InputType.TYPE_NUMBER_FLAG_SIGNED);
         form.addView(value, new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
-        String[] resultDate = new String[]{ReminderSchedule.formatDate(Calendar.getInstance())};
+        String[] resultDate = new String[]{initialLabResultDate()};
         TextView resultDateText = dateSelectorText(R.string.lab_result_date, resultDate[0]);
         resultDateText.setText(labResultDateSelectorLabel(resultDate[0]));
         resultDateText.setOnClickListener(v -> showLabResultDatePicker(resultDate[0], date -> {
                     resultDate[0] = date;
+                    sLastLabResultDate = date;
                     resultDateText.setText(labResultDateSelectorLabel(resultDate[0]));
                 }));
         form.addView(resultDateText);
@@ -2594,6 +2596,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                     Toast.makeText(this, R.string.could_not_save_lab_result, Toast.LENGTH_SHORT).show();
                     return;
                 }
+                sLastLabResultDate = resultDate[0];
                 Toast.makeText(this, R.string.saved, Toast.LENGTH_SHORT).show();
                 dialog.dismiss();
                 loadCurrentPage();
@@ -2601,6 +2604,13 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
             });
         });
         dialog.show();
+    }
+
+    private String initialLabResultDate() {
+        if (sLastLabResultDate != null && parseCourseDate(sLastLabResultDate) != null) {
+            return sLastLabResultDate;
+        }
+        return ReminderSchedule.formatDate(Calendar.getInstance());
     }
 
     private void reopenLabDetailIfNeeded(boolean returnToDetail, int itemId, boolean showTrend) {
