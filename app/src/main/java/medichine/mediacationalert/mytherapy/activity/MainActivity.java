@@ -1642,7 +1642,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
 
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle(group.size() > 1 ? getString(titleRes, group.size()) : getString(titleRes))
-                .setMessage(AlarmReceiver.buildGroupText(this, group))
+                .setMessage(reminderDialogMessage(scheduledAt, group))
                 .setPositiveButton(R.string.notification_taken, (d, which) -> {
                     ReminderDatabase.ConfirmResult result = rb.confirmReminderGroup(reminderIds, scheduledAt);
                     Toast.makeText(getApplicationContext(), result.message, Toast.LENGTH_SHORT).show();
@@ -1689,7 +1689,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
 
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle(R.string.confirm_medication_title)
-                .setMessage(AlarmReceiver.buildGroupText(this, group))
+                .setMessage(reminderDialogMessage(scheduledAt, group))
                 .setPositiveButton(R.string.notification_confirm, (d, which) -> {
                     mDismissedFollowUpConfirmationScheduledAt = null;
                     AlarmReceiver.confirmFollowUp(getApplicationContext(), scheduledAt);
@@ -1743,6 +1743,14 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
             mMedicationReminderDialog = null;
             mMedicationReminderDialogScheduledAt = null;
         }
+    }
+
+    private String reminderDialogMessage(String scheduledAt, List<Reminder> group) {
+        String[] parts = splitScheduledAt(scheduledAt);
+        String time = parts[1].length() == 0 ? scheduledAt : parts[1];
+        return time
+                + "\n\n"
+                + AlarmReceiver.buildGroupText(this, group);
     }
 
     private void loadCurrentPage() {
