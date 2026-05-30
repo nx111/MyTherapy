@@ -1778,6 +1778,15 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         }
     }
 
+    private void loadCurrentPageKeepingListPosition() {
+        RecyclerView.LayoutManager layoutManager = mList == null ? null : mList.getLayoutManager();
+        android.os.Parcelable listState = layoutManager == null ? null : layoutManager.onSaveInstanceState();
+        loadCurrentPage();
+        if (listState != null && mList != null && mList.getLayoutManager() != null) {
+            mList.getLayoutManager().onRestoreInstanceState(listState);
+        }
+    }
+
     private void updateActionButtons() {
         if (mAddReminderButton == null || mCalendarButton == null || mAccountButton == null
                 || mAccountNameText == null || mCourseShowAll == null) {
@@ -2622,7 +2631,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 sLastLabResultDate = resultDate[0];
                 Toast.makeText(this, existing == null ? R.string.saved : R.string.edited, Toast.LENGTH_SHORT).show();
                 dialog.dismiss();
-                loadCurrentPage();
+                loadCurrentPageKeepingListPosition();
                 reopenLabDetailIfNeeded(returnToDetail, item.mId, showTrend);
             });
         });
