@@ -135,6 +135,8 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     private static final String STATE_CURRENT_PAGE = "current_page";
     private static final String STATE_SELECTED_DATE = "selected_date";
     private static final String STATE_COURSE_SHOW_ALL = "course_show_all";
+    private static final String STATE_LAB_LIST_POSITION = "lab_list_position";
+    private static final String STATE_LAB_LIST_OFFSET = "lab_list_offset";
     private static String sLastLabResultDate;
 
     private BillingClient billingClient;
@@ -187,6 +189,9 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     private boolean mAccountLongPressHandled;
     private boolean mReminderSettingsDialogShowing;
     private boolean mLabOrderChanged;
+    private int mDisplayedPage = -1;
+    private int mLabListFirstVisiblePosition = RecyclerView.NO_POSITION;
+    private int mLabListFirstVisibleOffset;
 
     private List<ReminderItem> medicineList = new ArrayList<>();
     private List<SummaryItem> summaryList = new ArrayList<>();
@@ -236,6 +241,10 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 normalizeDate(mSelectedDate);
             }
             mCourseShowAll.setChecked(savedInstanceState.getBoolean(STATE_COURSE_SHOW_ALL, false));
+            mLabListFirstVisiblePosition = savedInstanceState.getInt(
+                    STATE_LAB_LIST_POSITION,
+                    RecyclerView.NO_POSITION);
+            mLabListFirstVisibleOffset = savedInstanceState.getInt(STATE_LAB_LIST_OFFSET, 0);
         }
 
         mList.setLayoutManager(new LinearLayoutManager(this));
@@ -305,6 +314,9 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         if (mCourseShowAll != null) {
             outState.putBoolean(STATE_COURSE_SHOW_ALL, mCourseShowAll.isChecked());
         }
+        rememberLabListPosition();
+        outState.putInt(STATE_LAB_LIST_POSITION, mLabListFirstVisiblePosition);
+        outState.putInt(STATE_LAB_LIST_OFFSET, mLabListFirstVisibleOffset);
     }
 
     private void showRestoredPage() {
@@ -1583,6 +1595,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
 
     @Override
     protected void onPause() {
+        rememberLabListPosition();
         AlarmReceiver.setAppReminderUiActive(false);
         unregisterInAppConfirmationReceiver();
         dismissMedicationReminderDialog();
@@ -1758,6 +1771,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     }
 
     private void loadCurrentPage() {
+        rememberLabListPosition();
         updateActionButtons();
         updateCalendarHeader();
         if (mCurrentPage == PAGE_HISTORY) {
@@ -1770,6 +1784,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
             mSummaryAdapter = new SummaryListAdapter(summaryList, this, this, false, true);
             mList.setAdapter(mSummaryAdapter);
             updateEmptyState(summaryList.isEmpty(), R.string.no_lab_records);
+            restoreLabListPosition();
         } else if (mCurrentPage == PAGE_COURSE) {
             summaryList = generateCourseData();
             mSummaryAdapter = new SummaryListAdapter(summaryList, this, this, true);
@@ -1788,30 +1803,52 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         } else {
             loadReminderList();
         }
+        mDisplayedPage = mCurrentPage;
+    }
+
+    private void rememberLabListPosition() {
+        if (mDisplayedPage != PAGE_LAB || mList == null || mList.getAdapter() != mSummaryAdapter) {
+            return;
+        }
+        RecyclerView.LayoutManager layoutManager = mList.getLayoutManager();
+        if (!(layoutManager instanceof LinearLayoutManager)) {
+            return;
+        }
+        LinearLayoutManager linearLayoutManager = (LinearLayoutManager) layoutManager;
+        int firstVisiblePosition = linearLayoutManager.findFirstVisibleItemPosition();
+        if (firstVisiblePosition == RecyclerView.NO_POSITION) {
+            return;
+        }
+        View firstVisibleView = linearLayoutManager.findViewByPosition(firstVisiblePosition);
+        mLabListFirstVisiblePosition = firstVisiblePosition;
+        mLabListFirstVisibleOffset = firstVisibleView == null
+                ? 0
+                : firstVisibleView.getTop() - mList.getPaddingTop();
+    }
+
+    private void restoreLabListPosition() {
+        if (mCurrentPage != PAGE_LAB || mList == null
+                || mLabListFirstVisiblePosition == RecyclerView.NO_POSITION) {
+            return;
+        }
+        int position = mLabListFirstVisiblePosition;
+        int offset = mLabListFirstVisibleOffset;
+        mList.post(() -> {
+            RecyclerView.Adapter adapter = mList.getAdapter();
+            RecyclerView.LayoutManager layoutManager = mList.getLayoutManager();
+            if (!(layoutManager instanceof LinearLayoutManager)
+                    || adapter == null
+                    || adapter.getItemCount() == 0) {
+                return;
+            }
+            int targetPosition = Math.min(position, adapter.getItemCount() - 1);
+            ((LinearLayoutManager) layoutManager).scrollToPositionWithOffset(targetPosition, offset);
+        });
     }
 
     private void loadCurrentPageKeepingListPosition() {
-        RecyclerView.LayoutManager layoutManager = mList == null ? null : mList.getLayoutManager();
-        if (!(layoutManager instanceof LinearLayoutManager)) {
-            loadCurrentPage();
-            return;
-        }
-
-        LinearLayoutManager linearLayoutManager = (LinearLayoutManager) layoutManager;
-        int firstVisiblePosition = linearLayoutManager.findFirstVisibleItemPosition();
-        View firstVisibleView = linearLayoutManager.findViewByPosition(firstVisiblePosition);
-        int firstVisibleOffset = firstVisibleView == null ? 0 : firstVisibleView.getTop() - mList.getPaddingTop();
-
+        rememberLabListPosition();
         loadCurrentPage();
-        if (firstVisiblePosition != RecyclerView.NO_POSITION && mList != null) {
-            mList.post(() -> {
-                RecyclerView.LayoutManager currentLayoutManager = mList.getLayoutManager();
-                if (currentLayoutManager instanceof LinearLayoutManager) {
-                    ((LinearLayoutManager) currentLayoutManager)
-                            .scrollToPositionWithOffset(firstVisiblePosition, firstVisibleOffset);
-                }
-            });
-        }
     }
 
     private void updateActionButtons() {
@@ -1874,6 +1911,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         medicineList = generateData();
         mAdapter = new MedListAdapter(medicineList, this, this);
         mList.setAdapter(mAdapter);
+        mDisplayedPage = PAGE_TODAY;
         updateEmptyState(medicineList.isEmpty(), R.string.no_today_reminders);
         scrollToFirstUnconfirmedReminder();
     }
