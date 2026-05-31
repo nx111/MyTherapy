@@ -1572,7 +1572,11 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
             AlarmReceiver alarmReceiver = mAlarmReceiver == null ? new AlarmReceiver() : mAlarmReceiver;
             alarmReceiver.reschedulePendingConfirmations(getApplicationContext());
         }
-        loadCurrentPage();
+        if (mCurrentPage == PAGE_LAB) {
+            loadCurrentPageKeepingListPosition();
+        } else {
+            loadCurrentPage();
+        }
         showNextDueFollowUpConfirmation();
         checkReminderSystemSettings();
     }
