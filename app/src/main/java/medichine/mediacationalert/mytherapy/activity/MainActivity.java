@@ -1788,10 +1788,25 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
 
     private void loadCurrentPageKeepingListPosition() {
         RecyclerView.LayoutManager layoutManager = mList == null ? null : mList.getLayoutManager();
-        android.os.Parcelable listState = layoutManager == null ? null : layoutManager.onSaveInstanceState();
+        if (!(layoutManager instanceof LinearLayoutManager)) {
+            loadCurrentPage();
+            return;
+        }
+
+        LinearLayoutManager linearLayoutManager = (LinearLayoutManager) layoutManager;
+        int firstVisiblePosition = linearLayoutManager.findFirstVisibleItemPosition();
+        View firstVisibleView = linearLayoutManager.findViewByPosition(firstVisiblePosition);
+        int firstVisibleOffset = firstVisibleView == null ? 0 : firstVisibleView.getTop() - mList.getPaddingTop();
+
         loadCurrentPage();
-        if (listState != null && mList != null && mList.getLayoutManager() != null) {
-            mList.getLayoutManager().onRestoreInstanceState(listState);
+        if (firstVisiblePosition != RecyclerView.NO_POSITION && mList != null) {
+            mList.post(() -> {
+                RecyclerView.LayoutManager currentLayoutManager = mList.getLayoutManager();
+                if (currentLayoutManager instanceof LinearLayoutManager) {
+                    ((LinearLayoutManager) currentLayoutManager)
+                            .scrollToPositionWithOffset(firstVisiblePosition, firstVisibleOffset);
+                }
+            });
         }
     }
 
