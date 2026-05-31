@@ -1080,6 +1080,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 rb = new ReminderDatabase(getApplicationContext());
             } else {
                 OutputStreamWriter writer = new OutputStreamWriter(outputStream, StandardCharsets.UTF_8);
+                writer.write('\uFEFF');
                 writer.write(mExportLabCsv ? rb.exportLabResultsCsv() : rb.exportCompleteCsv());
                 writer.flush();
             }

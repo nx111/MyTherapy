@@ -818,7 +818,6 @@ public class ReminderDatabase extends SQLiteOpenHelper {
 
         String[] itemRow = sizedRow(columnCount, mContext.getString(R.string.lab_export_item));
         String[] referenceRow = sizedRow(columnCount, mContext.getString(R.string.lab_export_reference));
-        String[] timeRow = sizedRow(columnCount, mContext.getString(R.string.lab_export_time));
         for (int i = 0; i < items.size(); i++) {
             int column = i + 1;
             LabTestItem item = items.get(i);
@@ -828,7 +827,6 @@ public class ReminderDatabase extends SQLiteOpenHelper {
         itemRow[columnCount - 1] = mContext.getString(R.string.lab_export_note);
         appendCsvRow(builder, itemRow);
         appendCsvRow(builder, referenceRow);
-        appendCsvRow(builder, timeRow);
 
         LinkedHashMap<String, String[]> rowsByDate = new LinkedHashMap<>();
         for (int i = 0; i < items.size(); i++) {
@@ -883,6 +881,9 @@ public class ReminderDatabase extends SQLiteOpenHelper {
     public int importCompleteCsv(InputStream inputStream) throws IOException {
         BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8));
         String firstLine = reader.readLine();
+        if (firstLine != null && firstLine.startsWith("\uFEFF")) {
+            firstLine = firstLine.substring(1);
+        }
         if (!COMPLETE_CSV_MARKER.equals(firstLine)) {
             throw new IOException("Invalid MyTherapy complete CSV");
         }
@@ -1710,21 +1711,16 @@ public class ReminderDatabase extends SQLiteOpenHelper {
     }
 
     private String labExportReferenceText(LabTestItem item) {
-        String unit = item.mUnit == null ? "" : item.mUnit.trim();
         if (item.mReferenceMin != null && item.mReferenceMax != null) {
-            return appendUnit(formatQuantity(item.mReferenceMin) + "-" + formatQuantity(item.mReferenceMax), unit);
+            return formatQuantity(item.mReferenceMin) + "-" + formatQuantity(item.mReferenceMax);
         }
         if (item.mReferenceMin != null) {
-            return appendUnit(">=" + formatQuantity(item.mReferenceMin), unit);
+            return ">=" + formatQuantity(item.mReferenceMin);
         }
         if (item.mReferenceMax != null) {
-            return appendUnit("<=" + formatQuantity(item.mReferenceMax), unit);
+            return "<=" + formatQuantity(item.mReferenceMax);
         }
         return "";
-    }
-
-    private String appendUnit(String value, String unit) {
-        return unit.length() == 0 ? value : value + " " + unit;
     }
 
     private String compactExportDate(String date) {
