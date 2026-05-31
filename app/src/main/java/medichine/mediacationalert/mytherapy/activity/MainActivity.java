@@ -2041,6 +2041,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
 
         LabTrendChartView chart = new LabTrendChartView(this);
         chart.setData(item, results);
+        chart.setOnResultClickListener(result -> showLabResultDoseDialog(result));
         detailFrame.addView(chart, new FrameLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.MATCH_PARENT));
@@ -2234,6 +2235,8 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         row.addView(value, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT));
+        row.setClickable(true);
+        row.setOnClickListener(v -> showLabResultDoseDialog(result));
         row.setOnLongClickListener(v -> {
             if (labDialog != null && labDialog[0] != null) {
                 labDialog[0].dismiss();
@@ -2266,6 +2269,143 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         styled.setSpan(new AbsoluteSizeSpan(16, true),
                 valueText.length() + 1, text.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         return styled;
+    }
+
+    private void showLabResultDoseDialog(LabResult result) {
+        Calendar date = parseLabResultDate(result == null ? "" : result.mCreatedAt);
+        if (date == null) {
+            return;
+        }
+        String scheduledDate = ReminderSchedule.formatDate(date);
+        String displayDate = formatLabResultListDate(result.mCreatedAt);
+        String message = buildDailyDoseText(scheduledDate);
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(getString(R.string.daily_dose_title, displayDate))
+                .setMessage(message)
+                .setNegativeButton(R.string.cancel, null)
+                .create();
+        if (!rb.getAllReminders().isEmpty()) {
+            dialog.setButton(AlertDialog.BUTTON_POSITIVE, getString(R.string.add_daily_dose),
+                    (d, which) -> showDailyDoseMedicinePicker(scheduledDate, result));
+        }
+        dialog.show();
+    }
+
+    private String buildDailyDoseText(String scheduledDate) {
+        LinkedHashMap<String, Double> doses = dailyPlannedDoses(scheduledDate);
+        LinkedHashMap<String, Double> supplemental = rb.getSupplementalDosesByDate(scheduledDate);
+        for (Map.Entry<String, Double> entry : supplemental.entrySet()) {
+            double current = doses.containsKey(entry.getKey()) ? doses.get(entry.getKey()) : 0;
+            doses.put(entry.getKey(), current + entry.getValue());
+        }
+        if (doses.isEmpty()) {
+            return getString(R.string.daily_dose_none);
+        }
+        StringBuilder builder = new StringBuilder();
+        for (Map.Entry<String, Double> entry : doses.entrySet()) {
+            if (builder.length() > 0) {
+                builder.append("\n");
+            }
+            builder.append(entry.getKey()).append(": ").append(formatQuantity(entry.getValue()));
+        }
+        return builder.toString();
+    }
+
+    private LinkedHashMap<String, Double> dailyPlannedDoses(String scheduledDate) {
+        LinkedHashMap<String, Double> doses = new LinkedHashMap<>();
+        Calendar day = ReminderSchedule.parseDate(scheduledDate);
+        long dayMillis = day.getTimeInMillis();
+        for (Reminder reminder : rb.getAllReminders()) {
+            if (!isReminderPlanEffectiveOn(reminder, dayMillis)) {
+                continue;
+            }
+            String title = normalizeTitle(reminder.getTitle());
+            double current = doses.containsKey(title) ? doses.get(title) : 0;
+            doses.put(title, current + reminder.getDose() * ReminderSchedule.doseTimes(reminder).size());
+        }
+        return doses;
+    }
+
+    private boolean isReminderPlanEffectiveOn(Reminder reminder, long dayMillis) {
+        long start = ReminderSchedule.parseDate(reminder.getDate()).getTimeInMillis();
+        if (dayMillis < start) {
+            return false;
+        }
+        if (ReminderSchedule.hasNoEndDate(reminder)) {
+            return true;
+        }
+        long end = ReminderSchedule.parseDate(reminder.getEndDate()).getTimeInMillis();
+        return dayMillis <= end;
+    }
+
+    private void showDailyDoseMedicinePicker(String scheduledDate, LabResult result) {
+        List<Reminder> reminders = rb.getAllReminders();
+        if (reminders.isEmpty()) {
+            return;
+        }
+        ArrayList<Reminder> choices = new ArrayList<>();
+        ArrayList<String> labels = new ArrayList<>();
+        for (Reminder reminder : reminders) {
+            String label = normalizeTitle(reminder.getTitle());
+            if (reminder.getSpec().length() > 0) {
+                label += " " + reminder.getSpec();
+            }
+            if (labels.contains(label)) {
+                continue;
+            }
+            choices.add(reminder);
+            labels.add(label);
+        }
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.add_daily_dose)
+                .setItems(labels.toArray(new String[0]),
+                        (dialog, which) -> showDailyDoseForm(choices.get(which), scheduledDate, result))
+                .show();
+    }
+
+    private void showDailyDoseForm(Reminder reminder, String scheduledDate, LabResult result) {
+        LinearLayout form = new LinearLayout(this);
+        form.setOrientation(LinearLayout.VERTICAL);
+        int padding = dp(20);
+        form.setPadding(padding, dp(8), padding, 0);
+
+        form.addView(formLabel(R.string.dose));
+        EditText dose = new EditText(this);
+        dose.setSingleLine(true);
+        dose.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        dose.setText(formatQuantity(reminder.getDose()));
+        form.addView(dose, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(R.string.add_daily_dose)
+                .setView(form)
+                .setPositiveButton(R.string.saved, null)
+                .setNegativeButton(R.string.cancel, null)
+                .create();
+        dialog.setOnShowListener(d -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            Double doseValue = parseNumber(dose);
+            if (doseValue == null) {
+                dose.setError(getString(R.string.enter_valid_dose));
+                return;
+            }
+            if (doseValue <= 0) {
+                dose.setError(getString(R.string.dose_must_be_positive));
+                return;
+            }
+            ReminderDatabase.ConfirmResult saveResult = rb.addSupplementalIntake(
+                    reminder.getID(),
+                    scheduledDate + " 0:00",
+                    doseValue);
+            Toast.makeText(getApplicationContext(), saveResult.message, Toast.LENGTH_SHORT).show();
+            if (saveResult.success) {
+                dialog.dismiss();
+                showLabResultDoseDialog(result);
+            }
+        }));
+        dialog.show();
     }
 
     private int labResultValueColorRes(LabTestItem item, LabResult result) {

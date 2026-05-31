@@ -245,6 +245,9 @@
     <string name="lab_detail_list">列表</string>
     <string name="lab_trend_title">%1$s趋势</string>
     <string name="lab_history_count">%1$d 条结果</string>
+    <string name="daily_dose_title">%1$s 用量</string>
+    <string name="daily_dose_none">该日期没有服药剂量记录</string>
+    <string name="add_daily_dose">补录剂量</string>
     <string name="lab_view_trend">趋势</string>
     <string name="lab_view_list">列表</string>
     <string name="lab_normal">正常</string>

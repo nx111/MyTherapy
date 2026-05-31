@@ -261,6 +261,9 @@
     <string name="lab_detail_list">List</string>
     <string name="lab_trend_title">%1$s Trend</string>
     <string name="lab_history_count">%1$d result(s)</string>
+    <string name="daily_dose_title">Dose on %1$s</string>
+    <string name="daily_dose_none">No medication dose recorded for this date</string>
+    <string name="add_daily_dose">Add dose</string>
     <string name="lab_view_trend">Trend</string>
     <string name="lab_view_list">List</string>
     <string name="lab_normal">Normal</string>

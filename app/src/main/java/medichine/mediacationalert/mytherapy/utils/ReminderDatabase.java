@@ -761,6 +761,30 @@ public class ReminderDatabase extends SQLiteOpenHelper {
         return total;
     }
 
+    public LinkedHashMap<String, Double> getSupplementalDosesByDate(String scheduledDate) {
+        LinkedHashMap<String, Double> doses = new LinkedHashMap<>();
+        if (scheduledDate == null || scheduledDate.length() == 0) {
+            return doses;
+        }
+
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = db.rawQuery(
+                "SELECT " + LOG_TITLE + ", SUM(" + LOG_DOSE + ") FROM " + TABLE_INTAKE_LOGS
+                        + " WHERE " + LOG_ACCOUNT_ID + "=?"
+                        + " AND " + LOG_REMINDER_ID + "<0"
+                        + " AND " + LOG_SCHEDULED_AT + " LIKE ?"
+                        + " GROUP BY " + LOG_TITLE
+                        + " ORDER BY " + LOG_TITLE + " ASC",
+                new String[]{accountIdText(), scheduledDate + " %"});
+        if (cursor.moveToFirst()) {
+            do {
+                doses.put(cursor.getString(0), cursor.isNull(1) ? 0 : cursor.getDouble(1));
+            } while (cursor.moveToNext());
+        }
+        cursor.close();
+        return doses;
+    }
+
     public String exportCurrentAccountArchiveCsv() {
         StringBuilder builder = new StringBuilder();
         builder.append("scheduled_date,actual_date,type,name,value,unit,status,end_date\n");
@@ -1023,14 +1047,20 @@ public class ReminderDatabase extends SQLiteOpenHelper {
 
     public long addLabResult(LabResult result) {
         SQLiteDatabase db = this.getWritableDatabase();
+        String createdAt = result.mCreatedAt == null || result.mCreatedAt.length() == 0
+                ? nowText()
+                : result.mCreatedAt;
         ContentValues values = new ContentValues();
         values.put(LAB_RESULT_ITEM_ID, result.mItemId);
         values.put(LAB_RESULT_VALUE, result.mValue);
-        values.put(LAB_RESULT_CREATED_AT, result.mCreatedAt == null || result.mCreatedAt.length() == 0
-                ? nowText()
-                : result.mCreatedAt);
+        values.put(LAB_RESULT_CREATED_AT, createdAt);
+        long existingId = findLabResultIdByDate(db, result.mItemId, datePart(createdAt));
+        if (existingId > 0) {
+            db.update(TABLE_LAB_RESULTS, values, LAB_RESULT_ID + "=?",
+                    new String[]{String.valueOf(existingId)});
+            return existingId;
+        }
         long id = db.insert(TABLE_LAB_RESULTS, null, values);
-        db.close();
         return id;
     }
 
@@ -1221,10 +1251,20 @@ public class ReminderDatabase extends SQLiteOpenHelper {
             String logScheduledAt = scheduledAt == null || scheduledAt.length() == 0
                     ? ReminderSchedule.format(Calendar.getInstance())
                     : scheduledAt;
+            String normalizedTitle = normalizeTitle(reminder.getTitle());
+            String scheduledDate = datePart(logScheduledAt);
+            double previousDose = getSupplementalDoseForDate(db, normalizedTitle, scheduledDate);
+            db.delete(TABLE_INTAKE_LOGS,
+                    LOG_ACCOUNT_ID + "=?"
+                            + " AND " + LOG_REMINDER_ID + "<0"
+                            + " AND " + LOG_TITLE + "=?"
+                            + " AND " + LOG_SCHEDULED_AT + " LIKE ?",
+                    new String[]{accountIdText(), normalizedTitle, scheduledDate + " %"});
+
             ContentValues values = new ContentValues();
             values.put(LOG_ACCOUNT_ID, mCurrentAccountId);
             values.put(LOG_REMINDER_ID, supplementalLogReminderId());
-            values.put(LOG_TITLE, normalizeTitle(reminder.getTitle()));
+            values.put(LOG_TITLE, normalizedTitle);
             values.put(LOG_DOSE, dose);
             values.put(LOG_SCHEDULED_AT, logScheduledAt);
             values.put(LOG_TAKEN_AT, nowText());
@@ -1233,8 +1273,13 @@ public class ReminderDatabase extends SQLiteOpenHelper {
             if (id == -1) {
                 result = new ConfirmResult(false, mContext.getString(R.string.already_confirmed), 0);
             } else {
-                consumeStock(db, reminder.getTitle(), dose);
-                shouldCheckStockAlert = true;
+                double stockDelta = dose - previousDose;
+                if (stockDelta > 0.000001) {
+                    consumeStock(db, reminder.getTitle(), stockDelta);
+                    shouldCheckStockAlert = true;
+                } else if (stockDelta < -0.000001) {
+                    restoreStock(db, reminder.getTitle(), -stockDelta);
+                }
                 db.setTransactionSuccessful();
                 result = new ConfirmResult(true, mContext.getString(R.string.saved), 1);
             }
@@ -1245,6 +1290,47 @@ public class ReminderDatabase extends SQLiteOpenHelper {
             notifyLowStockIfNeeded(reminder);
         }
         return result;
+    }
+
+    private long findLabResultIdByDate(SQLiteDatabase db, int itemId, String resultDate) {
+        if (resultDate == null || resultDate.length() == 0) {
+            return 0L;
+        }
+        Cursor cursor = db.query(TABLE_LAB_RESULTS, new String[]{LAB_RESULT_ID},
+                LAB_RESULT_ITEM_ID + "=? AND " + LAB_RESULT_CREATED_AT + " LIKE ?",
+                new String[]{String.valueOf(itemId), resultDate + "%"},
+                null, null, LAB_RESULT_ID + " DESC", "1");
+        long id = cursor.moveToFirst() ? cursor.getLong(0) : 0L;
+        cursor.close();
+        return id;
+    }
+
+    private double getSupplementalDoseForDate(SQLiteDatabase db, String title, String scheduledDate) {
+        if (title == null || scheduledDate == null || scheduledDate.length() == 0) {
+            return 0;
+        }
+        Cursor cursor = db.rawQuery(
+                "SELECT SUM(" + LOG_DOSE + ") FROM " + TABLE_INTAKE_LOGS
+                        + " WHERE " + LOG_ACCOUNT_ID + "=?"
+                        + " AND " + LOG_TITLE + "=?"
+                        + " AND " + LOG_SCHEDULED_AT + " LIKE ?"
+                        + " AND " + LOG_REMINDER_ID + "<0",
+                new String[]{accountIdText(), title, scheduledDate + " %"});
+        double total = 0;
+        if (cursor.moveToFirst()) {
+            total = cursor.isNull(0) ? 0 : cursor.getDouble(0);
+        }
+        cursor.close();
+        return total;
+    }
+
+    private String datePart(String scheduledAt) {
+        if (scheduledAt == null) {
+            return "";
+        }
+        String value = scheduledAt.trim();
+        int index = value.lastIndexOf(' ');
+        return index > 0 ? value.substring(0, index) : value;
     }
 
     private int supplementalLogReminderId() {
