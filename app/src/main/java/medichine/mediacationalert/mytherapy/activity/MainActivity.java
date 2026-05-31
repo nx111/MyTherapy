@@ -169,6 +169,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     private ItemTouchHelper mLabItemTouchHelper;
     private CourseIconEditState mCourseIconEditState;
     private boolean mExportFullBackup;
+    private boolean mExportLabCsv;
 
     private static class CourseIconEditState {
         String iconType;
@@ -964,32 +965,35 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     private void openArchiveExport() {
         String[] labels = new String[]{
                 getString(R.string.export_format_csv),
+                getString(R.string.export_format_lab_csv),
                 getString(R.string.export_format_backup)
         };
         new AlertDialog.Builder(this)
                 .setTitle(R.string.export_data)
-                .setItems(labels, (dialog, which) -> openArchiveExportDocument(which == 1))
+                .setItems(labels, (dialog, which) -> openArchiveExportDocument(which == 2, which == 1))
                 .setNegativeButton(R.string.cancel, null)
                 .show();
     }
 
-    private void openArchiveExportDocument(boolean fullBackup) {
+    private void openArchiveExportDocument(boolean fullBackup, boolean labCsv) {
         mExportFullBackup = fullBackup;
+        mExportLabCsv = labCsv;
         Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
         intent.setType(fullBackup ? "application/zip" : "text/csv");
-        intent.putExtra(Intent.EXTRA_TITLE, exportFileName(fullBackup));
+        intent.putExtra(Intent.EXTRA_TITLE, exportFileName(fullBackup, labCsv));
         startActivityForResult(intent, REQUEST_EXPORT_ARCHIVE);
     }
 
-    private String exportFileName(boolean fullBackup) {
+    private String exportFileName(boolean fullBackup, boolean labCsv) {
         String accountName = rb.getCurrentAccountName();
         String safeName = accountName == null ? "" : accountName.replaceAll("[\\\\/:*?\"<>|]+", "_").trim();
         if (safeName.length() == 0) {
             safeName = getString(R.string.app_name);
         }
         String timestamp = new SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Calendar.getInstance().getTime());
-        return safeName + "-" + timestamp + (fullBackup ? ".mtbackup" : ".csv");
+        String suffix = fullBackup ? ".mtbackup" : labCsv ? "-lab.csv" : ".csv";
+        return safeName + "-" + timestamp + suffix;
     }
 
     @Override
@@ -1076,7 +1080,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                 rb = new ReminderDatabase(getApplicationContext());
             } else {
                 OutputStreamWriter writer = new OutputStreamWriter(outputStream, StandardCharsets.UTF_8);
-                writer.write(rb.exportCompleteCsv());
+                writer.write(mExportLabCsv ? rb.exportLabResultsCsv() : rb.exportCompleteCsv());
                 writer.flush();
             }
             Toast.makeText(this, R.string.export_success, Toast.LENGTH_SHORT).show();

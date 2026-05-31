@@ -175,6 +175,7 @@
     <string name="import_data">Import Data</string>
     <string name="export_data">Export Data</string>
     <string name="export_format_csv">CSV for other apps</string>
+    <string name="export_format_lab_csv">Lab results CSV</string>
     <string name="export_format_backup">Full app backup</string>
     <string name="export_success">Data exported</string>
     <string name="export_failed">Export failed</string>
@@ -256,6 +257,11 @@
     <string name="lab_reference_max_only">Reference ≤ %1$s %2$s</string>
     <string name="lab_reference_empty">No reference value</string>
     <string name="lab_latest_result">%3$s\u0020\u0020%1$s %2$s</string>
+    <string name="lab_export_title">Lab Test Record</string>
+    <string name="lab_export_item">Item</string>
+    <string name="lab_export_reference">Reference range</string>
+    <string name="lab_export_time">Time</string>
+    <string name="lab_export_note">Note</string>
     <string name="lab_no_result">No result</string>
     <string name="lab_detail_chart">Trend chart</string>
     <string name="lab_detail_list">List</string>

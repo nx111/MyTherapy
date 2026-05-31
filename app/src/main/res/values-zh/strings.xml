@@ -155,6 +155,7 @@
     <string name="import_data">导入数据</string>
     <string name="export_data">导出数据</string>
     <string name="export_format_csv">CSV（给其它应用使用）</string>
+    <string name="export_format_lab_csv">检验项目 CSV</string>
     <string name="export_format_backup">完整应用备份</string>
     <string name="export_success">数据已导出</string>
     <string name="export_failed">导出失败</string>
@@ -240,6 +241,11 @@
     <string name="lab_reference_max_only">参考值 ≤ %1$s %2$s</string>
     <string name="lab_reference_empty">未填写参考值</string>
     <string name="lab_latest_result">%3$s\u0020\u0020%1$s %2$s</string>
+    <string name="lab_export_title">主要化验指标记录表</string>
+    <string name="lab_export_item">项目</string>
+    <string name="lab_export_reference">参考范围</string>
+    <string name="lab_export_time">时间</string>
+    <string name="lab_export_note">备注</string>
     <string name="lab_no_result">暂无结果</string>
     <string name="lab_detail_chart">趋势图</string>
     <string name="lab_detail_list">列表</string>

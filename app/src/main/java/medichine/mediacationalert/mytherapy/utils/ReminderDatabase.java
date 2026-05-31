@@ -15,6 +15,7 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -805,6 +806,52 @@ public class ReminderDatabase extends SQLiteOpenHelper {
                         "planned",
                         archiveEndDate(reminder.getEndDate()));
             }
+        }
+        return builder.toString();
+    }
+
+    public String exportLabResultsCsv() {
+        List<LabTestItem> items = getLabTestItems();
+        int columnCount = items.size() + 2;
+        StringBuilder builder = new StringBuilder();
+        appendCsvRow(builder, sizedRow(columnCount, mContext.getString(R.string.lab_export_title)));
+
+        String[] itemRow = sizedRow(columnCount, mContext.getString(R.string.lab_export_item));
+        String[] referenceRow = sizedRow(columnCount, mContext.getString(R.string.lab_export_reference));
+        String[] timeRow = sizedRow(columnCount, mContext.getString(R.string.lab_export_time));
+        for (int i = 0; i < items.size(); i++) {
+            int column = i + 1;
+            LabTestItem item = items.get(i);
+            itemRow[column] = item.mName;
+            referenceRow[column] = labExportReferenceText(item);
+        }
+        itemRow[columnCount - 1] = mContext.getString(R.string.lab_export_note);
+        appendCsvRow(builder, itemRow);
+        appendCsvRow(builder, referenceRow);
+        appendCsvRow(builder, timeRow);
+
+        LinkedHashMap<String, String[]> rowsByDate = new LinkedHashMap<>();
+        for (int i = 0; i < items.size(); i++) {
+            LabTestItem item = items.get(i);
+            int column = i + 1;
+            for (LabResult result : getLabResultsForItem(item.mId)) {
+                String date = datePart(result.mCreatedAt);
+                if (date.length() == 0) {
+                    continue;
+                }
+                String[] row = rowsByDate.get(date);
+                if (row == null) {
+                    row = sizedRow(columnCount, compactExportDate(date));
+                    rowsByDate.put(date, row);
+                }
+                row[column] = formatQuantity(result.mValue);
+            }
+        }
+
+        ArrayList<String> dates = new ArrayList<>(rowsByDate.keySet());
+        Collections.sort(dates);
+        for (String date : dates) {
+            appendCsvRow(builder, rowsByDate.get(date));
         }
         return builder.toString();
     }
@@ -1653,11 +1700,42 @@ public class ReminderDatabase extends SQLiteOpenHelper {
         builder.append('\n');
     }
 
+    private String[] sizedRow(int columnCount, String firstValue) {
+        String[] row = new String[columnCount];
+        for (int i = 0; i < row.length; i++) {
+            row[i] = "";
+        }
+        row[0] = firstValue == null ? "" : firstValue;
+        return row;
+    }
+
+    private String labExportReferenceText(LabTestItem item) {
+        String unit = item.mUnit == null ? "" : item.mUnit.trim();
+        if (item.mReferenceMin != null && item.mReferenceMax != null) {
+            return appendUnit(formatQuantity(item.mReferenceMin) + "-" + formatQuantity(item.mReferenceMax), unit);
+        }
+        if (item.mReferenceMin != null) {
+            return appendUnit(">=" + formatQuantity(item.mReferenceMin), unit);
+        }
+        if (item.mReferenceMax != null) {
+            return appendUnit("<=" + formatQuantity(item.mReferenceMax), unit);
+        }
+        return "";
+    }
+
+    private String appendUnit(String value, String unit) {
+        return unit.length() == 0 ? value : value + " " + unit;
+    }
+
+    private String compactExportDate(String date) {
+        return date != null && date.length() == 10 ? date.replace("-", "") : date;
+    }
+
     private String csvValue(String value) {
         if (value == null) {
             return "";
         }
-        if (value.contains(",") || value.contains("\"") || value.contains("\n")) {
+        if (value.contains(",") || value.contains("\"") || value.contains("\n") || value.contains("\r")) {
             return "\"" + value.replace("\"", "\"\"") + "\"";
         }
         return value;
