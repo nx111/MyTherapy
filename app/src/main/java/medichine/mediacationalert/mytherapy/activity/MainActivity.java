@@ -1763,7 +1763,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
             updateEmptyState(summaryList.isEmpty(), R.string.no_history_records);
         } else if (mCurrentPage == PAGE_LAB) {
             summaryList = generateLabData();
-            mSummaryAdapter = new SummaryListAdapter(summaryList, this, this, false, true, false);
+            mSummaryAdapter = new SummaryListAdapter(summaryList, this, this, false, true);
             mList.setAdapter(mSummaryAdapter);
             updateEmptyState(summaryList.isEmpty(), R.string.no_lab_records);
         } else if (mCurrentPage == PAGE_COURSE) {
