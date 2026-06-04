@@ -7,6 +7,7 @@ import android.graphics.DashPathEffect;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.RectF;
+import android.view.MotionEvent;
 import android.view.View;
 
 import java.util.ArrayList;
@@ -28,6 +29,7 @@ public class LabTrendChartView extends View {
     private final RectF plot = new RectF();
     private LabTestItem item;
     private List<LabResult> results = new ArrayList<>();
+    private OnResultClickListener resultClickListener;
 
     public LabTrendChartView(Context context) {
         super(context);
@@ -66,6 +68,10 @@ public class LabTrendChartView extends View {
         invalidate();
     }
 
+    public void setOnResultClickListener(OnResultClickListener listener) {
+        resultClickListener = listener;
+    }
+
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
@@ -92,6 +98,18 @@ public class LabTrendChartView extends View {
         drawGrid(canvas, min, max);
         drawTrend(canvas, min, span);
         drawDateLabels(canvas);
+    }
+
+    @Override
+    public boolean onTouchEvent(MotionEvent event) {
+        if (event.getAction() != MotionEvent.ACTION_UP || results.isEmpty() || plot.width() <= 0 || plot.height() <= 0) {
+            return true;
+        }
+        int index = nearestResultIndex(event.getX(), event.getY());
+        if (index >= 0 && resultClickListener != null) {
+            resultClickListener.onResultClick(results.get(index));
+        }
+        return true;
     }
 
     private void drawNoData(Canvas canvas) {
@@ -170,6 +188,29 @@ public class LabTrendChartView extends View {
         return plot.bottom - plot.height() * ratio;
     }
 
+    private int nearestResultIndex(float touchX, float touchY) {
+        double min = chartMin();
+        double max = chartMax();
+        double span = max - min;
+        if (span <= 0.000001) {
+            min -= 1;
+            span = 2;
+        }
+
+        int nearest = -1;
+        float bestDistance = dp(28);
+        for (int i = 0; i < results.size(); i++) {
+            float dx = touchX - xFor(i);
+            float dy = touchY - yFor(results.get(i).mValue, min, span);
+            float distance = (float) Math.sqrt(dx * dx + dy * dy);
+            if (distance <= bestDistance) {
+                bestDistance = distance;
+                nearest = i;
+            }
+        }
+        return nearest;
+    }
+
     private double chartMin() {
         double min = results.get(0).mValue;
         for (LabResult result : results) {
@@ -244,5 +285,9 @@ public class LabTrendChartView extends View {
 
     private float sp(int value) {
         return value * getResources().getDisplayMetrics().scaledDensity;
+    }
+
+    public interface OnResultClickListener {
+        void onResultClick(LabResult result);
     }
 }
