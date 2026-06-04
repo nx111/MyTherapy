@@ -12,6 +12,7 @@ final class ReminderOccurrenceState {
     private static final String KEY_IGNORED = "ignored:";
     private static final String KEY_SNOOZED_UNTIL = "snoozed_until:";
     private static final String KEY_CONFIRM_DUE_AT = "confirm_due_at:";
+    private static final String KEY_CONFIRM_ACKNOWLEDGED = "confirm_acknowledged:";
 
     private ReminderOccurrenceState() {
     }
@@ -33,11 +34,15 @@ final class ReminderOccurrenceState {
             return false;
         }
         long now = System.currentTimeMillis();
+        long scheduledMillis = ReminderSchedule.parseScheduledAt(scheduledAt).getTimeInMillis();
+        if (scheduledMillis > now) {
+            return false;
+        }
         long snoozedUntil = getSnoozedUntil(context, reminder.getID(), scheduledAt);
         if (snoozedUntil > 0L) {
             return snoozedUntil <= now;
         }
-        return ReminderSchedule.parseScheduledAt(scheduledAt).getTimeInMillis() <= now;
+        return true;
     }
 
     static void markIgnored(Context context, int reminderId, String scheduledAt) {
@@ -69,15 +74,36 @@ final class ReminderOccurrenceState {
     }
 
     static boolean isConfirmationDueNow(Context context, ReminderDatabase database, Reminder reminder, String scheduledAt) {
+        if (isConfirmationAcknowledged(context, reminder.getID(), scheduledAt)) {
+            return false;
+        }
         long dueAt = getConfirmationDueAt(context, reminder.getID(), scheduledAt);
         return dueAt > 0L
                 && dueAt <= System.currentTimeMillis()
                 && database.isReminderTaken(reminder.getID(), scheduledAt);
     }
 
+    static void markConfirmationAcknowledged(Context context, int reminderId, String scheduledAt) {
+        prefs(context).edit()
+                .putBoolean(key(KEY_CONFIRM_ACKNOWLEDGED, reminderId, scheduledAt), true)
+                .remove(key(KEY_CONFIRM_DUE_AT, reminderId, scheduledAt))
+                .apply();
+    }
+
+    static boolean isConfirmationAcknowledged(Context context, int reminderId, String scheduledAt) {
+        return prefs(context).getBoolean(key(KEY_CONFIRM_ACKNOWLEDGED, reminderId, scheduledAt), false);
+    }
+
     static void clearConfirmationPending(Context context, int reminderId, String scheduledAt) {
         prefs(context).edit()
                 .remove(key(KEY_CONFIRM_DUE_AT, reminderId, scheduledAt))
+                .apply();
+    }
+
+    static void clearConfirmation(Context context, int reminderId, String scheduledAt) {
+        prefs(context).edit()
+                .remove(key(KEY_CONFIRM_DUE_AT, reminderId, scheduledAt))
+                .remove(key(KEY_CONFIRM_ACKNOWLEDGED, reminderId, scheduledAt))
                 .apply();
     }
 
