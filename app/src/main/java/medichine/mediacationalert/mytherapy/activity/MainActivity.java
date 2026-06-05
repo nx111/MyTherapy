@@ -120,6 +120,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     private static final String PREF_NOTIFICATION_SETTINGS_HANDLED = "notification_settings_handled";
     private static final String PREF_NOTIFICATION_CHANNEL_SETTINGS_HANDLED = "notification_channel_settings_handled";
     private static final String PREF_BATTERY_OPTIMIZATION_HANDLED = "battery_optimization_handled";
+    private static final String PREF_LAB_EXPORT_ITEM_IDS = "lab_export_item_ids";
     private static final int PAGE_TODAY = 0;
     private static final int PAGE_LAB = 1;
     private static final int PAGE_COURSE = 2;
@@ -170,6 +171,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     private CourseIconEditState mCourseIconEditState;
     private boolean mExportFullBackup;
     private boolean mExportLabCsv;
+    private ArrayList<Integer> mExportLabItemIds = new ArrayList<>();
 
     private static class CourseIconEditState {
         String iconType;
@@ -970,14 +972,150 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         };
         new AlertDialog.Builder(this)
                 .setTitle(R.string.export_data)
-                .setItems(labels, (dialog, which) -> openArchiveExportDocument(which == 2, which == 1))
+                .setItems(labels, (dialog, which) -> {
+                    if (which == 1) {
+                        showLabExportActionDialog();
+                    } else {
+                        openArchiveExportDocument(which == 2, false);
+                    }
+                })
                 .setNegativeButton(R.string.cancel, null)
                 .show();
+    }
+
+    private void showLabExportActionDialog() {
+        List<LabTestItem> items = rb.getLabTestItems();
+        if (items.isEmpty()) {
+            Toast.makeText(this, R.string.no_lab_items, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        String[] labels = new String[]{
+                getString(R.string.export_lab_select_items),
+                getString(R.string.export_data)
+        };
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.export_format_lab_csv)
+                .setItems(labels, (dialog, which) -> {
+                    if (which == 0) {
+                        showLabExportItemDialog(items);
+                    } else {
+                        mExportLabItemIds = defaultLabExportItemIds(items);
+                        openArchiveExportDocument(false, true);
+                    }
+                })
+                .setNegativeButton(R.string.cancel, null)
+                .show();
+    }
+
+    private void showLabExportItemDialog() {
+        List<LabTestItem> items = rb.getLabTestItems();
+        if (items.isEmpty()) {
+            Toast.makeText(this, R.string.no_lab_items, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        showLabExportItemDialog(items);
+    }
+
+    private void showLabExportItemDialog(List<LabTestItem> items) {
+        String savedIds = prefs.getString(PREF_LAB_EXPORT_ITEM_IDS, "");
+        boolean useSavedSelection = savedIds.length() > 0;
+        boolean[] checked = new boolean[items.size()];
+        String[] labels = new String[items.size()];
+        for (int i = 0; i < items.size(); i++) {
+            LabTestItem item = items.get(i);
+            labels[i] = item.mName;
+            checked[i] = !useSavedSelection || savedLabExportItemSelected(savedIds, item.mId);
+        }
+        if (useSavedSelection && !hasCheckedItem(checked)) {
+            for (int i = 0; i < checked.length; i++) {
+                checked[i] = true;
+            }
+        }
+
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.export_lab_select_items)
+                .setMultiChoiceItems(labels, checked, (dialog, which, isChecked) -> checked[which] = isChecked)
+                .setPositiveButton(R.string.export_data, (dialog, which) -> {
+                    ArrayList<Integer> selectedIds = selectedLabExportItemIds(items, checked);
+                    if (selectedIds.isEmpty()) {
+                        Toast.makeText(this, R.string.lab_export_select_required, Toast.LENGTH_SHORT).show();
+                        return;
+                    }
+                    mExportLabItemIds = selectedIds;
+                    prefs.setString(PREF_LAB_EXPORT_ITEM_IDS, joinIds(selectedIds));
+                    openArchiveExportDocument(false, true);
+                })
+                .setNegativeButton(R.string.cancel, null)
+                .show();
+    }
+
+    private ArrayList<Integer> defaultLabExportItemIds(List<LabTestItem> items) {
+        String savedIds = prefs.getString(PREF_LAB_EXPORT_ITEM_IDS, "");
+        ArrayList<Integer> selectedIds = new ArrayList<>();
+        if (savedIds.length() > 0) {
+            for (LabTestItem item : items) {
+                if (savedLabExportItemSelected(savedIds, item.mId)) {
+                    selectedIds.add(item.mId);
+                }
+            }
+        }
+        if (selectedIds.isEmpty()) {
+            for (LabTestItem item : items) {
+                selectedIds.add(item.mId);
+            }
+        }
+        return selectedIds;
+    }
+
+    private boolean savedLabExportItemSelected(String savedIds, int itemId) {
+        String target = String.valueOf(itemId);
+        for (String id : savedIds.split(",")) {
+            if (target.equals(id.trim())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean hasCheckedItem(boolean[] checked) {
+        for (boolean value : checked) {
+            if (value) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private ArrayList<Integer> selectedLabExportItemIds(List<LabTestItem> items, boolean[] checked) {
+        ArrayList<Integer> selectedIds = new ArrayList<>();
+        for (int i = 0; i < items.size() && i < checked.length; i++) {
+            if (checked[i]) {
+                selectedIds.add(items.get(i).mId);
+            }
+        }
+        return selectedIds;
+    }
+
+    private String joinIds(List<Integer> ids) {
+        StringBuilder builder = new StringBuilder();
+        for (Integer id : ids) {
+            if (id == null) {
+                continue;
+            }
+            if (builder.length() > 0) {
+                builder.append(',');
+            }
+            builder.append(id);
+        }
+        return builder.toString();
     }
 
     private void openArchiveExportDocument(boolean fullBackup, boolean labCsv) {
         mExportFullBackup = fullBackup;
         mExportLabCsv = labCsv;
+        if (!labCsv) {
+            mExportLabItemIds.clear();
+        }
         Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
         intent.addCategory(Intent.CATEGORY_OPENABLE);
         intent.setType(fullBackup ? "application/zip" : "text/csv");
@@ -1081,7 +1219,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
             } else {
                 OutputStreamWriter writer = new OutputStreamWriter(outputStream, StandardCharsets.UTF_8);
                 writer.write('\uFEFF');
-                writer.write(mExportLabCsv ? rb.exportLabResultsCsv() : rb.exportCompleteCsv());
+                writer.write(mExportLabCsv ? rb.exportLabResultsCsv(mExportLabItemIds) : rb.exportCompleteCsv());
                 writer.flush();
             }
             Toast.makeText(this, R.string.export_success, Toast.LENGTH_SHORT).show();

@@ -811,7 +811,20 @@ public class ReminderDatabase extends SQLiteOpenHelper {
     }
 
     public String exportLabResultsCsv() {
+        return exportLabResultsCsv(null);
+    }
+
+    public String exportLabResultsCsv(List<Integer> selectedItemIds) {
         List<LabTestItem> items = getLabTestItems();
+        if (selectedItemIds != null && !selectedItemIds.isEmpty()) {
+            ArrayList<LabTestItem> selectedItems = new ArrayList<>();
+            for (LabTestItem item : items) {
+                if (selectedItemIds.contains(item.mId)) {
+                    selectedItems.add(item);
+                }
+            }
+            items = selectedItems;
+        }
         int columnCount = items.size() + 2;
         StringBuilder builder = new StringBuilder();
         appendCsvRow(builder, sizedRow(columnCount, mContext.getString(R.string.lab_export_title)));

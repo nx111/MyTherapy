@@ -179,6 +179,7 @@
     <string name="export_format_backup">Full app backup</string>
     <string name="export_success">Data exported</string>
     <string name="export_failed">Export failed</string>
+    <string name="export_lab_select_items">Select lab items</string>
     <string name="account_name_hint">Account name</string>
     <string name="account_name_required">Account name is required</string>
     <string name="account_name_exists">Account name already exists</string>
@@ -262,6 +263,7 @@
     <string name="lab_export_reference">Reference range</string>
     <string name="lab_export_time">Time</string>
     <string name="lab_export_note">Note</string>
+    <string name="lab_export_select_required">Select at least one lab item</string>
     <string name="lab_no_result">No result</string>
     <string name="lab_detail_chart">Trend chart</string>
     <string name="lab_detail_list">List</string>
