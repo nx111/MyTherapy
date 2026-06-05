@@ -1808,7 +1808,9 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                     Toast.makeText(getApplicationContext(), result.message, Toast.LENGTH_SHORT).show();
                     if (result.success) {
                         AlarmReceiver.completeConfirmedOccurrence(getApplicationContext(), reminderIds, scheduledAt);
-                        AlarmReceiver.scheduleFollowUpConfirmation(getApplicationContext(), reminderIds, scheduledAt);
+                        if (result.confirmedCount > 0) {
+                            AlarmReceiver.scheduleFollowUpConfirmation(getApplicationContext(), reminderIds, scheduledAt);
+                        }
                         loadCurrentPage();
                     }
                 })
@@ -3441,7 +3443,9 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         if (result.success) {
             if (taken) {
                 AlarmReceiver.completeConfirmedOccurrence(getApplicationContext(), reminderId, scheduledAt);
-                AlarmReceiver.scheduleFollowUpConfirmation(getApplicationContext(), reminderId, scheduledAt);
+                if (result.confirmedCount > 0) {
+                    AlarmReceiver.scheduleFollowUpConfirmation(getApplicationContext(), reminderId, scheduledAt);
+                }
             }
             loadReminderList();
         }
@@ -4491,7 +4495,9 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         Toast.makeText(getApplicationContext(), result.message, Toast.LENGTH_SHORT).show();
         if (result.success) {
             AlarmReceiver.completeConfirmedOccurrence(getApplicationContext(), item.mReminderIds, item.mScheduledAt);
-            AlarmReceiver.scheduleFollowUpConfirmation(getApplicationContext(), item.mReminderIds, item.mScheduledAt);
+            if (result.confirmedCount > 0) {
+                AlarmReceiver.scheduleFollowUpConfirmation(getApplicationContext(), item.mReminderIds, item.mScheduledAt);
+            }
         }
         loadReminderList();
     }

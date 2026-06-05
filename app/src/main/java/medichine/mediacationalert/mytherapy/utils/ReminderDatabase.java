@@ -1199,7 +1199,7 @@ public class ReminderDatabase extends SQLiteOpenHelper {
                 Reminder reminder = getReminder(reminderId);
                 if (reminder == null
                         || !ReminderSchedule.hasOccurrenceAt(reminder, scheduledAt)
-                        || (!"true".equals(reminder.getActive()) && scheduledMillis > nowMillis)
+                        || scheduledMillis > nowMillis
                         || isReminderTaken(reminder.getID(), scheduledAt)) {
                     continue;
                 }
@@ -1228,6 +1228,7 @@ public class ReminderDatabase extends SQLiteOpenHelper {
                     values.put(LOG_SCHEDULED_AT, scheduledAt);
                     values.put(LOG_TAKEN_AT, takenAt);
                     db.insertWithOnConflict(TABLE_INTAKE_LOGS, null, values, SQLiteDatabase.CONFLICT_IGNORE);
+                    ReminderOccurrenceState.clearConfirmation(mContext, reminder.getID(), scheduledAt);
                 }
 
                 stockAlertReminders.addAll(remindersToConfirm);
@@ -1269,6 +1270,7 @@ public class ReminderDatabase extends SQLiteOpenHelper {
                     values.put(LOG_SCHEDULED_AT, scheduledAt);
                     values.put(LOG_TAKEN_AT, nowText());
                     db.insertWithOnConflict(TABLE_INTAKE_LOGS, null, values, SQLiteDatabase.CONFLICT_IGNORE);
+                    ReminderOccurrenceState.clearConfirmation(mContext, reminder.getID(), scheduledAt);
                     shouldCheckStockAlert = true;
                     db.setTransactionSuccessful();
                     result = new ConfirmResult(true, mContext.getString(R.string.taken), 1);
@@ -1281,6 +1283,7 @@ public class ReminderDatabase extends SQLiteOpenHelper {
                     db.delete(TABLE_INTAKE_LOGS,
                             LOG_ID + "=? AND " + LOG_ACCOUNT_ID + "=?",
                             new String[]{String.valueOf(existingLog.id), accountIdText()});
+                    ReminderOccurrenceState.clearConfirmation(mContext, reminder.getID(), scheduledAt);
                     restoreStock(db, existingLog.title, existingLog.dose);
                     db.setTransactionSuccessful();
                     result = new ConfirmResult(true, mContext.getString(R.string.not_taken), 1);

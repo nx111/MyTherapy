@@ -116,6 +116,11 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
         if (scheduledAt == null || scheduledAt.length() == 0) {
             scheduledAt = ReminderSchedule.format(ReminderSchedule.currentOccurrence(reminder, rb));
         }
+        long scheduledMillis = ReminderSchedule.parseScheduledAt(scheduledAt).getTimeInMillis();
+        if (scheduledMillis > System.currentTimeMillis()) {
+            scheduleReminderAt(context, reminder, scheduledAt, scheduledMillis);
+            return;
+        }
         List<Reminder> group = rb.getActiveRemindersAt(scheduledAt);
         if (group.isEmpty()) {
             group.add(reminder);
@@ -154,7 +159,9 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
                 ReminderOccurrenceState.clear(context, reminder.getID(), scheduledAt);
             }
             scheduleGroupNextAfter(context, group, nextSearchAfter(scheduledAt));
-            scheduleFollowUpConfirmation(context, reminderIds, scheduledAt);
+            if (result.confirmedCount > 0) {
+                scheduleFollowUpConfirmation(context, reminderIds, scheduledAt);
+            }
             cancelNotification(context, scheduledAt);
         } else {
             createNotificationChannel(context, notificationManager);
@@ -178,10 +185,10 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
             return;
         }
         ReminderDatabase rb = new ReminderDatabase(context);
-        AlarmReceiver receiver = new AlarmReceiver();
-        List<Reminder> group = receiver.confirmationReminders(context, rb, rb.getActiveRemindersAt(scheduledAt), scheduledAt);
-        for (Reminder reminder : group) {
-            ReminderOccurrenceState.clearConfirmationPending(context, reminder.getID(), scheduledAt);
+        for (Reminder reminder : rb.getActiveRemindersAt(scheduledAt)) {
+            if (rb.isReminderTaken(reminder.getID(), scheduledAt)) {
+                ReminderOccurrenceState.markConfirmationAcknowledged(context, reminder.getID(), scheduledAt);
+            }
         }
         cancelConfirmationNotification(context, scheduledAt);
     }
@@ -199,6 +206,12 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
             return;
         }
         long dueAtMillis = confirmationDueAtMillis(rb, reminderId, scheduledAt);
+        long pendingDueAtMillis = ReminderOccurrenceState.getConfirmationDueAt(context, reminderId, scheduledAt);
+        if (ReminderOccurrenceState.isConfirmationAcknowledged(context, reminderId, scheduledAt)
+                || pendingDueAtMillis <= 0L) {
+            cancelConfirmationNotification(context, scheduledAt);
+            return;
+        }
         if (dueAtMillis <= 0L) {
             ReminderOccurrenceState.clearConfirmationPending(context, reminderId, scheduledAt);
             cancelConfirmationNotification(context, scheduledAt);
@@ -509,7 +522,8 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
             long dueAtMillis = confirmationDueAtMillis(rb, reminder.getID(), scheduledAt);
             if (dueAtMillis > 0L
                     && dueAtMillis <= now
-                    && rb.isReminderTaken(reminder.getID(), scheduledAt)) {
+                    && rb.isReminderTaken(reminder.getID(), scheduledAt)
+                    && !ReminderOccurrenceState.isConfirmationAcknowledged(context, reminder.getID(), scheduledAt)) {
                 long storedDueAt = ReminderOccurrenceState.getConfirmationDueAt(context, reminder.getID(), scheduledAt);
                 if (storedDueAt != dueAtMillis) {
                     ReminderOccurrenceState.markConfirmationPending(context, reminder.getID(), scheduledAt, dueAtMillis);
@@ -541,6 +555,9 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
             }
             Reminder reminder = rb.getReminder(reminderId);
             if (reminder == null || !"true".equals(reminder.getActive())) {
+                continue;
+            }
+            if (ReminderOccurrenceState.isConfirmationAcknowledged(context, reminderId, scheduledAt)) {
                 continue;
             }
             long dueAtMillis = confirmationDueAtMillis(rb, reminderId, scheduledAt);
@@ -579,7 +596,8 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
             Reminder reminder = rb.getReminder(state.reminderId);
             if (reminder == null
                     || !"true".equals(reminder.getActive())
-                    || !rb.isReminderTaken(state.reminderId, state.scheduledAt)) {
+                    || !rb.isReminderTaken(state.reminderId, state.scheduledAt)
+                    || ReminderOccurrenceState.isConfirmationAcknowledged(context, state.reminderId, state.scheduledAt)) {
                 ReminderOccurrenceState.clearConfirmationPending(context, state.reminderId, state.scheduledAt);
                 continue;
             }
@@ -788,7 +806,8 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
             Reminder reminder = rb.getReminder(state.reminderId);
             if (reminder == null
                     || !"true".equals(reminder.getActive())
-                    || !rb.isReminderTaken(state.reminderId, state.scheduledAt)) {
+                    || !rb.isReminderTaken(state.reminderId, state.scheduledAt)
+                    || ReminderOccurrenceState.isConfirmationAcknowledged(context, state.reminderId, state.scheduledAt)) {
                 ReminderOccurrenceState.clearConfirmationPending(context, state.reminderId, state.scheduledAt);
                 continue;
             }
