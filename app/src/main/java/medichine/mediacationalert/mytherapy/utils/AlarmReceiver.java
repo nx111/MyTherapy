@@ -42,6 +42,7 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
     public static final String CHANNEL_ID = "Channel_id";
     public static final String PREF_REMINDER_RINGTONE_URI = "reminder_ringtone_uri";
     private static final String REMINDER_CHANNEL_ID = CHANNEL_ID + "_alarm_display";
+    private static final String REMINDER_SILENT_CHANNEL_ID = CHANNEL_ID + "_alarm_silent";
     private static final String CHANNEL_NAME = "Notification";
     static final String ACTION_TAKE_GROUP = "medichine.mediacationalert.mytherapy.ACTION_TAKE_GROUP";
     static final String ACTION_CONFIRM_GROUP = "medichine.mediacationalert.mytherapy.ACTION_CONFIRM_GROUP";
@@ -115,6 +116,11 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
         String scheduledAt = intent.getStringExtra(EXTRA_SCHEDULED_AT);
         if (scheduledAt == null || scheduledAt.length() == 0) {
             scheduledAt = ReminderSchedule.format(ReminderSchedule.currentOccurrence(reminder, rb));
+        }
+        if (!isScheduledToday(scheduledAt)) {
+            cancelNotification(context, scheduledAt);
+            scheduleReminderAfter(context, reminder, System.currentTimeMillis());
+            return;
         }
         long scheduledMillis = ReminderSchedule.parseScheduledAt(scheduledAt).getTimeInMillis();
         if (scheduledMillis > System.currentTimeMillis()) {
@@ -198,9 +204,16 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
         if (scheduledAt == null) {
             return;
         }
+        int reminderId = intent.getIntExtra(ReminderEditActivity.EXTRA_REMINDER_ID, -1);
+        if (!isScheduledToday(scheduledAt)) {
+            if (reminderId > 0) {
+                ReminderOccurrenceState.clearConfirmationPending(context, reminderId, scheduledAt);
+            }
+            cancelConfirmationNotification(context, scheduledAt);
+            return;
+        }
 
         ReminderDatabase rb = new ReminderDatabase(context);
-        int reminderId = intent.getIntExtra(ReminderEditActivity.EXTRA_REMINDER_ID, -1);
         if (reminderId <= 0) {
             cancelConfirmationNotification(context, scheduledAt);
             return;
@@ -282,35 +295,29 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
     }
 
     private void showReminderNotification(Context context, Reminder reminder, List<Reminder> group, String scheduledAt) {
-        if (sAppReminderUiActive) {
-            cancelNotification(context, scheduledAt);
-            sendInAppMedicationReminder(context, scheduledAt);
-            return;
-        }
-
+        boolean appReminderUiActive = sAppReminderUiActive;
         this.manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
         createNotificationChannel(context, this.manager);
-        myNotication2 = buildReminderNotification(context, group, scheduledAt);
+        myNotication2 = buildReminderNotification(context, group, scheduledAt, !appReminderUiActive);
 
-        this.manager.cancel(CHANNEL_ID, notificationIdFor(scheduledAt));
         this.manager.notify(notificationIdFor(scheduledAt), myNotication2);
-        ReminderRingService.start(context, scheduledAt);
+        if (appReminderUiActive) {
+            sendInAppMedicationReminder(context, scheduledAt);
+        } else {
+            ReminderRingService.start(context, scheduledAt);
+        }
     }
 
     private void showConfirmationNotification(Context context, List<Reminder> group, String scheduledAt) {
-        if (sAppReminderUiActive) {
-            cancelConfirmationNotification(context, scheduledAt);
-            sendInAppConfirmation(context, scheduledAt);
-            return;
-        }
-
+        boolean appReminderUiActive = sAppReminderUiActive;
         this.manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
         createNotificationChannel(context, this.manager);
-        Notification notification = buildConfirmationReminderNotification(context, group, scheduledAt);
+        Notification notification = buildConfirmationReminderNotification(context, group, scheduledAt, !appReminderUiActive);
 
-        this.manager.cancel(CHANNEL_ID, confirmationNotificationIdFor(scheduledAt));
         this.manager.notify(confirmationNotificationIdFor(scheduledAt), notification);
-        ReminderRingService.start(context, confirmationKeyFor(scheduledAt), group);
+        if (!appReminderUiActive) {
+            ReminderRingService.start(context, confirmationKeyFor(scheduledAt), group);
+        }
         sendInAppConfirmation(context, scheduledAt);
     }
 
@@ -349,6 +356,10 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
     }
 
     static Notification buildReminderNotification(Context context, List<Reminder> group, String scheduledAt) {
+        return buildReminderNotification(context, group, scheduledAt, true);
+    }
+
+    static Notification buildReminderNotification(Context context, List<Reminder> group, String scheduledAt, boolean alert) {
         Intent mainIntent = new Intent(context, MainActivity.class);
         mainIntent.putExtra(MainActivity.EXTRA_STOP_REMINDER_SOUND, true);
         mainIntent.putExtra(MainActivity.EXTRA_REMINDER_SOUND_KEY, scheduledAt);
@@ -363,23 +374,23 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
                 ? context.getString(R.string.medication_time_count, group.size())
                 : context.getString(R.string.time_to_take_medication);
 
-        return new NotificationCompat.Builder(context, getReminderChannelId(context))
+        return new NotificationCompat.Builder(context, getReminderChannelId(context, alert))
                 .setLargeIcon(BitmapFactory.decodeResource(context.getResources(), R.drawable.pill_reminder_icon))
                 .setSmallIcon(R.drawable.baseline_access_alarm_24)
                 .setContentTitle(title)
                 .setTicker(contentText)
-                .setVibrate(new long[]{0, 500, 1000})
+                .setVibrate(alert ? new long[]{0, 500, 1000} : null)
                 .setContentText(contentText)
                 .setStyle(new NotificationCompat.BigTextStyle().bigText(contentText))
                 .setSound(null)
                 .setSilent(true)
                 .setContentIntent(mClick)
                 .setDeleteIntent(ReminderRingService.stopPendingIntent(context, scheduledAt))
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setCategory(NotificationCompat.CATEGORY_ALARM)
+                .setPriority(alert ? NotificationCompat.PRIORITY_HIGH : NotificationCompat.PRIORITY_LOW)
+                .setCategory(alert ? NotificationCompat.CATEGORY_ALARM : NotificationCompat.CATEGORY_REMINDER)
                 .setAutoCancel(false)
                 .setOngoing(true)
-                .setOnlyAlertOnce(false)
+                .setOnlyAlertOnce(!alert)
                 .addAction(R.drawable.baseline_check_24, context.getString(R.string.notification_taken), takenClick)
                 .addAction(R.drawable.baseline_notifications_off_24, context.getString(R.string.notification_skip), skipClick)
                 .addAction(R.drawable.baseline_replay_circle_filled_24, context.getString(R.string.notification_delay), delayClick)
@@ -387,6 +398,10 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
     }
 
     static Notification buildConfirmationReminderNotification(Context context, List<Reminder> group, String scheduledAt) {
+        return buildConfirmationReminderNotification(context, group, scheduledAt, true);
+    }
+
+    static Notification buildConfirmationReminderNotification(Context context, List<Reminder> group, String scheduledAt, boolean alert) {
         String confirmationKey = confirmationKeyFor(scheduledAt);
         Intent mainIntent = new Intent(context, MainActivity.class);
         mainIntent.putExtra(MainActivity.EXTRA_STOP_REMINDER_SOUND, true);
@@ -395,23 +410,23 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
         PendingIntent confirmClick = groupAction(context, scheduledAt, ACTION_CONFIRM_GROUP, 4);
 
         String contentText = buildGroupText(context, group);
-        return new NotificationCompat.Builder(context, getReminderChannelId(context))
+        return new NotificationCompat.Builder(context, getReminderChannelId(context, alert))
                 .setLargeIcon(BitmapFactory.decodeResource(context.getResources(), R.drawable.pill_reminder_icon))
                 .setSmallIcon(R.drawable.baseline_access_alarm_24)
                 .setContentTitle(context.getString(R.string.confirm_medication_title))
                 .setTicker(contentText)
-                .setVibrate(new long[]{0, 500, 1000})
+                .setVibrate(alert ? new long[]{0, 500, 1000} : null)
                 .setContentText(contentText)
                 .setStyle(new NotificationCompat.BigTextStyle().bigText(contentText))
                 .setSound(null)
                 .setSilent(true)
                 .setContentIntent(click)
                 .setDeleteIntent(ReminderRingService.stopPendingIntent(context, confirmationKey))
-                .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setCategory(NotificationCompat.CATEGORY_ALARM)
+                .setPriority(alert ? NotificationCompat.PRIORITY_HIGH : NotificationCompat.PRIORITY_LOW)
+                .setCategory(alert ? NotificationCompat.CATEGORY_ALARM : NotificationCompat.CATEGORY_REMINDER)
                 .setAutoCancel(false)
                 .setOngoing(true)
-                .setOnlyAlertOnce(false)
+                .setOnlyAlertOnce(!alert)
                 .addAction(R.drawable.baseline_check_24, context.getString(R.string.notification_confirm), confirmClick)
                 .build();
     }
@@ -439,6 +454,10 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
         return REMINDER_CHANNEL_ID;
     }
 
+    private static String getReminderChannelId(Context context, boolean alert) {
+        return alert ? REMINDER_CHANNEL_ID : REMINDER_SILENT_CHANNEL_ID;
+    }
+
     public static void recreateNotificationChannel(Context context, String oldChannelId) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
             return;
@@ -452,6 +471,7 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
         }
         notificationManager.deleteNotificationChannel(CHANNEL_ID);
         notificationManager.deleteNotificationChannel(getReminderChannelId(context));
+        notificationManager.deleteNotificationChannel(REMINDER_SILENT_CHANNEL_ID);
         createNotificationChannel(context, notificationManager);
     }
 
@@ -467,6 +487,16 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
             channel.setShowBadge(true);
             channel.setSound(null, null);
             notificationManager.createNotificationChannel(channel);
+
+            NotificationChannel silentChannel = new NotificationChannel(
+                    REMINDER_SILENT_CHANNEL_ID,
+                    CHANNEL_NAME,
+                    NotificationManager.IMPORTANCE_LOW);
+            silentChannel.enableVibration(false);
+            silentChannel.enableLights(false);
+            silentChannel.setShowBadge(true);
+            silentChannel.setSound(null, null);
+            notificationManager.createNotificationChannel(silentChannel);
         }
     }
 
@@ -507,6 +537,9 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
 
     List<Reminder> pendingReminders(Context context, ReminderDatabase rb, List<Reminder> group, String scheduledAt) {
         ArrayList<Reminder> pending = new ArrayList<>();
+        if (!isScheduledToday(scheduledAt)) {
+            return pending;
+        }
         for (Reminder reminder : group) {
             if (ReminderOccurrenceState.isPendingNow(context, rb, reminder, scheduledAt)) {
                 pending.add(reminder);
@@ -517,6 +550,9 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
 
     List<Reminder> confirmationReminders(Context context, ReminderDatabase rb, List<Reminder> group, String scheduledAt) {
         ArrayList<Reminder> pending = new ArrayList<>();
+        if (!isScheduledToday(scheduledAt)) {
+            return pending;
+        }
         long now = System.currentTimeMillis();
         for (Reminder reminder : group) {
             long dueAtMillis = confirmationDueAtMillis(rb, reminder.getID(), scheduledAt);
@@ -544,6 +580,9 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
 
     public static void scheduleFollowUpConfirmation(Context context, List<Integer> reminderIds, String scheduledAt) {
         if (reminderIds == null || reminderIds.isEmpty() || scheduledAt == null || scheduledAt.length() == 0) {
+            return;
+        }
+        if (!isScheduledToday(scheduledAt)) {
             return;
         }
 
@@ -593,6 +632,10 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
 
         long now = System.currentTimeMillis();
         for (ReminderOccurrenceState.ConfirmationState state : states) {
+            if (!isScheduledToday(state.scheduledAt)) {
+                ReminderOccurrenceState.clearConfirmationPending(context, state.reminderId, state.scheduledAt);
+                continue;
+            }
             Reminder reminder = rb.getReminder(state.reminderId);
             if (reminder == null
                     || !"true".equals(reminder.getActive())
@@ -803,6 +846,10 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
         ReminderDatabase rb = new ReminderDatabase(context);
         long now = System.currentTimeMillis();
         for (ReminderOccurrenceState.ConfirmationState state : ReminderOccurrenceState.getPendingConfirmations(context)) {
+            if (!isScheduledToday(state.scheduledAt)) {
+                ReminderOccurrenceState.clearConfirmationPending(context, state.reminderId, state.scheduledAt);
+                continue;
+            }
             Reminder reminder = rb.getReminder(state.reminderId);
             if (reminder == null
                     || !"true".equals(reminder.getActive())
@@ -920,6 +967,16 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
         calendar.set(Calendar.SECOND, 0);
         calendar.set(Calendar.MILLISECOND, 0);
         return calendar.getTimeInMillis();
+    }
+
+    private static boolean isScheduledToday(String scheduledAt) {
+        if (scheduledAt == null || scheduledAt.length() == 0) {
+            return false;
+        }
+        Calendar scheduled = ReminderSchedule.parseScheduledAt(scheduledAt);
+        Calendar today = Calendar.getInstance();
+        return scheduled.get(Calendar.YEAR) == today.get(Calendar.YEAR)
+                && scheduled.get(Calendar.DAY_OF_YEAR) == today.get(Calendar.DAY_OF_YEAR);
     }
 
     private void scheduleWakeup(Context context, long triggerAtMillis, PendingIntent pendingIntent) {
