@@ -121,6 +121,8 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
     private static final String PREF_NOTIFICATION_CHANNEL_SETTINGS_HANDLED = "notification_channel_settings_handled";
     private static final String PREF_BATTERY_OPTIMIZATION_HANDLED = "battery_optimization_handled";
     private static final String PREF_LAB_EXPORT_ITEM_IDS = "lab_export_item_ids";
+    private static final String PREF_LAST_APP_ACTIVE_AT = "last_app_active_at";
+    private static final long AUTO_TODAY_RESET_MILLIS = 60L * 60L * 1000L;
     private static final int PAGE_TODAY = 0;
     private static final int PAGE_LAB = 1;
     private static final int PAGE_COURSE = 2;
@@ -1722,18 +1724,39 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         registerInAppConfirmationReceiver();
         AlarmReceiver.setAppReminderUiActive(true);
         mDismissedFollowUpConfirmationScheduledAt = null;
+        boolean forceTodayPage = shouldForceTodayPageOnActivation();
+        if (forceTodayPage) {
+            mCurrentPage = PAGE_TODAY;
+            resetSelectedDateToToday();
+        }
         if (rb != null) {
             rescheduleCurrentAccountReminders();
             AlarmReceiver alarmReceiver = mAlarmReceiver == null ? new AlarmReceiver() : mAlarmReceiver;
             alarmReceiver.reschedulePendingConfirmations(getApplicationContext());
         }
-        if (mCurrentPage == PAGE_LAB) {
+        boolean pageLoadedByNavigation = false;
+        if (forceTodayPage && mBottomNavigation != null
+                && mBottomNavigation.getSelectedItemId() != R.id.nav_today) {
+            mBottomNavigation.setSelectedItemId(R.id.nav_today);
+            pageLoadedByNavigation = true;
+        }
+        if (!pageLoadedByNavigation && mCurrentPage == PAGE_LAB) {
             loadCurrentPageKeepingListPosition();
-        } else {
+        } else if (!pageLoadedByNavigation) {
             loadCurrentPage();
         }
         showNextDueFollowUpConfirmation();
         checkReminderSystemSettings();
+    }
+
+    private boolean shouldForceTodayPageOnActivation() {
+        if (prefs == null) {
+            return false;
+        }
+        long now = System.currentTimeMillis();
+        long lastActiveAt = prefs.getLong(PREF_LAST_APP_ACTIVE_AT, 0L);
+        prefs.setLong(PREF_LAST_APP_ACTIVE_AT, now);
+        return lastActiveAt > 0L && now - lastActiveAt > AUTO_TODAY_RESET_MILLIS;
     }
 
     @Override

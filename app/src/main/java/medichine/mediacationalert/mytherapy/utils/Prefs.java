@@ -65,6 +65,11 @@ public class Prefs {
         editor.apply();
     }
 
+    public void setLong(String key, long value) {
+        editor.putLong(key, value);
+        editor.apply();
+    }
+
     public void setString(String key, String value) {
         editor.putString(key, value);
         editor.apply();
@@ -86,6 +91,10 @@ public class Prefs {
 
     public int getInt(String key, int def) {
         return sharedPreferences.getInt(key, def);
+    }
+
+    public long getLong(String key, long def) {
+        return sharedPreferences.getLong(key, def);
     }
 
 
