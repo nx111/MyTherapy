@@ -32,8 +32,11 @@ public class ReminderRingService extends Service {
     private static final long DUPLICATE_START_WINDOW_MILLIS = 45000L;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
+    private final Runnable timeoutStopRunnable = this::handleRingTimeout;
     private Ringtone ringtone;
     private boolean foregroundStarted;
+    private String currentScheduledAt;
+    private int[] currentConfirmationReminderIds;
 
     public static void start(Context context, String scheduledAt) {
         Intent intent = new Intent(context, ReminderRingService.class);
@@ -114,6 +117,8 @@ public class ReminderRingService extends Service {
             }
             return START_NOT_STICKY;
         }
+        currentScheduledAt = scheduledAt;
+        currentConfirmationReminderIds = intent.getIntArrayExtra(EXTRA_CONFIRMATION_REMINDER_IDS);
         rememberStart(scheduledAt);
         startForeground(AlarmReceiver.notificationIdFor(scheduledAt), notification);
         foregroundStarted = true;
@@ -124,7 +129,7 @@ public class ReminderRingService extends Service {
         }
         playAlarmRingtone();
         handler.removeCallbacksAndMessages(null);
-        handler.postDelayed(this::stopSelf, MAX_RING_MILLIS);
+        handler.postDelayed(timeoutStopRunnable, MAX_RING_MILLIS);
         return START_NOT_STICKY;
     }
 
@@ -228,6 +233,17 @@ public class ReminderRingService extends Service {
         ringtone = null;
     }
 
+    private void handleRingTimeout() {
+        String scheduledAt = currentScheduledAt;
+        if (scheduledAt != null && scheduledAt.length() > 0) {
+            AlarmReceiver.showTimedOutUnconfirmedNotification(
+                    getApplicationContext(),
+                    scheduledAt,
+                    currentConfirmationReminderIds);
+        }
+        stopSelf();
+    }
+
     private boolean isQuiet(String scheduledAt) {
         long quietUntil = prefs(this).getLong(key(KEY_QUIET_UNTIL, scheduledAt), 0L);
         if (quietUntil <= System.currentTimeMillis()) {
@@ -252,6 +268,8 @@ public class ReminderRingService extends Service {
         handler.removeCallbacksAndMessages(null);
         stopRingtone();
         foregroundStarted = false;
+        currentScheduledAt = null;
+        currentConfirmationReminderIds = null;
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             stopForeground(STOP_FOREGROUND_DETACH);
         } else {
