@@ -35,6 +35,7 @@ public class ReminderRingService extends Service {
     private final Runnable timeoutStopRunnable = this::handleRingTimeout;
     private Ringtone ringtone;
     private boolean foregroundStarted;
+    private boolean ringTimedOut;
     private String currentScheduledAt;
     private int[] currentConfirmationReminderIds;
 
@@ -93,6 +94,7 @@ public class ReminderRingService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         if (intent == null || ACTION_STOP.equals(intent.getAction())) {
+            ringTimedOut = false;
             stopSelf();
             return START_NOT_STICKY;
         }
@@ -119,6 +121,7 @@ public class ReminderRingService extends Service {
         }
         currentScheduledAt = scheduledAt;
         currentConfirmationReminderIds = intent.getIntArrayExtra(EXTRA_CONFIRMATION_REMINDER_IDS);
+        ringTimedOut = false;
         rememberStart(scheduledAt);
         startForeground(AlarmReceiver.notificationIdFor(scheduledAt), notification);
         foregroundStarted = true;
@@ -234,13 +237,7 @@ public class ReminderRingService extends Service {
     }
 
     private void handleRingTimeout() {
-        String scheduledAt = currentScheduledAt;
-        if (scheduledAt != null && scheduledAt.length() > 0) {
-            AlarmReceiver.showTimedOutUnconfirmedNotification(
-                    getApplicationContext(),
-                    scheduledAt,
-                    currentConfirmationReminderIds);
-        }
+        ringTimedOut = true;
         stopSelf();
     }
 
@@ -268,13 +265,27 @@ public class ReminderRingService extends Service {
         handler.removeCallbacksAndMessages(null);
         stopRingtone();
         foregroundStarted = false;
+        String scheduledAt = currentScheduledAt;
+        int[] confirmationReminderIds = currentConfirmationReminderIds;
+        boolean timedOut = ringTimedOut;
+        if (timedOut && scheduledAt != null && scheduledAt.length() > 0) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                stopForeground(STOP_FOREGROUND_REMOVE);
+            } else {
+                stopForeground(true);
+            }
+            AlarmReceiver.showTimedOutUnconfirmedNotification(
+                    getApplicationContext(), scheduledAt, confirmationReminderIds);
+        } else {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                stopForeground(STOP_FOREGROUND_DETACH);
+            } else {
+                stopForeground(false);
+            }
+        }
+        ringTimedOut = false;
         currentScheduledAt = null;
         currentConfirmationReminderIds = null;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            stopForeground(STOP_FOREGROUND_DETACH);
-        } else {
-            stopForeground(false);
-        }
         super.onDestroy();
     }
 
