@@ -1780,11 +1780,22 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                     showInAppFollowUpConfirmation(intent.getStringExtra(AlarmReceiver.EXTRA_SCHEDULED_AT));
                 } else if (AlarmReceiver.ACTION_IN_APP_MEDICATION_REMINDER.equals(intent.getAction())) {
                     showInAppMedicationReminder(intent.getStringExtra(AlarmReceiver.EXTRA_SCHEDULED_AT));
+                } else if (AlarmReceiver.ACTION_IN_APP_MEDICATION_REMINDER_RESOLVED.equals(intent.getAction())) {
+                    String scheduledAt = intent.getStringExtra(AlarmReceiver.EXTRA_SCHEDULED_AT);
+                    dismissMedicationReminderDialog(scheduledAt);
+                    loadCurrentPage();
+                } else if (AlarmReceiver.ACTION_IN_APP_CONFIRMATION_RESOLVED.equals(intent.getAction())) {
+                    String scheduledAt = intent.getStringExtra(AlarmReceiver.EXTRA_SCHEDULED_AT);
+                    dismissFollowUpConfirmationDialog(scheduledAt);
+                    loadCurrentPage();
+                    mUiHandler.post(MainActivity.this::showNextDueFollowUpConfirmation);
                 }
             }
         };
         IntentFilter filter = new IntentFilter(AlarmReceiver.ACTION_IN_APP_CONFIRMATION);
         filter.addAction(AlarmReceiver.ACTION_IN_APP_MEDICATION_REMINDER);
+        filter.addAction(AlarmReceiver.ACTION_IN_APP_MEDICATION_REMINDER_RESOLVED);
+        filter.addAction(AlarmReceiver.ACTION_IN_APP_CONFIRMATION_RESOLVED);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             registerReceiver(mInAppConfirmationReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
         } else {
@@ -1922,11 +1933,27 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         }
     }
 
+    private void dismissFollowUpConfirmationDialog(String scheduledAt) {
+        if (mFollowUpConfirmationDialog != null
+                && scheduledAt != null
+                && scheduledAt.equals(mFollowUpConfirmationDialogScheduledAt)) {
+            mFollowUpConfirmationDialog.dismiss();
+        }
+    }
+
     private void dismissMedicationReminderDialog() {
         if (mMedicationReminderDialog != null) {
             mMedicationReminderDialog.dismiss();
             mMedicationReminderDialog = null;
             mMedicationReminderDialogScheduledAt = null;
+        }
+    }
+
+    private void dismissMedicationReminderDialog(String scheduledAt) {
+        if (mMedicationReminderDialog != null
+                && scheduledAt != null
+                && scheduledAt.equals(mMedicationReminderDialogScheduledAt)) {
+            mMedicationReminderDialog.dismiss();
         }
     }
 

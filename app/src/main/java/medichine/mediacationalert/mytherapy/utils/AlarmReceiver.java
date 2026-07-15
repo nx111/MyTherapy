@@ -48,6 +48,8 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
     static final String ACTION_CONFIRM_GROUP = "medichine.mediacationalert.mytherapy.ACTION_CONFIRM_GROUP";
     public static final String ACTION_IN_APP_MEDICATION_REMINDER = "medichine.mediacationalert.mytherapy.ACTION_IN_APP_MEDICATION_REMINDER";
     public static final String ACTION_IN_APP_CONFIRMATION = "medichine.mediacationalert.mytherapy.ACTION_IN_APP_CONFIRMATION";
+    public static final String ACTION_IN_APP_MEDICATION_REMINDER_RESOLVED = "medichine.mediacationalert.mytherapy.ACTION_IN_APP_MEDICATION_REMINDER_RESOLVED";
+    public static final String ACTION_IN_APP_CONFIRMATION_RESOLVED = "medichine.mediacationalert.mytherapy.ACTION_IN_APP_CONFIRMATION_RESOLVED";
     private static final String ACTION_SHOW_CONFIRMATION = "medichine.mediacationalert.mytherapy.ACTION_SHOW_CONFIRMATION";
     static final String ACTION_SKIP_GROUP = "medichine.mediacationalert.mytherapy.ACTION_SKIP_GROUP";
     static final String ACTION_DELAY_OPTIONS = "medichine.mediacationalert.mytherapy.ACTION_DELAY_OPTIONS";
@@ -150,6 +152,7 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
         List<Reminder> group = pendingReminders(context, rb, rb.getActiveRemindersAt(scheduledAt), scheduledAt);
         if (group.isEmpty()) {
             cancelNotification(context, scheduledAt);
+            sendInAppMedicationReminderResolved(context, scheduledAt);
             return;
         }
         ArrayList<Integer> reminderIds = new ArrayList<>();
@@ -169,6 +172,7 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
                 scheduleFollowUpConfirmation(context, reminderIds, scheduledAt);
             }
             cancelNotification(context, scheduledAt);
+            sendInAppMedicationReminderResolved(context, scheduledAt);
         } else {
             createNotificationChannel(context, notificationManager);
             NotificationCompat.Builder builder = new NotificationCompat.Builder(context, getReminderChannelId(context))
@@ -197,6 +201,7 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
             }
         }
         cancelConfirmationNotification(context, scheduledAt);
+        sendInAppConfirmationResolved(context, scheduledAt);
     }
 
     private void showConfirmationFromAlarm(Context context, Intent intent) {
@@ -259,6 +264,7 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
         }
         cancelNotification(context, scheduledAt);
         scheduleGroupNextAfter(context, group, nextSearchAfter(scheduledAt));
+        sendInAppMedicationReminderResolved(context, scheduledAt);
     }
 
     private void showDelayOptionsFromNotification(Context context, Intent intent) {
@@ -292,6 +298,7 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
             cancelAlarm(context, reminder.getID());
             setSnoozeAlarm(context, reminder, scheduledAt, snoozedUntil);
         }
+        sendInAppMedicationReminderResolved(context, scheduledAt);
     }
 
     private void showReminderNotification(Context context, Reminder reminder, List<Reminder> group, String scheduledAt) {
@@ -818,6 +825,21 @@ public class AlarmReceiver extends WakefulBroadcastReceiver {
 
     private static void sendInAppConfirmation(Context context, String scheduledAt) {
         Intent intent = new Intent(ACTION_IN_APP_CONFIRMATION);
+        intent.setPackage(context.getPackageName());
+        intent.putExtra(EXTRA_SCHEDULED_AT, scheduledAt);
+        context.sendBroadcast(intent);
+    }
+
+    private static void sendInAppMedicationReminderResolved(Context context, String scheduledAt) {
+        sendInAppEvent(context, ACTION_IN_APP_MEDICATION_REMINDER_RESOLVED, scheduledAt);
+    }
+
+    private static void sendInAppConfirmationResolved(Context context, String scheduledAt) {
+        sendInAppEvent(context, ACTION_IN_APP_CONFIRMATION_RESOLVED, scheduledAt);
+    }
+
+    private static void sendInAppEvent(Context context, String action, String scheduledAt) {
+        Intent intent = new Intent(action);
         intent.setPackage(context.getPackageName());
         intent.putExtra(EXTRA_SCHEDULED_AT, scheduledAt);
         context.sendBroadcast(intent);
