@@ -81,6 +81,7 @@
     <string name="select_type">Select Type</string>
     <string name="enter_number">Enter Number</string>
     <string name="add_stock_batch">Add Stock</string>
+    <string name="modify_stock">Modify Stock</string>
     <string name="select_icon">Select Icon</string>
     <string name="medicine_photo">Medicine Photo</string>
     <string name="gallery">Gallery</string>

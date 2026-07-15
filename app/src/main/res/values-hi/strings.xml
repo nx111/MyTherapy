@@ -42,6 +42,7 @@
     <string name="select_type">प्रकार चुनें</string>
     <string name="enter_number">संख्या दर्ज करें</string>
     <string name="add_stock_batch">स्टॉक जोड़ें</string>
+    <string name="modify_stock">स्टॉक संशोधित करें</string>
     <string name="select_icon">आइकन चुनें</string>
     <string name="medicine_photo">दवा की फोटो</string>
     <string name="gallery">गैलरी</string>

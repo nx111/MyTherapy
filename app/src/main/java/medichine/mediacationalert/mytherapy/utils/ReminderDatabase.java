@@ -651,6 +651,20 @@ public class ReminderDatabase extends SQLiteOpenHelper {
         db.close();
     }
 
+    public void replaceStock(String title, double quantity) {
+        String normalizedTitle = normalizeTitle(title);
+        if (normalizedTitle.length() == 0 || quantity < 0) {
+            return;
+        }
+        double adjustment = quantity - getTotalStock(normalizedTitle);
+        if (Math.abs(adjustment) <= 0.000001) {
+            return;
+        }
+        SQLiteDatabase db = this.getWritableDatabase();
+        addStockAdjustment(db, normalizedTitle, adjustment);
+        db.close();
+    }
+
     public double getTotalStock(String title) {
         SQLiteDatabase db = this.getReadableDatabase();
         Cursor cursor = db.rawQuery(

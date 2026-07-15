@@ -42,6 +42,7 @@
     <string name="select_type">Выбрать тип</string>
     <string name="enter_number">Введите число</string>
     <string name="add_stock_batch">Добавить запас</string>
+    <string name="modify_stock">Изменить запас</string>
     <string name="select_icon">Выбрать значок</string>
     <string name="medicine_photo">Фото лекарства</string>
     <string name="gallery">Галерея</string>

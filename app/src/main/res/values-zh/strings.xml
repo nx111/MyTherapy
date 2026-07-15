@@ -65,6 +65,7 @@
     <string name="select_type">选择类型</string>
     <string name="enter_number">输入数字</string>
     <string name="add_stock_batch">添加库存</string>
+    <string name="modify_stock">修改库存</string>
     <string name="select_icon">选择图标</string>
     <string name="medicine_photo">药品照片</string>
     <string name="gallery">相册</string>

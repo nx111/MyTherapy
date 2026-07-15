@@ -3580,6 +3580,10 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         final AlertDialog[] dialogHolder = new AlertDialog[1];
         content.addView(createMedicineHeaderRow(displayTitle, normalizedTitle, reminders.get(0), groupIds, dialogHolder));
 
+        LinearLayout stockRow = new LinearLayout(this);
+        stockRow.setOrientation(LinearLayout.HORIZONTAL);
+        stockRow.setGravity(Gravity.CENTER_VERTICAL);
+
         TextView summary = new TextView(this);
         String summaryText = getString(R.string.stock_amount, formatQuantity(rb.getTotalStock(normalizedTitle)));
         String specText = courseSpec(reminders);
@@ -3589,7 +3593,17 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         summary.setText(summaryText);
         summary.setTextColor(getResources().getColor(R.color.text_secondary));
         summary.setTextSize(14);
-        content.addView(summary, new LinearLayout.LayoutParams(
+        stockRow.addView(summary, new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+
+        ImageButton addStock = new ImageButton(this);
+        addStock.setImageResource(R.drawable.baseline_add_24);
+        addStock.setColorFilter(getResources().getColor(R.color.text_primary));
+        addStock.setBackgroundResource(android.R.drawable.list_selector_background);
+        addStock.setContentDescription(getString(R.string.add_stock_batch));
+        addStock.setOnClickListener(v -> showCourseStockAddDialog(normalizedTitle, groupIds, dialogHolder[0]));
+        stockRow.addView(addStock, new LinearLayout.LayoutParams(dp(44), dp(44)));
+        content.addView(stockRow, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
         content.addView(createPlanHeaderRow(normalizedTitle, reminders.get(0), reminders.size(), groupIds, dialogHolder));
@@ -3880,7 +3894,7 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         stockEntry.setTextSize(16);
         stockEntry.setClickable(true);
         stockEntry.setPadding(0, dp(12), 0, dp(4));
-        stockEntry.setCompoundDrawablesWithIntrinsicBounds(R.drawable.baseline_add_24, 0, 0, 0);
+        stockEntry.setCompoundDrawablesWithIntrinsicBounds(R.drawable.baseline_edit_24, 0, 0, 0);
         stockEntry.setCompoundDrawablePadding(dp(12));
         updateMedicineInfoStockEntry(stockEntry, title);
         stockEntry.setOnClickListener(v -> showMedicineInfoStockDialog(name, stockEntry));
@@ -4006,17 +4020,11 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
 
     private void updateMedicineInfoStockEntry(TextView stockEntry, String title) {
         String normalizedTitle = normalizeTitle(title);
-        stockEntry.setText(getString(R.string.add_stock_batch)
+        stockEntry.setText(getString(R.string.modify_stock)
                 + "\n" + getString(R.string.stock_amount, formatQuantity(rb.getTotalStock(normalizedTitle))));
     }
 
-    private void showMedicineInfoStockDialog(EditText nameInput, TextView stockEntry) {
-        String title = normalizeTitle(nameInput.getText().toString());
-        if (title.length() == 0) {
-            nameInput.setError(getString(R.string.medication_name_required_stock));
-            return;
-        }
-
+    private void showCourseStockAddDialog(String title, List<Integer> groupIds, AlertDialog currentDialog) {
         AlertDialog.Builder alert = new AlertDialog.Builder(this);
         alert.setTitle(R.string.add_stock_batch);
         final EditText input = new EditText(this);
@@ -4034,6 +4042,39 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
                     return;
                 }
                 rb.addStockBatch(title, quantity);
+                refreshCourseDetail(groupIds, currentDialog);
+            } catch (NumberFormatException e) {
+                Toast.makeText(getApplicationContext(), R.string.enter_valid_stock_quantity, Toast.LENGTH_SHORT).show();
+            }
+        });
+        alert.setNegativeButton(R.string.cancel, null);
+        alert.show();
+    }
+
+    private void showMedicineInfoStockDialog(EditText nameInput, TextView stockEntry) {
+        String title = normalizeTitle(nameInput.getText().toString());
+        if (title.length() == 0) {
+            nameInput.setError(getString(R.string.medication_name_required_stock));
+            return;
+        }
+
+        AlertDialog.Builder alert = new AlertDialog.Builder(this);
+        alert.setTitle(R.string.modify_stock);
+        final EditText input = new EditText(this);
+        input.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        FrameLayout inputFrame = new FrameLayout(this);
+        inputFrame.setPadding(dp(20), dp(4), dp(20), 0);
+        inputFrame.addView(input, new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT));
+        alert.setView(inputFrame);
+        alert.setPositiveButton(R.string.ok, (dialog, which) -> {
+            try {
+                double quantity = Double.parseDouble(input.getText().toString().trim());
+                if (quantity <= 0) {
+                    Toast.makeText(getApplicationContext(), R.string.stock_must_be_positive, Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                rb.replaceStock(title, quantity);
                 updateMedicineInfoStockEntry(stockEntry, title);
             } catch (NumberFormatException e) {
                 Toast.makeText(getApplicationContext(), R.string.enter_valid_stock_quantity, Toast.LENGTH_SHORT).show();
