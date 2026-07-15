@@ -43,6 +43,8 @@
     <string name="enter_number">إدخال رقم</string>
     <string name="add_stock_batch">إضافة مخزون</string>
     <string name="modify_stock">تعديل المخزون</string>
+    <string name="stock_change_history">تغييرات المخزون الأخيرة</string>
+    <string name="no_stock_change_history">لا توجد تغييرات في المخزون حتى الآن</string>
     <string name="select_icon">اختيار الأيقونة</string>
     <string name="medicine_photo">صورة الدواء</string>
     <string name="gallery">المعرض</string>

@@ -43,6 +43,8 @@
     <string name="enter_number">Zahl eingeben</string>
     <string name="add_stock_batch">Bestand hinzufügen</string>
     <string name="modify_stock">Bestand ändern</string>
+    <string name="stock_change_history">Letzte Bestandsänderungen</string>
+    <string name="no_stock_change_history">Noch keine Bestandsänderungen</string>
     <string name="select_icon">Symbol auswählen</string>
     <string name="medicine_photo">Medikamentenfoto</string>
     <string name="gallery">Galerie</string>

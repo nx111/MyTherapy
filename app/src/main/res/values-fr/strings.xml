@@ -43,6 +43,8 @@
     <string name="enter_number">Saisir un nombre</string>
     <string name="add_stock_batch">Ajouter du stock</string>
     <string name="modify_stock">Modifier le stock</string>
+    <string name="stock_change_history">Dernières modifications du stock</string>
+    <string name="no_stock_change_history">Aucun changement de stock pour l’instant</string>
     <string name="select_icon">Sélectionner une icône</string>
     <string name="medicine_photo">Photo du médicament</string>
     <string name="gallery">Galerie</string>

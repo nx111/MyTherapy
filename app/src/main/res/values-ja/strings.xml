@@ -43,6 +43,8 @@
     <string name="enter_number">数値を入力</string>
     <string name="add_stock_batch">在庫を追加</string>
     <string name="modify_stock">在庫を変更</string>
+    <string name="stock_change_history">最近の在庫変更</string>
+    <string name="no_stock_change_history">在庫変更はまだありません</string>
     <string name="select_icon">アイコンを選択</string>
     <string name="medicine_photo">薬の写真</string>
     <string name="gallery">ギャラリー</string>

@@ -30,7 +30,7 @@ import medichine.mediacationalert.mytherapy.model.Account;
 import medichine.mediacationalert.mytherapy.R;
 
 public class ReminderDatabase extends SQLiteOpenHelper {
-    private static final int DATABASE_VERSION = 10;
+    private static final int DATABASE_VERSION = 11;
     public static final String DATABASE_NAME = "MedicationDbTab";
     public static final String COMPLETE_CSV_MARKER = "MYTHERAPY_CSV_V2";
     private static final String CSV_NULL = "__MYTHERAPY_NULL__";
@@ -67,6 +67,13 @@ public class ReminderDatabase extends SQLiteOpenHelper {
     private static final String STOCK_ORIGINAL_QUANTITY = "original_quantity";
     private static final String STOCK_REMAINING_QUANTITY = "remaining_quantity";
     private static final String STOCK_CREATED_AT = "created_at";
+
+    private static final String TABLE_STOCK_HISTORY = "StockHistory";
+    private static final String STOCK_HISTORY_ID = "id";
+    private static final String STOCK_HISTORY_ACCOUNT_ID = "account_id";
+    private static final String STOCK_HISTORY_TITLE = "title";
+    private static final String STOCK_HISTORY_DELTA = "quantity_delta";
+    private static final String STOCK_HISTORY_CREATED_AT = "created_at";
 
     private static final String TABLE_INTAKE_LOGS = "IntakeLogs";
     private static final String LOG_ID = "id";
@@ -115,6 +122,16 @@ public class ReminderDatabase extends SQLiteOpenHelper {
         }
     }
 
+    public static class StockChange {
+        public final double quantityDelta;
+        public final String createdAt;
+
+        StockChange(double quantityDelta, String createdAt) {
+            this.quantityDelta = quantityDelta;
+            this.createdAt = createdAt;
+        }
+    }
+
     private static class IntakeLog {
         final int id;
         final String title;
@@ -139,6 +156,7 @@ public class ReminderDatabase extends SQLiteOpenHelper {
         createAccountTable(db);
         createReminderTable(db);
         createStockTable(db);
+        createStockHistoryTable(db);
         createIntakeLogTable(db);
         createHealthEntryTable(db);
         createLabTestTables(db);
@@ -190,6 +208,10 @@ public class ReminderDatabase extends SQLiteOpenHelper {
         }
         if (oldVersion < 10) {
             migrateLabItemSortOrder(db);
+        }
+        if (oldVersion < 11) {
+            createStockHistoryTable(db);
+            migrateStockHistory(db);
         }
     }
 
@@ -305,6 +327,29 @@ public class ReminderDatabase extends SQLiteOpenHelper {
                 + STOCK_CREATED_AT + " TEXT NOT NULL"
                 + ")";
         db.execSQL(sql);
+    }
+
+    private void createStockHistoryTable(SQLiteDatabase db) {
+        String sql = "CREATE TABLE IF NOT EXISTS " + TABLE_STOCK_HISTORY + "("
+                + STOCK_HISTORY_ID + " INTEGER PRIMARY KEY AUTOINCREMENT,"
+                + STOCK_HISTORY_ACCOUNT_ID + " INTEGER NOT NULL DEFAULT " + DEFAULT_ACCOUNT_ID + ","
+                + STOCK_HISTORY_TITLE + " TEXT NOT NULL,"
+                + STOCK_HISTORY_DELTA + " REAL NOT NULL,"
+                + STOCK_HISTORY_CREATED_AT + " TEXT NOT NULL"
+                + ")";
+        db.execSQL(sql);
+    }
+
+    private void migrateStockHistory(SQLiteDatabase db) {
+        db.execSQL("INSERT INTO " + TABLE_STOCK_HISTORY + "("
+                + STOCK_HISTORY_ACCOUNT_ID + ","
+                + STOCK_HISTORY_TITLE + ","
+                + STOCK_HISTORY_DELTA + ","
+                + STOCK_HISTORY_CREATED_AT + ") SELECT "
+                + STOCK_ACCOUNT_ID + ","
+                + STOCK_TITLE + ","
+                + STOCK_ORIGINAL_QUANTITY + ","
+                + STOCK_CREATED_AT + " FROM " + TABLE_STOCK_BATCHES);
     }
 
     private void createIntakeLogTable(SQLiteDatabase db) {
@@ -627,6 +672,9 @@ public class ReminderDatabase extends SQLiteOpenHelper {
             stockValues.put(STOCK_TITLE, newName);
             db.update(TABLE_STOCK_BATCHES, stockValues, accountSelection(STOCK_ACCOUNT_ID, STOCK_TITLE + "=?"),
                     accountArgs(oldName));
+            db.update(TABLE_STOCK_HISTORY, stockValues,
+                    accountSelection(STOCK_HISTORY_ACCOUNT_ID, STOCK_HISTORY_TITLE + "=?"),
+                    accountArgs(oldName));
 
             ContentValues logValues = new ContentValues();
             logValues.put(LOG_TITLE, newName);
@@ -641,13 +689,20 @@ public class ReminderDatabase extends SQLiteOpenHelper {
 
     public void addStockBatch(String title, double quantity) {
         SQLiteDatabase db = this.getWritableDatabase();
-        ContentValues values = new ContentValues();
-        values.put(STOCK_ACCOUNT_ID, mCurrentAccountId);
-        values.put(STOCK_TITLE, normalizeTitle(title));
-        values.put(STOCK_ORIGINAL_QUANTITY, quantity);
-        values.put(STOCK_REMAINING_QUANTITY, quantity);
-        values.put(STOCK_CREATED_AT, nowText());
-        db.insert(TABLE_STOCK_BATCHES, null, values);
+        db.beginTransaction();
+        try {
+            ContentValues values = new ContentValues();
+            values.put(STOCK_ACCOUNT_ID, mCurrentAccountId);
+            values.put(STOCK_TITLE, normalizeTitle(title));
+            values.put(STOCK_ORIGINAL_QUANTITY, quantity);
+            values.put(STOCK_REMAINING_QUANTITY, quantity);
+            values.put(STOCK_CREATED_AT, nowText());
+            db.insert(TABLE_STOCK_BATCHES, null, values);
+            recordStockChange(db, title, quantity);
+            db.setTransactionSuccessful();
+        } finally {
+            db.endTransaction();
+        }
         db.close();
     }
 
@@ -661,12 +716,23 @@ public class ReminderDatabase extends SQLiteOpenHelper {
             return;
         }
         SQLiteDatabase db = this.getWritableDatabase();
-        addStockAdjustment(db, normalizedTitle, adjustment);
+        db.beginTransaction();
+        try {
+            addStockAdjustment(db, normalizedTitle, adjustment);
+            recordStockChange(db, normalizedTitle, adjustment);
+            db.setTransactionSuccessful();
+        } finally {
+            db.endTransaction();
+        }
         db.close();
     }
 
     public double getTotalStock(String title) {
         SQLiteDatabase db = this.getReadableDatabase();
+        return getTotalStock(db, title);
+    }
+
+    private double getTotalStock(SQLiteDatabase db, String title) {
         Cursor cursor = db.rawQuery(
                 "SELECT SUM(" + STOCK_REMAINING_QUANTITY + ") FROM " + TABLE_STOCK_BATCHES
                         + " WHERE " + STOCK_TITLE + "=? AND " + STOCK_ACCOUNT_ID + "=?",
@@ -677,6 +743,27 @@ public class ReminderDatabase extends SQLiteOpenHelper {
         }
         cursor.close();
         return total;
+    }
+
+    public List<StockChange> getRecentStockChanges(String title, int limit) {
+        ArrayList<StockChange> changes = new ArrayList<>();
+        if (limit <= 0) {
+            return changes;
+        }
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = db.query(TABLE_STOCK_HISTORY,
+                new String[]{STOCK_HISTORY_DELTA, STOCK_HISTORY_CREATED_AT},
+                STOCK_HISTORY_TITLE + "=? AND " + STOCK_HISTORY_ACCOUNT_ID + "=?",
+                new String[]{normalizeTitle(title), accountIdText()}, null, null,
+                STOCK_HISTORY_CREATED_AT + " DESC, " + STOCK_HISTORY_ID + " DESC",
+                String.valueOf(limit));
+        if (cursor.moveToFirst()) {
+            do {
+                changes.add(new StockChange(cursor.getDouble(0), cursor.getString(1)));
+            } while (cursor.moveToNext());
+        }
+        cursor.close();
+        return changes;
     }
 
     public boolean isReminderTaken(int reminderId, String scheduledAt) {
@@ -1459,6 +1546,7 @@ public class ReminderDatabase extends SQLiteOpenHelper {
         if (remaining > 0.000001) {
             addStockAdjustment(db, title, -remaining);
         }
+        recordStockChange(db, title, -amount);
     }
 
     private void restoreStock(SQLiteDatabase db, String title, double amount) {
@@ -1466,6 +1554,7 @@ public class ReminderDatabase extends SQLiteOpenHelper {
             return;
         }
         addStockAdjustment(db, title, amount);
+        recordStockChange(db, title, amount);
     }
 
     private void addStockAdjustment(SQLiteDatabase db, String title, double amount) {
@@ -1476,6 +1565,15 @@ public class ReminderDatabase extends SQLiteOpenHelper {
         values.put(STOCK_REMAINING_QUANTITY, amount);
         values.put(STOCK_CREATED_AT, nowText());
         db.insert(TABLE_STOCK_BATCHES, null, values);
+    }
+
+    private void recordStockChange(SQLiteDatabase db, String title, double quantityDelta) {
+        ContentValues values = new ContentValues();
+        values.put(STOCK_HISTORY_ACCOUNT_ID, mCurrentAccountId);
+        values.put(STOCK_HISTORY_TITLE, normalizeTitle(title));
+        values.put(STOCK_HISTORY_DELTA, quantityDelta);
+        values.put(STOCK_HISTORY_CREATED_AT, nowText());
+        db.insert(TABLE_STOCK_HISTORY, null, values);
     }
 
     private IntakeLog getIntakeLog(SQLiteDatabase db, int reminderId, String scheduledAt) {
@@ -1769,6 +1867,7 @@ public class ReminderDatabase extends SQLiteOpenHelper {
                 TABLE_ACCOUNTS,
                 TABLE_REMINDERS,
                 TABLE_STOCK_BATCHES,
+                TABLE_STOCK_HISTORY,
                 TABLE_INTAKE_LOGS,
                 TABLE_HEALTH_ENTRIES,
                 TABLE_LAB_ITEMS,

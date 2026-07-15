@@ -3593,6 +3593,10 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         summary.setText(summaryText);
         summary.setTextColor(getResources().getColor(R.color.text_secondary));
         summary.setTextSize(14);
+        summary.setClickable(true);
+        summary.setBackgroundResource(android.R.drawable.list_selector_background);
+        summary.setContentDescription(getString(R.string.stock_change_history));
+        summary.setOnClickListener(v -> showCourseStockHistory(normalizedTitle));
         stockRow.addView(summary, new LinearLayout.LayoutParams(
                 0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
 
@@ -4048,6 +4052,26 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
             }
         });
         alert.setNegativeButton(R.string.cancel, null);
+        alert.show();
+    }
+
+    private void showCourseStockHistory(String title) {
+        List<ReminderDatabase.StockChange> changes = rb.getRecentStockChanges(title, 3);
+        AlertDialog.Builder alert = new AlertDialog.Builder(this)
+                .setTitle(R.string.stock_change_history)
+                .setNegativeButton(R.string.cancel, null);
+        if (changes.isEmpty()) {
+            alert.setMessage(R.string.no_stock_change_history);
+        } else {
+            String[] entries = new String[changes.size()];
+            for (int i = 0; i < changes.size(); i++) {
+                ReminderDatabase.StockChange change = changes.get(i);
+                String quantity = formatQuantity(change.quantityDelta);
+                entries[i] = change.createdAt + "    "
+                        + (change.quantityDelta > 0 ? "+" : "") + quantity;
+            }
+            alert.setItems(entries, null);
+        }
         alert.show();
     }
 
