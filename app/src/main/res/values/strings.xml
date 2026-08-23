@@ -100,6 +100,8 @@
     <string name="reminder_not_found">Reminder not found</string>
     <string name="medication_name_required_stock">Medication name is required before adding stock</string>
     <string name="stock_must_be_positive">Stock must be greater than 0</string>
+    <string name="stock_adjustment_must_be_non_zero">Stock adjustment cannot be 0</string>
+    <string name="stock_adjustment_quantity_hint">Adjustment quantity; use a negative number to reduce stock</string>
     <string name="enter_valid_stock_quantity">Enter a valid stock quantity</string>
     <string name="camera_not_available">Camera not available</string>
     <string name="reminder_title_blank">Reminder Title cannot be blank!</string>

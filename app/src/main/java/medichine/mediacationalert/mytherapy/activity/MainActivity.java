@@ -4032,7 +4032,9 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         AlertDialog.Builder alert = new AlertDialog.Builder(this);
         alert.setTitle(R.string.add_stock_batch);
         final EditText input = new EditText(this);
-        input.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        input.setHint(R.string.stock_adjustment_quantity_hint);
+        input.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL
+                | InputType.TYPE_NUMBER_FLAG_SIGNED);
         FrameLayout inputFrame = new FrameLayout(this);
         inputFrame.setPadding(dp(20), dp(4), dp(20), 0);
         inputFrame.addView(input, new FrameLayout.LayoutParams(
@@ -4041,8 +4043,8 @@ public class MainActivity extends AppCompatActivity implements ItemClickListener
         alert.setPositiveButton(R.string.ok, (dialog, which) -> {
             try {
                 double quantity = Double.parseDouble(input.getText().toString().trim());
-                if (quantity <= 0) {
-                    Toast.makeText(getApplicationContext(), R.string.stock_must_be_positive, Toast.LENGTH_SHORT).show();
+                if (Math.abs(quantity) < 0.000001) {
+                    Toast.makeText(getApplicationContext(), R.string.stock_adjustment_must_be_non_zero, Toast.LENGTH_SHORT).show();
                     return;
                 }
                 rb.addStockBatch(title, quantity);

@@ -84,6 +84,8 @@
     <string name="reminder_not_found">未找到提醒</string>
     <string name="medication_name_required_stock">添加库存前需要填写药品名称</string>
     <string name="stock_must_be_positive">库存必须大于 0</string>
+    <string name="stock_adjustment_must_be_non_zero">库存调整数量不能为 0</string>
+    <string name="stock_adjustment_quantity_hint">补充库存数量，负数表示核减</string>
     <string name="enter_valid_stock_quantity">请输入有效库存数量</string>
     <string name="camera_not_available">相机不可用</string>
     <string name="reminder_title_blank">提醒标题不能为空</string>

@@ -30,7 +30,7 @@ import medichine.mediacationalert.mytherapy.model.Account;
 import medichine.mediacationalert.mytherapy.R;
 
 public class ReminderDatabase extends SQLiteOpenHelper {
-    private static final int DATABASE_VERSION = 11;
+    private static final int DATABASE_VERSION = 12;
     public static final String DATABASE_NAME = "MedicationDbTab";
     public static final String COMPLETE_CSV_MARKER = "MYTHERAPY_CSV_V2";
     private static final String CSV_NULL = "__MYTHERAPY_NULL__";
@@ -211,7 +211,9 @@ public class ReminderDatabase extends SQLiteOpenHelper {
         }
         if (oldVersion < 11) {
             createStockHistoryTable(db);
-            migrateStockHistory(db);
+        }
+        if (oldVersion < 12) {
+            db.delete(TABLE_STOCK_HISTORY, null, null);
         }
     }
 
@@ -339,19 +341,6 @@ public class ReminderDatabase extends SQLiteOpenHelper {
                 + ")";
         db.execSQL(sql);
     }
-
-    private void migrateStockHistory(SQLiteDatabase db) {
-        db.execSQL("INSERT INTO " + TABLE_STOCK_HISTORY + "("
-                + STOCK_HISTORY_ACCOUNT_ID + ","
-                + STOCK_HISTORY_TITLE + ","
-                + STOCK_HISTORY_DELTA + ","
-                + STOCK_HISTORY_CREATED_AT + ") SELECT "
-                + STOCK_ACCOUNT_ID + ","
-                + STOCK_TITLE + ","
-                + STOCK_ORIGINAL_QUANTITY + ","
-                + STOCK_CREATED_AT + " FROM " + TABLE_STOCK_BATCHES);
-    }
-
     private void createIntakeLogTable(SQLiteDatabase db) {
         String sql = "CREATE TABLE IF NOT EXISTS " + TABLE_INTAKE_LOGS + "("
                 + LOG_ID + " INTEGER PRIMARY KEY AUTOINCREMENT,"
@@ -1546,7 +1535,6 @@ public class ReminderDatabase extends SQLiteOpenHelper {
         if (remaining > 0.000001) {
             addStockAdjustment(db, title, -remaining);
         }
-        recordStockChange(db, title, -amount);
     }
 
     private void restoreStock(SQLiteDatabase db, String title, double amount) {
@@ -1554,7 +1542,6 @@ public class ReminderDatabase extends SQLiteOpenHelper {
             return;
         }
         addStockAdjustment(db, title, amount);
-        recordStockChange(db, title, amount);
     }
 
     private void addStockAdjustment(SQLiteDatabase db, String title, double amount) {
